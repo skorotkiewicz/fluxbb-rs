@@ -24,9 +24,9 @@ pub fn Login() -> Element {
         section { class: "page",
             article { class: "hero-card compact-hero",
                 SectionHeader {
-                    kicker: "Authentication".to_string(),
+                    kicker: "Account".to_string(),
                     title: "Login".to_string(),
-                    subtitle: "This now follows the core FluxBB flow: verify credentials, create a session, and move back into the forum.".to_string(),
+                    subtitle: "Sign in to access your account and participate in discussions.".to_string(),
                 }
             }
 
@@ -46,7 +46,7 @@ pub fn Login() -> Element {
                             class: "text-input",
                             value: "{username}",
                             oninput: move |event| username.set(event.value()),
-                            placeholder: "nora",
+                            placeholder: "Your username",
                         }
                     }
                     label { "Password"
@@ -100,14 +100,14 @@ pub fn Login() -> Element {
                                 submitting.set(false);
                             });
                         },
-                        if submitting() { "Signing in..." } else { "Sign in" }
+                        if submitting() { "Signing in…" } else { "Sign in" }
                     }
                 }
 
                 article { class: "panel side-note",
-                    h3 { "What matches FluxBB" }
-                    p { "Usernames are validated case-insensitively and the password check now happens on the server against the stored user hash." }
-                    p { "Seeded local accounts use the demo password `fluxbb-demo`." }
+                    h3 { "Demo accounts" }
+                    p { "Seeded accounts use the password fluxbb-demo." }
+                    p { "Try signing in as nora (admin) or sol (member)." }
                 }
             }
         }
@@ -131,9 +131,9 @@ pub fn Register() -> Element {
         section { class: "page",
             article { class: "hero-card compact-hero",
                 SectionHeader {
-                    kicker: "Registration".to_string(),
+                    kicker: "Account".to_string(),
                     title: "Create account".to_string(),
-                    subtitle: "The form now writes a real user row into Postgres, then signs the new user in immediately like a non-verified FluxBB registration flow.".to_string(),
+                    subtitle: "Join the community to start posting.".to_string(),
                 }
             }
 
@@ -153,7 +153,7 @@ pub fn Register() -> Element {
                             class: "text-input",
                             value: "{username}",
                             oninput: move |event| username.set(event.value()),
-                            placeholder: "sol",
+                            placeholder: "Pick a username",
                         }
                     }
                     label { "Email"
@@ -161,7 +161,7 @@ pub fn Register() -> Element {
                             class: "text-input",
                             value: "{email}",
                             oninput: move |event| email.set(event.value()),
-                            placeholder: "sol@example.com",
+                            placeholder: "you@example.com",
                         }
                     }
                     label { "Password"
@@ -226,13 +226,14 @@ pub fn Register() -> Element {
                                 submitting.set(false);
                             });
                         },
-                        if submitting() { "Creating account..." } else { "Create account" }
+                        if submitting() { "Creating account…" } else { "Create account" }
                     }
                 }
 
                 article { class: "panel side-note",
-                    h3 { "What matches FluxBB" }
-                    p { "Username length, reserved-name checks, duplicate account checks, and minimum password length are enforced on the server before the row is inserted." }
+                    h3 { "Registration rules" }
+                    p { "Username must be 2–25 characters. Password must be at least 9 characters." }
+                    p { "Duplicate usernames and email addresses are not allowed." }
                 }
             }
         }

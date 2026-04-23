@@ -2,7 +2,7 @@ use dioxus::{document, prelude::*};
 
 use crate::{
     data::{
-        cookie_max_age, cookie_name, current_session_user, load_board, logout_account, SessionUser,
+        cookie_name, current_session_user, load_board, logout_account, SessionUser,
     },
     Route,
 };
@@ -24,12 +24,13 @@ pub fn AppShell() -> Element {
 
     let board = match board_resource() {
         Some(Ok(board)) => board,
-        Some(Err(error)) => {
+        Some(Err(_error)) => {
             return rsx! {
                 section { class: "page",
                     article { class: "empty-state",
-                        h3 { "Board unavailable" }
-                        p { "{error}" }
+                        h3 { "Board not installed" }
+                        p { "This forum has not been set up yet." }
+                        Link { class: "primary-button", to: Route::Install {}, "Run installer" }
                     }
                 }
             };
@@ -38,8 +39,8 @@ pub fn AppShell() -> Element {
             return rsx! {
                 section { class: "page",
                     article { class: "empty-state",
-                        h3 { "Loading board" }
-                        p { "Waiting for Postgres-backed board data." }
+                        h3 { "Loading…" }
+                        p { "Connecting to the forum." }
                     }
                 }
             };
@@ -47,6 +48,9 @@ pub fn AppShell() -> Element {
     };
 
     let stats = board.board_stats();
+    let is_admin = current_user()
+        .as_ref()
+        .is_some_and(|u| u.group_id == 1);
 
     use_context_provider(|| board.clone());
     use_context_provider(|| current_user);
@@ -55,7 +59,7 @@ pub fn AppShell() -> Element {
         div { class: "site-shell",
             header { class: "masthead",
                 div { class: "masthead-copy",
-                    p { class: "eyebrow", "FluxBB -> Rust migration" }
+                    p { class: "eyebrow", "Community Forum" }
                     h1 { "{board.meta.title}" }
                     p { class: "masthead-tagline", "{board.meta.tagline}" }
                 }
@@ -71,10 +75,13 @@ pub fn AppShell() -> Element {
                 Link { class: "nav-link", to: Route::Index {}, "Forums" }
                 Link { class: "nav-link", to: Route::Search {}, "Search" }
                 Link { class: "nav-link", to: Route::Users {}, "Users" }
-                Link { class: "nav-link", to: Route::Admin {}, "Admin" }
+
+                if is_admin {
+                    Link { class: "nav-link", to: Route::Admin {}, "Admin" }
+                }
 
                 if let Some(user) = current_user() {
-                    span { class: "auth-chip", "Signed in as {user.username} ({user.title})" }
+                    span { class: "auth-chip", "Signed in as {user.username}" }
                     button {
                         class: "nav-link nav-button",
                         onclick: move |_| {
@@ -100,7 +107,6 @@ pub fn AppShell() -> Element {
                 p { "Topics: {stats.topics}" }
                 p { "Posts: {stats.posts}" }
                 p { "Newest: {stats.newest_member}" }
-                p { "Session lifetime: {cookie_max_age() / 86_400} days" }
             }
 
             main { class: "page-wrap",
@@ -108,7 +114,7 @@ pub fn AppShell() -> Element {
             }
 
             footer { class: "site-footer",
-                p { "The board data now comes from Postgres. Login and registration use server actions plus a browser cookie-backed session token." }
+                p { "Powered by FluxBB RS" }
             }
         }
     }

@@ -25,17 +25,17 @@ pub fn Index() -> Element {
                     StatCard {
                         label: "Members".to_string(),
                         value: stats.members.to_string(),
-                        detail: format!("Newest account: {}", stats.newest_member),
+                        detail: format!("Newest: {}", stats.newest_member),
                     }
                     StatCard {
                         label: "Topics".to_string(),
                         value: stats.topics.to_string(),
-                        detail: "Core forum browsing is live in Rust.".to_string(),
+                        detail: "Active discussions".to_string(),
                     }
                     StatCard {
                         label: "Posts".to_string(),
                         value: stats.posts.to_string(),
-                        detail: "Loaded from the Postgres forum tables.".to_string(),
+                        detail: "Total contributions".to_string(),
                     }
                 }
             }
@@ -79,7 +79,6 @@ pub fn Index() -> Element {
             article { class: "panel",
                 div { class: "panel-heading",
                     h3 { "Recent activity" }
-                    p { "This stream helps verify the board taxonomy against the original FluxBB browse flows." }
                 }
 
                 div { class: "recent-list",
@@ -90,7 +89,7 @@ pub fn Index() -> Element {
                                     TopicStatusBadge { status: topic.status.clone() }
                                     Link { class: "recent-topic-link", to: Route::Topic { id: topic.id }, "{topic.subject}" }
                                 }
-                                p { class: "recent-meta", "by {author.username} in {topic.updated_at}" }
+                                p { class: "recent-meta", "by {author.username} · {topic.updated_at}" }
                             }
                         }
                     }

@@ -32,11 +32,11 @@ pub fn TopicStatusBadge(status: TopicStatus) -> Element {
 }
 
 #[component]
-pub fn PostCard(author_name: String, author_role: String, post: Post) -> Element {
+pub fn PostCard(author_name: String, author_role: String, author_id: i32, post: Post) -> Element {
     rsx! {
         article { class: "post-card",
             aside { class: "post-aside",
-                p { class: "post-author", "{author_name}" }
+                Link { class: "post-author", to: crate::Route::Profile { id: author_id }, "{author_name}" }
                 p { class: "post-role", "{author_role}" }
                 p { class: "post-timestamp", "{post.posted_at}" }
                 if let Some(edited_at) = post.edited_at.clone() {

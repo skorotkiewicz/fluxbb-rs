@@ -1,6 +1,6 @@
 use dioxus::prelude::*;
 
-use views::{Admin, AppShell, Forum, Index, Login, Register, Search, Topic, Users};
+use views::{Admin, AppShell, Forum, Index, Install, Login, NewTopic, Profile, Register, Search, Topic, Users};
 
 mod components;
 mod data;
@@ -12,13 +12,19 @@ const MAIN_CSS: Asset = asset!("/assets/styling/main.css");
 #[derive(Debug, Clone, Routable, PartialEq)]
 #[rustfmt::skip]
 enum Route {
+    #[route("/install")]
+    Install {},
     #[layout(AppShell)]
         #[route("/")]
         Index {},
         #[route("/forum/:id")]
         Forum { id: i32 },
+        #[route("/forum/:id/new")]
+        NewTopic { id: i32 },
         #[route("/topic/:id")]
         Topic { id: i32 },
+        #[route("/user/:id")]
+        Profile { id: i32 },
         #[route("/users")]
         Users {},
         #[route("/search")]

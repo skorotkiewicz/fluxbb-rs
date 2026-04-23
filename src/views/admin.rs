@@ -1,17 +1,37 @@
 use dioxus::prelude::*;
 
-use crate::components::SectionHeader;
+use crate::{
+    components::SectionHeader,
+    data::SessionUser,
+};
 
 #[component]
 pub fn Admin() -> Element {
+    let current_user = use_context::<Signal<Option<SessionUser>>>();
+
+    let is_admin = current_user()
+        .as_ref()
+        .is_some_and(|u| u.group_id == 1);
+
+    if !is_admin {
+        return rsx! {
+            section { class: "page",
+                article { class: "empty-state",
+                    h3 { "Access denied" }
+                    p { "You must be an administrator to view this page." }
+                }
+            }
+        };
+    }
+
     let admin_sections = [
         (
             "Structure",
-            "Categories, forums, and route parity for the public board.",
+            "Manage categories, forums, and board structure.",
         ),
         (
             "Users",
-            "Member groups, moderation roles, and future auth/session controls.",
+            "Member groups, moderation roles, and account management.",
         ),
         (
             "Moderation",
@@ -25,8 +45,8 @@ pub fn Admin() -> Element {
             article { class: "hero-card compact-hero",
                 SectionHeader {
                     kicker: "Admin".to_string(),
-                    title: "Migration control panel".to_string(),
-                    subtitle: "This view mirrors FluxBB's admin surface at a high level so the new application structure has a place for settings and moderation tooling.".to_string(),
+                    title: "Control panel".to_string(),
+                    subtitle: "Board administration and moderation tools.".to_string(),
                 }
             }
 

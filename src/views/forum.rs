@@ -2,20 +2,21 @@ use dioxus::prelude::*;
 
 use crate::{
     components::{EmptyState, SectionHeader, TopicStatusBadge},
-    data::AppData,
+    data::{AppData, SessionUser},
     Route,
 };
 
 #[component]
 pub fn Forum(id: i32) -> Element {
     let board = use_context::<AppData>();
+    let current_user = use_context::<Signal<Option<SessionUser>>>();
 
     let Some(forum) = board.forum(id) else {
         return rsx! {
             section { class: "page",
                 EmptyState {
                     title: "Forum not found".to_string(),
-                    body: "The requested forum does not exist in the current migration dataset.".to_string(),
+                    body: "The requested forum does not exist.".to_string(),
                 }
             }
         };
@@ -40,16 +41,23 @@ pub fn Forum(id: i32) -> Element {
                 p { class: "forum-moderators", "Moderators: {forum.moderators.join(\", \")}" }
             }
 
+            if current_user().is_some() {
+                Link {
+                    class: "primary-button",
+                    to: Route::NewTopic { id },
+                    "New topic"
+                }
+            }
+
             article { class: "panel",
                 div { class: "panel-heading",
                     h3 { "Topics" }
-                    p { "Ordered by most recent activity, preserving the familiar forum-table rhythm." }
                 }
 
                 if topics.is_empty() {
                     EmptyState {
                         title: "No topics yet".to_string(),
-                        body: "This forum is ready for the posting flow once the next migration slice lands.".to_string(),
+                        body: "Be the first to start a discussion in this forum.".to_string(),
                     }
                 } else {
                     div { class: "topic-table",
@@ -66,8 +74,10 @@ pub fn Forum(id: i32) -> Element {
                                     div { class: "topic-main",
                                         TopicStatusBadge { status: topic.status.clone() }
                                         Link { class: "topic-link", to: Route::Topic { id: topic.id }, "{topic.subject}" }
-                                        p { class: "topic-tags", "{topic.tags.join(\" | \")}" }
-                                        p { class: "topic-meta", "Started by {author.username} on {topic.created_at}" }
+                                        if !topic.tags.is_empty() {
+                                            p { class: "topic-tags", "{topic.tags.join(\" | \")}" }
+                                        }
+                                        p { class: "topic-meta", "by {author.username} · {topic.created_at}" }
                                     }
                                     p { class: "topic-metric", "{topic.reply_count(&board)}" }
                                     p { class: "topic-metric", "{topic.views}" }

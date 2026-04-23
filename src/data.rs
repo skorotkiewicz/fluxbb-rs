@@ -1,16 +1,24 @@
+use std::cmp::Reverse;
+
+#[cfg(feature = "server")]
 use std::{
-    cmp::Reverse,
     net::IpAddr,
     process::Command,
     time::{SystemTime, UNIX_EPOCH},
 };
 
 use dioxus::prelude::*;
+#[cfg(feature = "server")]
 use http::HeaderMap;
+#[cfg(feature = "server")]
 use rand::RngCore;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
+#[cfg(feature = "server")]
+use serde::de::DeserializeOwned;
+#[cfg(feature = "server")]
 use sha2::{Digest, Sha256};
 
+#[cfg(feature = "server")]
 const DATABASE_URL: &str = "postgresql://dev:password@localhost:5432/fluxbb";
 const SESSION_COOKIE: &str = "fluxbb_rs_session";
 const SESSION_MAX_AGE_SECS: i64 = 60 * 60 * 24 * 14;
@@ -129,6 +137,7 @@ pub struct SessionUser {
     pub id: i32,
     pub username: String,
     pub title: String,
+    pub group_id: i32,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -155,10 +164,39 @@ pub struct LoginForm {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct InstallForm {
+    pub board_title: String,
+    pub board_tagline: String,
+    pub admin_username: String,
+    pub admin_email: String,
+    pub admin_password: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct NewTopicForm {
+    pub forum_id: i32,
+    pub subject: String,
+    pub message: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ReplyForm {
+    pub topic_id: i32,
+    pub message: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct NewTopicResult {
+    pub topic_id: i32,
+}
+
+#[cfg(feature = "server")]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 struct StoredAuthUser {
     pub id: i32,
     pub username: String,
     pub title: String,
+    pub group_id: i32,
     pub password_hash: String,
 }
 
@@ -396,6 +434,57 @@ pub async fn logout_account() -> Result<(), ServerFnError> {
     }
 }
 
+#[post("/api/check-installed")]
+pub async fn check_installed() -> Result<bool, ServerFnError> {
+    #[cfg(feature = "server")]
+    {
+        check_installed_impl().map_err(server_error)
+    }
+    #[cfg(not(feature = "server"))]
+    {
+        Ok(true)
+    }
+}
+
+#[post("/api/install")]
+pub async fn install_board(input: InstallForm) -> Result<AuthResponse, ServerFnError> {
+    #[cfg(feature = "server")]
+    {
+        install_board_impl(input).map_err(server_error)
+    }
+    #[cfg(not(feature = "server"))]
+    {
+        let _ = input;
+        Err(ServerFnError::new("Install requires the server feature."))
+    }
+}
+
+#[post("/api/new-topic", headers: HeaderMap)]
+pub async fn create_topic(input: NewTopicForm) -> Result<NewTopicResult, ServerFnError> {
+    #[cfg(feature = "server")]
+    {
+        create_topic_impl(input, headers).map_err(server_error)
+    }
+    #[cfg(not(feature = "server"))]
+    {
+        let _ = input;
+        Err(ServerFnError::new("Posting requires the server feature."))
+    }
+}
+
+#[post("/api/reply", headers: HeaderMap)]
+pub async fn create_reply(input: ReplyForm) -> Result<(), ServerFnError> {
+    #[cfg(feature = "server")]
+    {
+        create_reply_impl(input, headers).map_err(server_error)
+    }
+    #[cfg(not(feature = "server"))]
+    {
+        let _ = input;
+        Err(ServerFnError::new("Posting requires the server feature."))
+    }
+}
+
 #[cfg(feature = "server")]
 fn register_account_impl(input: RegisterForm) -> Result<AuthResponse, String> {
     let username = normalize_username(&input.username);
@@ -441,7 +530,7 @@ fn register_account_impl(input: RegisterForm) -> Result<AuthResponse, String> {
                  EXTRACT(EPOCH FROM now())::bigint,
                  '127.0.0.1'
              )
-             RETURNING id, username, title
+             RETURNING id, username, title, group_id
          )
          SELECT row_to_json(inserted) FROM inserted;",
         username = sql_literal(&username),
@@ -471,7 +560,7 @@ fn login_account_impl(input: LoginForm) -> Result<AuthResponse, String> {
         "SELECT COALESCE((
              SELECT row_to_json(user_row)
              FROM (
-                 SELECT id, username, title, password_hash
+                 SELECT id, username, title, group_id, password_hash
                  FROM users
                  WHERE LOWER(username) = LOWER({username})
                  LIMIT 1
@@ -495,20 +584,16 @@ fn login_account_impl(input: LoginForm) -> Result<AuthResponse, String> {
     ))?;
 
     let session_token = create_session(user.id)?;
-    let message = if input.remember {
-        "Signed in and this browser session was remembered.".to_string()
-    } else {
-        "Signed in successfully.".to_string()
-    };
 
     Ok(AuthResponse {
         user: SessionUser {
             id: user.id,
             username: user.username,
             title: user.title,
+            group_id: user.group_id,
         },
         session_token,
-        message,
+        message: "Signed in successfully.".to_string(),
     })
 }
 
@@ -522,7 +607,7 @@ fn current_session_user_impl(headers: HeaderMap) -> Result<Option<SessionUser>, 
         "SELECT COALESCE((
              SELECT row_to_json(session_row)
              FROM (
-                 SELECT u.id, u.username, u.title
+                 SELECT u.id, u.username, u.title, u.group_id
                  FROM forum_sessions AS s
                  INNER JOIN users AS u ON u.id = s.user_id
                  WHERE s.token = {token}
@@ -542,6 +627,188 @@ fn logout_account_impl(headers: HeaderMap) -> Result<(), String> {
             token = sql_literal(&token)
         ))?;
     }
+
+    Ok(())
+}
+
+#[cfg(feature = "server")]
+fn check_installed_impl() -> Result<bool, String> {
+    let count = run_scalar_i64(
+        "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'board_meta' AND table_schema = 'public';",
+    )?;
+    if count == 0 {
+        return Ok(false);
+    }
+    let rows = run_scalar_i64("SELECT COUNT(*) FROM board_meta;")?;
+    Ok(rows > 0)
+}
+
+#[cfg(feature = "server")]
+fn install_board_impl(input: InstallForm) -> Result<AuthResponse, String> {
+    let title = input.board_title.trim();
+    let tagline = input.board_tagline.trim();
+    let username = normalize_username(&input.admin_username);
+    let email = input.admin_email.trim().to_lowercase();
+
+    if title.is_empty() {
+        return Err("Board title is required.".to_string());
+    }
+    validate_username(&username)?;
+    validate_email(&email)?;
+    if input.admin_password.chars().count() < 9 {
+        return Err("Password must be at least 9 characters.".to_string());
+    }
+
+    // Run schema
+    let schema_path = std::path::Path::new("db/schema.sql");
+    if schema_path.exists() {
+        let sql = std::fs::read_to_string(schema_path)
+            .map_err(|e| format!("failed to read schema.sql: {e}"))?;
+        run_exec(&sql)?;
+    } else {
+        return Err("db/schema.sql not found.".to_string());
+    }
+
+    // Board meta
+    run_exec(&format!(
+        "INSERT INTO board_meta (title, tagline) VALUES ({title}, {tagline}) ON CONFLICT (id) DO UPDATE SET title = EXCLUDED.title, tagline = EXCLUDED.tagline;",
+        title = sql_literal(title),
+        tagline = sql_literal(tagline),
+    ))?;
+
+    // Admin user
+    let salt = random_hex(16);
+    let password_hash = hash_password(&input.admin_password, &salt);
+
+    let user = run_json_query::<SessionUser>(&format!(
+        "WITH ins AS (
+             INSERT INTO users (username, title, status, joined_at, email, password_hash, group_id, registered_at, last_visit)
+             VALUES ({username}, 'Administrator', 'Online', to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD'), {email}, {password_hash}, 1, EXTRACT(EPOCH FROM now())::bigint, EXTRACT(EPOCH FROM now())::bigint)
+             RETURNING id, username, title, group_id
+         ) SELECT row_to_json(ins) FROM ins;",
+        username = sql_literal(&username),
+        email = sql_literal(&email),
+        password_hash = sql_literal(&password_hash),
+    ))?;
+
+    // Default category and forum
+    run_exec(&format!(
+        "INSERT INTO categories (name, description, sort_order) VALUES ('General', 'Main discussion area.', 1);
+         INSERT INTO forums (category_id, name, description, moderators, sort_order) VALUES (1, 'General Discussion', 'Talk about anything.', ARRAY[{username}], 1);",
+        username = sql_literal(&username),
+    ))?;
+
+    let session_token = create_session(user.id)?;
+    Ok(AuthResponse {
+        user,
+        session_token,
+        message: "Board installed. You are signed in as administrator.".to_string(),
+    })
+}
+
+#[cfg(feature = "server")]
+fn require_session(headers: &HeaderMap) -> Result<SessionUser, String> {
+    let token = parse_session_cookie(headers)
+        .ok_or_else(|| "You must be signed in to do this.".to_string())?;
+    run_json_query::<Option<SessionUser>>(&format!(
+        "SELECT COALESCE((
+             SELECT row_to_json(r) FROM (
+                 SELECT u.id, u.username, u.title, u.group_id
+                 FROM forum_sessions s
+                 JOIN users u ON u.id = s.user_id
+                 WHERE s.token = {token} AND s.expires_at > EXTRACT(EPOCH FROM now())::bigint
+                 LIMIT 1
+             ) r
+         ), 'null'::json);",
+        token = sql_literal(&token),
+    ))?
+    .ok_or_else(|| "Session expired. Please sign in again.".to_string())
+}
+
+#[cfg(feature = "server")]
+fn create_topic_impl(input: NewTopicForm, headers: HeaderMap) -> Result<NewTopicResult, String> {
+    let user = require_session(&headers)?;
+    let subject = input.subject.trim();
+    let message = input.message.trim();
+    if subject.is_empty() {
+        return Err("Subject is required.".to_string());
+    }
+    if message.is_empty() {
+        return Err("Message is required.".to_string());
+    }
+    if subject.len() > 70 {
+        return Err("Subject must be 70 characters or fewer.".to_string());
+    }
+
+    let now_str = "to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI UTC')";
+
+    // Create topic
+    #[derive(Deserialize)]
+    struct IdRow { id: i32 }
+    let topic = run_json_query::<IdRow>(&format!(
+        "WITH ins AS (
+             INSERT INTO topics (forum_id, author_id, subject, status, created_at, updated_at, activity_rank)
+             VALUES ({fid}, {uid}, {subject}, 'fresh', {now}, {now}, EXTRACT(EPOCH FROM now())::integer)
+             RETURNING id
+         ) SELECT row_to_json(ins) FROM ins;",
+        fid = input.forum_id,
+        uid = user.id,
+        subject = sql_literal(subject),
+        now = now_str,
+    ))?;
+
+    // Create first post
+    run_exec(&format!(
+        "INSERT INTO posts (topic_id, author_id, posted_at, body, position)
+         VALUES ({tid}, {uid}, {now}, ARRAY[{msg}], 1);",
+        tid = topic.id,
+        uid = user.id,
+        now = now_str,
+        msg = sql_literal(message),
+    ))?;
+
+    // Increment post count
+    run_exec(&format!("UPDATE users SET post_count = post_count + 1 WHERE id = {};", user.id))?;
+
+    Ok(NewTopicResult { topic_id: topic.id })
+}
+
+#[cfg(feature = "server")]
+fn create_reply_impl(input: ReplyForm, headers: HeaderMap) -> Result<(), String> {
+    let user = require_session(&headers)?;
+    let message = input.message.trim();
+    if message.is_empty() {
+        return Err("Message is required.".to_string());
+    }
+
+    let now_str = "to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI UTC')";
+
+    // Get next position
+    let pos = run_scalar_i64(&format!(
+        "SELECT COALESCE(MAX(position), 0) + 1 FROM posts WHERE topic_id = {};",
+        input.topic_id,
+    ))?;
+
+    // Insert reply
+    run_exec(&format!(
+        "INSERT INTO posts (topic_id, author_id, posted_at, body, position)
+         VALUES ({tid}, {uid}, {now}, ARRAY[{msg}], {pos});",
+        tid = input.topic_id,
+        uid = user.id,
+        now = now_str,
+        msg = sql_literal(message),
+        pos = pos,
+    ))?;
+
+    // Update topic timestamps
+    run_exec(&format!(
+        "UPDATE topics SET updated_at = {now}, activity_rank = EXTRACT(EPOCH FROM now())::integer WHERE id = {tid};",
+        now = now_str,
+        tid = input.topic_id,
+    ))?;
+
+    // Increment post count
+    run_exec(&format!("UPDATE users SET post_count = post_count + 1 WHERE id = {};", user.id))?;
 
     Ok(())
 }
@@ -641,9 +908,6 @@ fn create_session(user_id: i32) -> Result<String, String> {
         "INSERT INTO forum_sessions (token, user_id, created_at, expires_at, last_seen)
          VALUES ({token}, {user_id}, {now}, {expires}, {now});",
         token = sql_literal(&token),
-        user_id = user_id,
-        now = now,
-        expires = expires,
     ))?;
 
     Ok(token)
@@ -803,7 +1067,7 @@ where
         .map_err(|error| format!("psql returned non-utf8 output: {error}"))?;
     let payload = stdout.trim();
 
-    serde_json::from_str(payload).map_err(|error| format!("failed to parse postgres json: {error}"))
+    serde_json::from_str(payload).map_err(|e| format!("failed to parse postgres json: {e}"))
 }
 
 #[cfg(feature = "server")]

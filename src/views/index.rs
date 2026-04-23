@@ -31,11 +31,17 @@ pub fn Index() -> Element {
     let stats = data.stats.clone();
     let categories = data.categories.clone();
     let forums = data.forums.clone();
-    let forum_stats: std::collections::HashMap<i32, crate::data::ForumStats> =
-        data.forum_stats.iter().map(|fs| (fs.forum_id, fs.clone())).collect();
+    let forum_stats: std::collections::HashMap<i32, crate::data::ForumStats> = data
+        .forum_stats
+        .iter()
+        .map(|fs| (fs.forum_id, fs.clone()))
+        .collect();
     let recent_topics = data.recent_topics.clone();
-    let recent_users: std::collections::HashMap<i32, crate::data::UserProfile> =
-        data.recent_users.iter().map(|u| (u.id, u.clone())).collect();
+    let recent_users: std::collections::HashMap<i32, crate::data::UserProfile> = data
+        .recent_users
+        .iter()
+        .map(|u| (u.id, u.clone()))
+        .collect();
 
     let cat_items: Vec<_> = categories
         .iter()
@@ -113,7 +119,10 @@ pub fn Index() -> Element {
                                     div { class: "forum-main",
                                         Link {
                                             class: "forum-link",
-                                            to: Route::Forum { id: forum.id },
+                                            to: Route::ForumPage {
+                                                id: forum.id,
+                                                page: 1,
+                                            },
                                             "{forum.name}"
                                         }
                                         p { class: "forum-description", "{forum.description}" }
@@ -126,8 +135,9 @@ pub fn Index() -> Element {
                                     div { class: "forum-last",
                                         Link {
                                             class: "last-topic-link",
-                                            to: Route::Topic {
+                                            to: Route::TopicPage {
                                                 id: fs.last_topic_id,
+                                                page: 1,
                                             },
                                             "{fs.last_topic_subject}"
                                         }
@@ -153,7 +163,10 @@ pub fn Index() -> Element {
                                     TopicStatusBadge { status: topic.status.clone() }
                                     Link {
                                         class: "recent-topic-link",
-                                        to: Route::Topic { id: topic.id },
+                                        to: Route::TopicPage {
+                                            id: topic.id,
+                                            page: 1,
+                                        },
                                         "{topic.subject}"
                                     }
                                 }

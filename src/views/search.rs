@@ -19,12 +19,6 @@ pub fn Search() -> Element {
         }
     });
 
-    let matches = match results_resource() {
-        Some(Ok(r)) => r,
-        Some(Err(_)) => SearchResults::default(),
-        None => SearchResults::default(),
-    };
-
     rsx! {
         section { class: "page",
             article { class: "hero-card compact-hero",
@@ -46,52 +40,69 @@ pub fn Search() -> Element {
                 article { class: "panel",
                     div { class: "panel-heading",
                         h3 { "Topics" }
-                        p { "{matches.topics.len()} result(s)" }
                     }
-                    if matches.topics.is_empty() {
-                        EmptyState {
-                            title: "No topics found".to_string(),
-                            body: if query().trim().is_empty() { "Type a search term to find topics.".to_string() } else { "Try a different search term.".to_string() },
-                        }
-                    } else {
-                        div { class: "search-results",
-                            for topic in matches.topics {
-                                div { class: "search-result-row",
-                                    TopicStatusBadge { status: topic.status.clone() }
-                                    div { class: "search-result-copy",
-                                        Link {
-                                            class: "topic-link",
-                                            to: Route::Topic { id: topic.id },
-                                            "{topic.subject}"
-                                        }
-                                        p { class: "topic-meta",
-                                            "{topic.tags.join(\" | \")} · {topic.updated_at}"
+                    if let Some(Ok(matches)) = results_resource() {
+                        p { "{matches.topics.len()} result(s)" }
+                        if matches.topics.is_empty() {
+                            EmptyState {
+                                title: "No topics found".to_string(),
+                                body: if query().trim().is_empty() { "Type a search term to find topics.".to_string() } else { "Try a different search term.".to_string() },
+                            }
+                        } else {
+                            div { class: "search-results",
+                                for topic in matches.topics {
+                                    div { class: "search-result-row",
+                                        TopicStatusBadge { status: topic.status.clone() }
+                                        div { class: "search-result-copy",
+                                            Link {
+                                                class: "topic-link",
+                                                to: Route::TopicPage {
+                                                    id: topic.id,
+                                                    page: 1,
+                                                },
+                                                "{topic.subject}"
+                                            }
+                                            p { class: "topic-meta",
+                                                "{topic.tags.join(\" | \")} · {topic.updated_at}"
+                                            }
                                         }
                                     }
                                 }
                             }
+                        }
+                    } else {
+                        EmptyState {
+                            title: "Searching…".to_string(),
+                            body: "".to_string(),
                         }
                     }
                 }
                 article { class: "panel",
                     div { class: "panel-heading",
                         h3 { "Members" }
-                        p { "{matches.users.len()} result(s)" }
                     }
-                    if matches.users.is_empty() {
-                        EmptyState {
-                            title: "No members found".to_string(),
-                            body: if query().trim().is_empty() { "Type a search term to find members.".to_string() } else { "Search by username, role, or location.".to_string() },
-                        }
-                    } else {
-                        div { class: "search-results",
-                            for user in matches.users {
-                                div { class: "member-result-row",
-                                    h4 { "{user.username}" }
-                                    p { class: "user-title", "{user.title}" }
-                                    p { class: "user-copy", "{user.about}" }
+                    if let Some(Ok(matches)) = results_resource() {
+                        p { "{matches.users.len()} result(s)" }
+                        if matches.users.is_empty() {
+                            EmptyState {
+                                title: "No members found".to_string(),
+                                body: if query().trim().is_empty() { "Type a search term to find members.".to_string() } else { "Search by username, role, or location.".to_string() },
+                            }
+                        } else {
+                            div { class: "search-results",
+                                for user in matches.users {
+                                    div { class: "member-result-row",
+                                        h4 { "{user.username}" }
+                                        p { class: "user-title", "{user.title}" }
+                                        p { class: "user-copy", "{user.about}" }
+                                    }
                                 }
                             }
+                        }
+                    } else {
+                        EmptyState {
+                            title: "Searching…".to_string(),
+                            body: "".to_string(),
                         }
                     }
                 }

@@ -18,24 +18,23 @@ pub fn NewTopic(id: i32) -> Element {
     });
 
     let data = if let Some(Ok(data)) = data_resource() {
-    data
-} else {
-    return rsx! {
-        section { class: "page",
-            if data_resource().is_none() {
-                article { class: "empty-state",
-                    h3 { "Loading forum…" }
-                }
-            } else {
-                EmptyState {
-                    title: "Forum not found".to_string(),
-                    body: "The requested forum does not exist.".to_string(),
+        data
+    } else {
+        return rsx! {
+            section { class: "page",
+                if data_resource().is_none() {
+                    article { class: "empty-state",
+                        h3 { "Loading forum…" }
+                    }
+                } else {
+                    EmptyState {
+                        title: "Forum not found".to_string(),
+                        body: "The requested forum does not exist.".to_string(),
+                    }
                 }
             }
-        }
-    }
-        
-};
+        };
+    };
 
     let forum = data.forum.clone();
 
@@ -104,10 +103,29 @@ pub fn NewTopic(id: i32) -> Element {
                     class: "primary-button",
                     disabled: submitting(),
                     onclick: move |_| {
+                        let s = subject().trim().to_string();
+                        let m = message().trim().to_string();
+
+                        let validation = if s.is_empty() {
+                            "Subject is required."
+                        } else if s.len() > 70 {
+                            "Subject must be at most 70 characters."
+                        } else if m.is_empty() {
+                            "Message body is required."
+                        } else {
+                            ""
+                        };
+
+                        if !validation.is_empty() {
+                            is_error.set(true);
+                            status.set(validation.to_string());
+                            return;
+                        }
+
                         let form = NewTopicForm {
                             forum_id: id,
-                            subject: subject(),
-                            message: message(),
+                            subject: s,
+                            message: m,
                         };
                         spawn(async move {
                             submitting.set(true);

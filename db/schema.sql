@@ -72,5 +72,29 @@ CREATE TABLE IF NOT EXISTS forum_sessions (
     last_seen BIGINT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS groups (
+    id SERIAL PRIMARY KEY,
+    title TEXT NOT NULL,
+    read_board BOOLEAN NOT NULL DEFAULT true,
+    post_topics BOOLEAN NOT NULL DEFAULT true,
+    post_replies BOOLEAN NOT NULL DEFAULT true,
+    edit_posts BOOLEAN NOT NULL DEFAULT true,
+    delete_posts BOOLEAN NOT NULL DEFAULT false,
+    is_moderator BOOLEAN NOT NULL DEFAULT false,
+    is_admin BOOLEAN NOT NULL DEFAULT false
+);
+
+CREATE TABLE IF NOT EXISTS bans (
+    id SERIAL PRIMARY KEY,
+    username TEXT DEFAULT '',
+    email TEXT DEFAULT '',
+    ip TEXT DEFAULT '',
+    message TEXT NOT NULL DEFAULT '',
+    created_at BIGINT NOT NULL DEFAULT 0,
+    expires_at BIGINT DEFAULT NULL
+);
+
 CREATE INDEX IF NOT EXISTS forum_sessions_user_id_idx ON forum_sessions (user_id);
 CREATE UNIQUE INDEX IF NOT EXISTS users_email_unique_idx ON users (LOWER(email));
+CREATE INDEX IF NOT EXISTS bans_username_idx ON bans (username);
+CREATE INDEX IF NOT EXISTS bans_email_idx ON bans (LOWER(email));

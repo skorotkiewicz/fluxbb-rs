@@ -203,10 +203,32 @@ pub fn Register() -> Element {
                         class: "primary-button",
                         disabled: submitting(),
                         onclick: move |_| {
+                            let u = username();
+                            let e = email();
+                            let p = password();
+
+                            let validation = if u.trim().len() < 2 {
+                                "Username must be at least 2 characters."
+                            } else if u.trim().len() > 25 {
+                                "Username must be at most 25 characters."
+                            } else if !e.contains('@') || !e.contains('.') {
+                                "Please enter a valid email address."
+                            } else if p.len() < 9 {
+                                "Password must be at least 9 characters."
+                            } else {
+                                ""
+                            };
+
+                            if !validation.is_empty() {
+                                is_error.set(true);
+                                status.set(validation.to_string());
+                                return;
+                            }
+
                             let form = RegisterForm {
-                                username: username(),
-                                email: email(),
-                                password: password(),
+                                username: u,
+                                email: e,
+                                password: p,
                                 location: location(),
                                 about: about(),
                             };

@@ -17,17 +17,16 @@ pub fn Profile(id: i32) -> Element {
     });
 
     let data = if let Some(Ok(data)) = data_resource() {
-    data
-} else {
-    return rsx! {
-        section { class: "page",
-            article { class: "empty-state",
-                h3 { "Loading profile…" }
+        data
+    } else {
+        return rsx! {
+            section { class: "page",
+                article { class: "empty-state",
+                    h3 { "Loading profile…" }
+                }
             }
-        }
-    }
-        
-};
+        };
+    };
 
     let user = data.user.clone();
     let topics = data.topics.clone();
@@ -81,7 +80,10 @@ pub fn Profile(id: i32) -> Element {
                                 div { class: "search-result-copy",
                                     Link {
                                         class: "topic-link",
-                                        to: Route::Topic { id: topic.id },
+                                        to: Route::TopicPage {
+                                            id: topic.id,
+                                            page: 1,
+                                        },
                                         "{topic.subject}"
                                     }
                                     p { class: "topic-meta", "{topic.created_at}" }

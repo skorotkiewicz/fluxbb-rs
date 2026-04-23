@@ -47,9 +47,8 @@ pub fn EditPost(id: i32) -> Element {
         }
     };
 
-    let topic_resource = use_resource(move || async move {
-        load_topic_data(post.topic_id, 1).await.ok()
-    });
+    let topic_resource =
+        use_resource(move || async move { load_topic_data(post.topic_id, 1).await.ok() });
 
     let topic_data = match topic_resource().flatten() {
         Some(td) => td,

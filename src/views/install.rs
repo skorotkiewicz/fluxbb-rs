@@ -1,9 +1,7 @@
 use dioxus::{document, prelude::*};
 
 use crate::{
-    data::{
-        check_installed, cookie_max_age, cookie_name, install_board, InstallForm,
-    },
+    data::{check_installed, cookie_max_age, cookie_name, install_board, InstallForm},
     Route, MAIN_CSS,
 };
 

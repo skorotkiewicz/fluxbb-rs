@@ -3,11 +3,11 @@ use dioxus::prelude::*;
 use crate::{
     components::SectionHeader,
     data::{
-        admin_add_category, admin_add_forum, admin_delete_category, admin_delete_forum,
+        add_ban, admin_add_category, admin_add_forum, admin_delete_category, admin_delete_forum,
         admin_delete_topic, admin_delete_user, admin_update_board, admin_update_topic,
-        admin_update_user, load_admin_data, AdminBoardSettings, AdminCategoryForm,
-        AdminDeleteItem, AdminForumForm, AdminTopicUpdate, AdminUserUpdate, AdminData,
-        SessionUser,
+        admin_update_user, load_admin_data, load_bans, load_groups, remove_ban, update_group,
+        AdminBoardSettings, AdminCategoryForm, AdminData, AdminDeleteItem, AdminForumForm,
+        AdminTopicUpdate, AdminUserUpdate, Ban, BanForm, Group, GroupUpdateForm, SessionUser,
     },
     Route,
 };
@@ -15,7 +15,7 @@ use crate::{
 #[component]
 pub fn Admin() -> Element {
     let current_user = use_context::<Signal<Option<SessionUser>>>();
-    let mut refresh = use_context::<Signal<()>>();
+    let refresh = use_context::<Signal<()>>();
 
     let data_resource = use_resource(move || async move {
         refresh();
@@ -25,30 +25,6 @@ pub fn Admin() -> Element {
     let is_admin = current_user()
         .as_ref()
         .is_some_and(|u| u.group_id == 1);
-
-    if !is_admin {
-        return rsx! {
-            section { class: "page",
-                article { class: "empty-state",
-                    h3 { "Access denied" }
-                    p { "You must be an administrator to view this page." }
-                }
-            }
-        };
-    }
-
-    let data = if let Some(Ok(data)) = data_resource() {
-    data
-} else {
-    return rsx! {
-        section { class: "page",
-            article { class: "empty-state",
-                h3 { "Loading admin data…" }
-            }
-        }
-    }
-        
-};
 
     let mut tab = use_signal(|| "structure");
     let status = use_signal(String::new);
@@ -64,69 +40,88 @@ pub fn Admin() -> Element {
                 }
             }
 
-            nav { class: "admin-tabs",
-                button {
-                    class: if tab() == "structure" { "admin-tab active" } else { "admin-tab" },
-                    onclick: move |_| tab.set("structure"),
-                    "Structure"
+            if !is_admin {
+                article { class: "empty-state",
+                    h3 { "Access denied" }
+                    p { "You must be an administrator to view this page." }
                 }
-                button {
-                    class: if tab() == "users" { "admin-tab active" } else { "admin-tab" },
-                    onclick: move |_| tab.set("users"),
-                    "Users"
+            } else if let Some(Ok(data)) = data_resource() {
+                nav { class: "admin-tabs",
+                    button {
+                        class: if tab() == "structure" { "admin-tab active" } else { "admin-tab" },
+                        onclick: move |_| tab.set("structure"),
+                        "Structure"
+                    }
+                    button {
+                        class: if tab() == "users" { "admin-tab active" } else { "admin-tab" },
+                        onclick: move |_| tab.set("users"),
+                        "Users"
+                    }
+                    button {
+                        class: if tab() == "moderation" { "admin-tab active" } else { "admin-tab" },
+                        onclick: move |_| tab.set("moderation"),
+                        "Moderation"
+                    }
+                    button {
+                        class: if tab() == "settings" { "admin-tab active" } else { "admin-tab" },
+                        onclick: move |_| tab.set("settings"),
+                        "Settings"
+                    }
+                    button {
+                        class: if tab() == "bans" { "admin-tab active" } else { "admin-tab" },
+                        onclick: move |_| tab.set("bans"),
+                        "Bans"
+                    }
+                    button {
+                        class: if tab() == "groups" { "admin-tab active" } else { "admin-tab" },
+                        onclick: move |_| tab.set("groups"),
+                        "Groups"
+                    }
                 }
-                button {
-                    class: if tab() == "moderation" { "admin-tab active" } else { "admin-tab" },
-                    onclick: move |_| tab.set("moderation"),
-                    "Moderation"
-                }
-                button {
-                    class: if tab() == "settings" { "admin-tab active" } else { "admin-tab" },
-                    onclick: move |_| tab.set("settings"),
-                    "Settings"
-                }
-            }
 
-            if !status().is_empty() {
-                p { class: if is_error() { "form-message form-error" } else { "form-message form-success" },
-                    "{status}"
+                if !status().is_empty() {
+                    p { class: if is_error() { "form-message form-error" } else { "form-message form-success" },
+                        "{status}"
+                    }
                 }
-            }
 
-            match tab().as_ref() {
-                "structure" => rsx! {
+                if tab() == "structure" {
                     StructurePanel {
                         data: data.clone(),
                         status,
                         is_error,
                         refresh,
                     }
-                },
-                "users" => rsx! {
+                } else if tab() == "users" {
                     UsersPanel {
                         data: data.clone(),
                         status,
                         is_error,
                         refresh,
                     }
-                },
-                "moderation" => rsx! {
+                } else if tab() == "moderation" {
                     ModerationPanel {
                         data: data.clone(),
                         status,
                         is_error,
                         refresh,
                     }
-                },
-                "settings" => rsx! {
+                } else if tab() == "settings" {
                     SettingsPanel {
                         data: data.clone(),
                         status,
                         is_error,
                         refresh,
                     }
-                },
-                _ => rsx! {},
+                } else if tab() == "bans" {
+                    BansPanel { status, is_error, refresh }
+                } else if tab() == "groups" {
+                    GroupsPanel { status, is_error, refresh }
+                }
+            } else {
+                article { class: "empty-state",
+                    h3 { "Loading admin data…" }
+                }
             }
         }
     }
@@ -135,7 +130,12 @@ pub fn Admin() -> Element {
 // ── Structure panel: categories & forums ──
 
 #[component]
-fn StructurePanel(data: AdminData, mut status: Signal<String>, mut is_error: Signal<bool>, mut refresh: Signal<()>) -> Element {
+fn StructurePanel(
+    data: AdminData,
+    mut status: Signal<String>,
+    mut is_error: Signal<bool>,
+    mut refresh: Signal<()>,
+) -> Element {
     let mut cat_name = use_signal(String::new);
     let mut cat_desc = use_signal(String::new);
     let mut forum_name = use_signal(String::new);
@@ -193,7 +193,10 @@ fn StructurePanel(data: AdminData, mut status: Signal<String>, mut is_error: Sig
                         div { class: "forum-main",
                             Link {
                                 class: "forum-link",
-                                to: Route::Forum { id: forum.id },
+                                to: Route::ForumPage {
+                                    id: forum.id,
+                                    page: 1,
+                                },
                                 "{forum.name}"
                             }
                             p { class: "forum-description", "{forum.description}" }
@@ -339,9 +342,19 @@ fn StructurePanel(data: AdminData, mut status: Signal<String>, mut is_error: Sig
 // ── Users panel ──
 
 #[component]
-fn UsersPanel(data: AdminData, mut status: Signal<String>, mut is_error: Signal<bool>, mut refresh: Signal<()>) -> Element {
+fn UsersPanel(
+    data: AdminData,
+    mut status: Signal<String>,
+    mut is_error: Signal<bool>,
+    mut refresh: Signal<()>,
+) -> Element {
     fn group_label(gid: i32) -> &'static str {
-        match gid { 1 => "Admin", 2 => "Moderator", 3 => "Guest", _ => "Member" }
+        match gid {
+            1 => "Admin",
+            2 => "Moderator",
+            3 => "Guest",
+            _ => "Member",
+        }
     }
 
     rsx! {
@@ -469,7 +482,12 @@ fn UsersPanel(data: AdminData, mut status: Signal<String>, mut is_error: Signal<
 // ── Moderation panel ──
 
 #[component]
-fn ModerationPanel(data: AdminData, mut status: Signal<String>, mut is_error: Signal<bool>, mut refresh: Signal<()>) -> Element {
+fn ModerationPanel(
+    data: AdminData,
+    mut status: Signal<String>,
+    mut is_error: Signal<bool>,
+    mut refresh: Signal<()>,
+) -> Element {
     let statuses = ["pinned", "hot", "resolved", "fresh"];
     let users_map: std::collections::HashMap<i32, crate::data::UserProfile> =
         data.users.iter().map(|u| (u.id, u.clone())).collect();
@@ -492,7 +510,10 @@ fn ModerationPanel(data: AdminData, mut status: Signal<String>, mut is_error: Si
                         div { class: "topic-main",
                             Link {
                                 class: "topic-link",
-                                to: Route::Topic { id: topic.id },
+                                to: Route::TopicPage {
+                                    id: topic.id,
+                                    page: 1,
+                                },
                                 "{topic.subject}"
                             }
                             p { class: "topic-meta",
@@ -566,7 +587,12 @@ fn ModerationPanel(data: AdminData, mut status: Signal<String>, mut is_error: Si
 // ── Settings panel ──
 
 #[component]
-fn SettingsPanel(data: AdminData, mut status: Signal<String>, mut is_error: Signal<bool>, mut refresh: Signal<()>) -> Element {
+fn SettingsPanel(
+    data: AdminData,
+    mut status: Signal<String>,
+    mut is_error: Signal<bool>,
+    mut refresh: Signal<()>,
+) -> Element {
     let mut title = use_signal(|| data.meta.title.clone());
     let mut tagline = use_signal(|| data.meta.tagline.clone());
     let mut ann_title = use_signal(|| data.meta.announcement_title.clone());
@@ -631,6 +657,382 @@ fn SettingsPanel(data: AdminData, mut status: Signal<String>, mut is_error: Sign
                     });
                 },
                 "Save settings"
+            }
+        }
+    }
+}
+
+// ── Bans panel ──
+
+#[component]
+fn BansPanel(
+    mut status: Signal<String>,
+    mut is_error: Signal<bool>,
+    mut refresh: Signal<()>,
+) -> Element {
+    let bans_resource = use_resource(move || async move {
+        refresh();
+        load_bans().await
+    });
+
+    let mut ban_user = use_signal(String::new);
+    let mut ban_email = use_signal(String::new);
+    let mut ban_message = use_signal(String::new);
+    let mut ban_days = use_signal(|| 0_i32);
+
+    rsx! {
+        article { class: "panel",
+            div { class: "panel-heading",
+                h3 { "Active bans" }
+            }
+            if let Some(Ok(bans)) = bans_resource() {
+                if bans.is_empty() {
+                    p { "No active bans." }
+                } else {
+                    div { class: "topic-table",
+                        div { class: "topic-table-head",
+                            span { "User / Email" }
+                            span { "Reason" }
+                            span { "Expires" }
+                            span { "Actions" }
+                        }
+                        for ban in bans {
+                            div { class: "topic-row",
+                                div { class: "topic-main",
+                                    p { "{ban.username}" }
+                                    if !ban.email.is_empty() {
+                                        p { class: "topic-meta", "{ban.email}" }
+                                    }
+                                }
+                                p { class: "topic-metric", "{ban.message}" }
+                                p { class: "topic-metric",
+                                    if let Some(exp) = ban.expires_at {
+                                        "{(exp - ban.created_at) / 86400} days"
+                                    } else {
+                                        "Permanent"
+                                    }
+                                }
+                                button {
+                                    class: "danger-button small-button",
+                                    onclick: {
+                                        let bid = ban.id;
+                                        move |_| {
+                                            spawn(async move {
+                                                match remove_ban(bid).await {
+                                                    Ok(_) => refresh.set(()),
+                                                    Err(e) => {
+                                                        is_error.set(true);
+                                                        status.set(e.to_string());
+                                                    }
+                                                }
+                                            });
+                                        }
+                                    },
+                                    "Remove"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        article { class: "form-card",
+            h3 { "Add ban" }
+            label {
+                "Username (optional)"
+                input {
+                    class: "text-input",
+                    value: "{ban_user}",
+                    oninput: move |e| ban_user.set(e.value()),
+                    placeholder: "Exact username",
+                }
+            }
+            label {
+                "Email (optional)"
+                input {
+                    class: "text-input",
+                    value: "{ban_email}",
+                    oninput: move |e| ban_email.set(e.value()),
+                    placeholder: "Email address",
+                }
+            }
+            label {
+                "Reason / message"
+                input {
+                    class: "text-input",
+                    value: "{ban_message}",
+                    oninput: move |e| ban_message.set(e.value()),
+                    placeholder: "Why is this user banned?",
+                }
+            }
+            label {
+                "Duration (days, 0 = permanent)"
+                input {
+                    class: "text-input",
+                    r#type: "number",
+                    value: "{ban_days}",
+                    oninput: move |e| {
+                        if let Ok(v) = e.value().parse::<i32>() {
+                            ban_days.set(v.max(0));
+                        }
+                    },
+                }
+            }
+            button {
+                class: "primary-button",
+                onclick: move |_| {
+                    let form = BanForm {
+                        username: ban_user(),
+                        email: ban_email(),
+                        message: ban_message(),
+                        duration_days: if ban_days() > 0 { Some(ban_days()) } else { None },
+                    };
+                    spawn(async move {
+                        match add_ban(form).await {
+                            Ok(_) => {
+                                is_error.set(false);
+                                status.set("Ban added.".to_string());
+                                ban_user.set(String::new());
+                                ban_email.set(String::new());
+                                ban_message.set(String::new());
+                                ban_days.set(0);
+                                refresh.set(());
+                            }
+                            Err(e) => {
+                                is_error.set(true);
+                                status.set(e.to_string());
+                            }
+                        }
+                    });
+                },
+                "Add ban"
+            }
+        }
+    }
+}
+
+// ── Groups panel ──
+
+#[component]
+fn GroupsPanel(
+    mut status: Signal<String>,
+    mut is_error: Signal<bool>,
+    mut refresh: Signal<()>,
+) -> Element {
+    let groups_resource = use_resource(move || async move {
+        refresh();
+        load_groups().await
+    });
+
+    rsx! {
+        if let Some(Ok(groups)) = groups_resource() {
+            for group in groups {
+                article { class: "form-card",
+                    h3 { "{group.title}" }
+                    div { class: "topic-table",
+                        div { class: "topic-table-head",
+                            span { "Permission" }
+                            span { "Enabled" }
+                        }
+                        PermissionRow {
+                            label: "Read board".to_string(),
+                            value: group.read_board,
+                            onchange: {
+                                let gid = group.id;
+                                let g = group.clone();
+                                move |v: bool| {
+                                    let g = g.clone();
+                                    spawn(async move {
+                                        let _ = update_group(GroupUpdateForm {
+                                                group_id: gid,
+                                                title: g.title.clone(),
+                                                read_board: v,
+                                                post_topics: g.post_topics,
+                                                post_replies: g.post_replies,
+                                                edit_posts: g.edit_posts,
+                                                delete_posts: g.delete_posts,
+                                                is_moderator: g.is_moderator,
+                                                is_admin: g.is_admin,
+                                            })
+                                            .await;
+                                        refresh.set(());
+                                    });
+                                }
+                            },
+                        }
+                        PermissionRow {
+                            label: "Post topics".to_string(),
+                            value: group.post_topics,
+                            onchange: {
+                                let gid = group.id;
+                                let g = group.clone();
+                                move |v: bool| {
+                                    let g = g.clone();
+                                    spawn(async move {
+                                        let _ = update_group(GroupUpdateForm {
+                                                group_id: gid,
+                                                title: g.title.clone(),
+                                                read_board: g.read_board,
+                                                post_topics: v,
+                                                post_replies: g.post_replies,
+                                                edit_posts: g.edit_posts,
+                                                delete_posts: g.delete_posts,
+                                                is_moderator: g.is_moderator,
+                                                is_admin: g.is_admin,
+                                            })
+                                            .await;
+                                        refresh.set(());
+                                    });
+                                }
+                            },
+                        }
+                        PermissionRow {
+                            label: "Post replies".to_string(),
+                            value: group.post_replies,
+                            onchange: {
+                                let gid = group.id;
+                                let g = group.clone();
+                                move |v: bool| {
+                                    let g = g.clone();
+                                    spawn(async move {
+                                        let _ = update_group(GroupUpdateForm {
+                                                group_id: gid,
+                                                title: g.title.clone(),
+                                                read_board: g.read_board,
+                                                post_topics: g.post_topics,
+                                                post_replies: v,
+                                                edit_posts: g.edit_posts,
+                                                delete_posts: g.delete_posts,
+                                                is_moderator: g.is_moderator,
+                                                is_admin: g.is_admin,
+                                            })
+                                            .await;
+                                        refresh.set(());
+                                    });
+                                }
+                            },
+                        }
+                        PermissionRow {
+                            label: "Edit posts".to_string(),
+                            value: group.edit_posts,
+                            onchange: {
+                                let gid = group.id;
+                                let g = group.clone();
+                                move |v: bool| {
+                                    let g = g.clone();
+                                    spawn(async move {
+                                        let _ = update_group(GroupUpdateForm {
+                                                group_id: gid,
+                                                title: g.title.clone(),
+                                                read_board: g.read_board,
+                                                post_topics: g.post_topics,
+                                                post_replies: g.post_replies,
+                                                edit_posts: v,
+                                                delete_posts: g.delete_posts,
+                                                is_moderator: g.is_moderator,
+                                                is_admin: g.is_admin,
+                                            })
+                                            .await;
+                                        refresh.set(());
+                                    });
+                                }
+                            },
+                        }
+                        PermissionRow {
+                            label: "Delete posts".to_string(),
+                            value: group.delete_posts,
+                            onchange: {
+                                let gid = group.id;
+                                let g = group.clone();
+                                move |v: bool| {
+                                    let g = g.clone();
+                                    spawn(async move {
+                                        let _ = update_group(GroupUpdateForm {
+                                                group_id: gid,
+                                                title: g.title.clone(),
+                                                read_board: g.read_board,
+                                                post_topics: g.post_topics,
+                                                post_replies: g.post_replies,
+                                                edit_posts: g.edit_posts,
+                                                delete_posts: v,
+                                                is_moderator: g.is_moderator,
+                                                is_admin: g.is_admin,
+                                            })
+                                            .await;
+                                        refresh.set(());
+                                    });
+                                }
+                            },
+                        }
+                        PermissionRow {
+                            label: "Moderator".to_string(),
+                            value: group.is_moderator,
+                            onchange: {
+                                let gid = group.id;
+                                let g = group.clone();
+                                move |v: bool| {
+                                    let g = g.clone();
+                                    spawn(async move {
+                                        let _ = update_group(GroupUpdateForm {
+                                                group_id: gid,
+                                                title: g.title.clone(),
+                                                read_board: g.read_board,
+                                                post_topics: g.post_topics,
+                                                post_replies: g.post_replies,
+                                                edit_posts: g.edit_posts,
+                                                delete_posts: g.delete_posts,
+                                                is_moderator: v,
+                                                is_admin: g.is_admin,
+                                            })
+                                            .await;
+                                        refresh.set(());
+                                    });
+                                }
+                            },
+                        }
+                        PermissionRow {
+                            label: "Admin".to_string(),
+                            value: group.is_admin,
+                            onchange: {
+                                let gid = group.id;
+                                let g = group.clone();
+                                move |v: bool| {
+                                    let g = g.clone();
+                                    spawn(async move {
+                                        let _ = update_group(GroupUpdateForm {
+                                                group_id: gid,
+                                                title: g.title.clone(),
+                                                read_board: g.read_board,
+                                                post_topics: g.post_topics,
+                                                post_replies: g.post_replies,
+                                                edit_posts: g.edit_posts,
+                                                delete_posts: g.delete_posts,
+                                                is_moderator: g.is_moderator,
+                                                is_admin: v,
+                                            })
+                                            .await;
+                                        refresh.set(());
+                                    });
+                                }
+                            },
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[component]
+fn PermissionRow(label: String, value: bool, onchange: EventHandler<bool>) -> Element {
+    rsx! {
+        div { class: "topic-row",
+            span { "{label}" }
+            input {
+                r#type: "checkbox",
+                checked: value,
+                onchange: move |e| onchange.call(e.data.value() == "true" || e.data.checked()),
             }
         }
     }

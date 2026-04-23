@@ -1,6 +1,9 @@
 use dioxus::prelude::*;
 
-use views::{Admin, AppShell, EditPost, Forum, ForumPage, Help, Index, Install, Login, NewTopic, Profile, ProfileEdit, Register, Rules, Search, Topic, TopicPage, Users};
+use views::{
+    Admin, AppShell, EditPost, Forum, ForumPage, Help, Index, Install, Login, NewTopic, Profile,
+    ProfileEdit, Register, Rules, Search, Topic, TopicPage, Users,
+};
 
 mod components;
 mod data;

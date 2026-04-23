@@ -3,8 +3,8 @@ use dioxus::prelude::*;
 use crate::{
     components::{EmptyState, PostCard, TopicStatusBadge},
     data::{
-        create_reply, increment_topic_views, load_topic_data, toggle_topic_status, ReplyForm,
-        SessionUser, TopicData,
+        create_reply, delete_topic, increment_topic_views, load_forum_data, load_topic_data,
+        move_topic, toggle_topic_status, MoveTopicForm, ReplyForm, SessionUser, TopicData,
     },
     Route,
 };
@@ -26,11 +26,14 @@ pub fn Topic(id: i32) -> Element {
 
 #[component]
 pub fn TopicPage(id: i32, page: i32) -> Element {
+    let navigator = use_navigator();
     let current_user = use_context::<Signal<Option<SessionUser>>>();
     let mut refresh = use_context::<Signal<()>>();
 
     // Increment view counter once when topic loads
-    use_resource(move || async move { let _ = increment_topic_views(id).await; });
+    use_resource(move || async move {
+        let _ = increment_topic_views(id).await;
+    });
 
     let data_resource = use_resource(move || async move {
         refresh();
@@ -59,14 +62,23 @@ pub fn TopicPage(id: i32, page: i32) -> Element {
     let mut reply_status = use_signal(String::new);
     let mut reply_error = use_signal(|| false);
     let mut replying = use_signal(|| false);
+    let mut move_forum_id = use_signal(|| 0_i32);
 
-    let is_admin = current_user()
-        .as_ref()
-        .is_some_and(|u| u.group_id == 1);
+    let is_admin = current_user().as_ref().is_some_and(|u| u.group_id == 1);
     let is_closed = matches!(topic.status, crate::data::TopicStatus::Closed);
 
     let total_pages = ((data.total_posts + data.per_page - 1) / data.per_page).max(1);
     let current_page = data.page;
+
+    let forums_resource = use_resource(move || async move {
+        if is_admin {
+            load_forum_data(0, 1).await.ok().map(|d| d.forum)
+        } else {
+            None
+        }
+    });
+
+    let forum_id = forum.as_ref().map(|f| f.id).unwrap_or(0);
 
     rsx! {
         section { class: "page",
@@ -74,7 +86,13 @@ pub fn TopicPage(id: i32, page: i32) -> Element {
                 Link { to: Route::Index {}, "Forums" }
                 if let Some(forum) = forum.clone() {
                     span { "/" }
-                    Link { to: Route::Forum { id: forum.id }, "{forum.name}" }
+                    Link {
+                        to: Route::ForumPage {
+                            id: forum.id,
+                            page: 1,
+                        },
+                        "{forum.name}"
+                    }
                 }
                 span { "/" }
                 span { "{topic.subject}" }
@@ -93,19 +111,42 @@ pub fn TopicPage(id: i32, page: i32) -> Element {
                 }
 
                 if is_admin {
-                    button {
-                        class: "small-button",
-                        onclick: move |_| {
-                            let tid = id;
-                            spawn(async move {
-                                let _ = toggle_topic_status(tid).await;
-                                refresh.set(());
-                            });
-                        },
-                        if is_closed {
-                            "Open topic"
-                        } else {
-                            "Close topic"
+                    div { class: "post-actions",
+                        button {
+                            class: "small-button",
+                            onclick: move |_| {
+                                let tid = id;
+                                spawn(async move {
+                                    let _ = toggle_topic_status(tid).await;
+                                    refresh.set(());
+                                });
+                            },
+                            if is_closed {
+                                "Open topic"
+                            } else {
+                                "Close topic"
+                            }
+                        }
+                        button {
+                            class: "danger-button small-button",
+                            onclick: move |_| {
+                                let tid = id;
+                                let fid = forum_id;
+                                let navigator = navigator.clone();
+                                spawn(async move {
+                                    match delete_topic(tid).await {
+                                        Ok(_) => {
+                                            navigator
+                                                .push(Route::ForumPage {
+                                                    id: fid,
+                                                    page: 1,
+                                                });
+                                        }
+                                        Err(_) => {}
+                                    }
+                                });
+                            },
+                            "Delete topic"
                         }
                     }
                 }
@@ -184,9 +225,15 @@ pub fn TopicPage(id: i32, page: i32) -> Element {
                         class: "primary-button",
                         disabled: replying(),
                         onclick: move |_| {
+                            let m = reply_text().trim().to_string();
+                            if m.is_empty() {
+                                reply_error.set(true);
+                                reply_status.set("Message body is required.".to_string());
+                                return;
+                            }
                             let form = ReplyForm {
                                 topic_id: id,
-                                message: reply_text(),
+                                message: m,
                             };
                             spawn(async move {
                                 replying.set(true);

@@ -2,7 +2,7 @@ use dioxus::{document, prelude::*};
 
 use crate::{
     data::{
-        cookie_name, current_session_user, load_board, logout_account, SessionUser,
+        cookie_name, current_session_user, load_board, logout_account, AppData, SessionUser,
     },
     Route,
 };
@@ -11,7 +11,7 @@ const HEADER_ART: Asset = asset!("/assets/header.svg");
 
 #[component]
 pub fn AppShell() -> Element {
-    let board_resource = use_server_future(load_board)?;
+    let mut board_resource = use_resource(|| async move { load_board().await });
     let session_resource =
         use_resource(|| async move { current_session_user().await.unwrap_or(None) });
     let mut current_user = use_signal(|| None::<SessionUser>);
@@ -21,6 +21,10 @@ pub fn AppShell() -> Element {
             current_user.set(user);
         }
     });
+
+    // Provide a refresh trigger that child views can call after mutations
+    let refresh = use_signal(|| ());
+    use_context_provider(|| refresh);
 
     let board = match board_resource() {
         Some(Ok(board)) => board,
@@ -55,6 +59,12 @@ pub fn AppShell() -> Element {
     use_context_provider(|| board.clone());
     use_context_provider(|| current_user);
 
+    // Watch for refresh trigger
+    use_effect(move || {
+        refresh();
+        board_resource.restart();
+    });
+
     rsx! {
         div { class: "site-shell",
             header { class: "masthead",
@@ -80,8 +90,12 @@ pub fn AppShell() -> Element {
                     Link { class: "nav-link", to: Route::Admin {}, "Admin" }
                 }
 
-                if let Some(user) = current_user() {
-                    span { class: "auth-chip", "Signed in as {user.username}" }
+                if let Some(ref user) = current_user() {
+                    Link {
+                        class: "auth-chip",
+                        to: Route::Profile { id: user.id },
+                        "Signed in as {user.username}"
+                    }
                     button {
                         class: "nav-link nav-button",
                         onclick: move |_| {

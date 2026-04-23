@@ -29,6 +29,7 @@ pub fn Admin() -> Element {
     let mut tab = use_signal(|| "structure");
     let status = use_signal(String::new);
     let is_error = use_signal(|| false);
+    let mut refresh = use_context::<Signal<()>>();
 
     rsx! {
         section { class: "page",
@@ -59,10 +60,10 @@ pub fn Admin() -> Element {
             }
 
             match tab().as_ref() {
-                "structure" => rsx! { StructurePanel { board: board.clone(), status, is_error } },
-                "users" => rsx! { UsersPanel { board: board.clone(), status, is_error } },
-                "moderation" => rsx! { ModerationPanel { board: board.clone(), status, is_error } },
-                "settings" => rsx! { SettingsPanel { board: board.clone(), status, is_error } },
+                "structure" => rsx! { StructurePanel { board: board.clone(), status, is_error, refresh } },
+                "users" => rsx! { UsersPanel { board: board.clone(), status, is_error, refresh } },
+                "moderation" => rsx! { ModerationPanel { board: board.clone(), status, is_error, refresh } },
+                "settings" => rsx! { SettingsPanel { board: board.clone(), status, is_error, refresh } },
                 _ => rsx! {},
             }
         }
@@ -72,7 +73,7 @@ pub fn Admin() -> Element {
 // ── Structure panel: categories & forums ──
 
 #[component]
-fn StructurePanel(board: AppData, mut status: Signal<String>, mut is_error: Signal<bool>) -> Element {
+fn StructurePanel(board: AppData, mut status: Signal<String>, mut is_error: Signal<bool>, mut refresh: Signal<()>) -> Element {
     let mut cat_name = use_signal(String::new);
     let mut cat_desc = use_signal(String::new);
     let mut forum_name = use_signal(String::new);
@@ -191,7 +192,7 @@ fn StructurePanel(board: AppData, mut status: Signal<String>, mut is_error: Sign
 // ── Users panel ──
 
 #[component]
-fn UsersPanel(board: AppData, mut status: Signal<String>, mut is_error: Signal<bool>) -> Element {
+fn UsersPanel(board: AppData, mut status: Signal<String>, mut is_error: Signal<bool>, mut refresh: Signal<()>) -> Element {
     fn group_label(gid: i32) -> &'static str {
         match gid { 1 => "Admin", 2 => "Moderator", 3 => "Guest", _ => "Member" }
     }
@@ -285,7 +286,7 @@ fn UsersPanel(board: AppData, mut status: Signal<String>, mut is_error: Signal<b
 // ── Moderation panel ──
 
 #[component]
-fn ModerationPanel(board: AppData, mut status: Signal<String>, mut is_error: Signal<bool>) -> Element {
+fn ModerationPanel(board: AppData, mut status: Signal<String>, mut is_error: Signal<bool>, mut refresh: Signal<()>) -> Element {
     let statuses = ["pinned", "hot", "resolved", "fresh"];
 
     rsx! {
@@ -359,7 +360,7 @@ fn ModerationPanel(board: AppData, mut status: Signal<String>, mut is_error: Sig
 // ── Settings panel ──
 
 #[component]
-fn SettingsPanel(board: AppData, mut status: Signal<String>, mut is_error: Signal<bool>) -> Element {
+fn SettingsPanel(board: AppData, mut status: Signal<String>, mut is_error: Signal<bool>, mut refresh: Signal<()>) -> Element {
     let mut title = use_signal(|| board.meta.title.clone());
     let mut tagline = use_signal(|| board.meta.tagline.clone());
     let mut ann_title = use_signal(|| board.meta.announcement_title.clone());

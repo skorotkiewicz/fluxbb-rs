@@ -10,6 +10,7 @@ use crate::{
 pub fn Topic(id: i32) -> Element {
     let board = use_context::<AppData>();
     let current_user = use_context::<Signal<Option<SessionUser>>>();
+    let mut refresh = use_context::<Signal<()>>();
 
     // Increment view counter once when topic loads
     use_resource(move || async move { let _ = increment_topic_views(id).await; });
@@ -69,7 +70,7 @@ pub fn Topic(id: i32) -> Element {
 
             if current_user().is_some() {
                 article { class: "form-card",
-                    h3 { "Reply" }
+                    h3 { "Post a reply" }
 
                     if !reply_status().is_empty() {
                         p {
@@ -100,8 +101,9 @@ pub fn Topic(id: i32) -> Element {
                                 match create_reply(form).await {
                                     Ok(_) => {
                                         reply_error.set(false);
-                                        reply_status.set("Reply posted! Refresh to see it.".to_string());
+                                        reply_status.set("Reply posted!".to_string());
                                         reply_text.set(String::new());
+                                        refresh.set(());
                                     }
                                     Err(e) => {
                                         reply_error.set(true);
@@ -120,6 +122,7 @@ pub fn Topic(id: i32) -> Element {
                         h3 { "Sign in to reply" }
                         p { "You must be logged in to post replies." }
                     }
+                    Link { class: "primary-button", to: Route::Login {}, "Sign in" }
                 }
             }
         }

@@ -11,6 +11,7 @@ pub fn NewTopic(id: i32) -> Element {
     let board = use_context::<AppData>();
     let current_user = use_context::<Signal<Option<SessionUser>>>();
     let navigator = use_navigator();
+    let mut refresh = use_context::<Signal<()>>();
 
     let Some(forum) = board.forum(id) else {
         return rsx! {
@@ -96,6 +97,7 @@ pub fn NewTopic(id: i32) -> Element {
                             submitting.set(true);
                             match create_topic(form).await {
                                 Ok(result) => {
+                                    refresh.set(());
                                     navigator.push(Route::Topic { id: result.topic_id });
                                 }
                                 Err(e) => {

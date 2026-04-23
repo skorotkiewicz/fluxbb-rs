@@ -336,19 +336,38 @@ impl AppData {
             .iter()
             .map(|topic| self.posts_for_topic(topic.id).len())
             .sum::<usize>();
-        let latest_topic = topics.first()?.clone();
-        let latest_post = self.posts_for_topic(latest_topic.id).last()?.clone();
-        let latest_user = self.user(latest_post.author_id)?;
 
-        Some(ForumSnapshot {
-            forum,
-            topic_count,
-            post_count,
-            last_topic_id: latest_topic.id,
-            last_topic_subject: latest_topic.subject,
-            last_post_author: latest_user.username,
-            last_posted_at: latest_post.posted_at,
-        })
+        if let Some(latest_topic) = topics.first().cloned() {
+            let latest_post = self.posts_for_topic(latest_topic.id).last().cloned();
+            let last_post_author = latest_post
+                .as_ref()
+                .and_then(|p| self.user(p.author_id))
+                .map(|u| u.username)
+                .unwrap_or_default();
+            let last_posted_at = latest_post
+                .map(|p| p.posted_at)
+                .unwrap_or_default();
+
+            Some(ForumSnapshot {
+                forum,
+                topic_count,
+                post_count,
+                last_topic_id: latest_topic.id,
+                last_topic_subject: latest_topic.subject,
+                last_post_author,
+                last_posted_at,
+            })
+        } else {
+            Some(ForumSnapshot {
+                forum,
+                topic_count: 0,
+                post_count: 0,
+                last_topic_id: 0,
+                last_topic_subject: "No topics yet".to_string(),
+                last_post_author: String::new(),
+                last_posted_at: String::new(),
+            })
+        }
     }
 
     pub fn search(&self, query: &str) -> SearchResults {

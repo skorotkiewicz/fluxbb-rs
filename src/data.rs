@@ -178,11 +178,17 @@ pub struct IndexData {
     pub recent_users: Vec<UserProfile>,
 }
 
+const FORUM_TOPICS_PER_PAGE: i32 = 25;
+const TOPIC_POSTS_PER_PAGE: i32 = 20;
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ForumData {
     pub forum: Forum,
     pub topics: Vec<Topic>,
     pub users: Vec<UserProfile>,
+    pub total_topics: i32,
+    pub page: i32,
+    pub per_page: i32,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -191,6 +197,9 @@ pub struct TopicData {
     pub posts: Vec<Post>,
     pub users: Vec<UserProfile>,
     pub forum: Option<Forum>,
+    pub total_posts: i32,
+    pub page: i32,
+    pub per_page: i32,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -601,10 +610,13 @@ pub async fn load_index_data() -> Result<IndexData, ServerFnError> {
     }
 }
 
-#[post("/api/forum/:id")]
-pub async fn load_forum_data(id: i32) -> Result<ForumData, ServerFnError> {
+#[post("/api/forum/:id/:page")]
+pub async fn load_forum_data(id: i32, page: i32) -> Result<ForumData, ServerFnError> {
     #[cfg(feature = "server")]
     {
+        let page = page.max(1);
+        let per_page = FORUM_TOPICS_PER_PAGE;
+        let offset = (page - 1) * per_page;
         let data = run_json_query::<ForumData>(&format!(
             "SELECT json_build_object(
                 'forum', (SELECT row_to_json(f) FROM forums f WHERE f.id = {id}),
@@ -612,47 +624,66 @@ pub async fn load_forum_data(id: i32) -> Result<ForumData, ServerFnError> {
                     SELECT id, forum_id, author_id, subject, status, views, tags, created_at, updated_at, activity_rank,
                         COALESCE((SELECT COUNT(*) FROM posts WHERE topic_id = t.id), 0) - 1 AS reply_count
                     FROM topics t WHERE forum_id = {id} ORDER BY activity_rank DESC, id
+                    LIMIT {per_page} OFFSET {offset}
                 ) t),
                 'users', (SELECT COALESCE(json_agg(row_to_json(u)), '[]'::json) FROM (
                     SELECT id, username, title, status, joined_at, post_count, location, about, last_seen, email, group_id
                     FROM users WHERE id IN (SELECT author_id FROM topics WHERE forum_id = {id})
-                ) u)
+                ) u),
+                'total_topics', (SELECT COUNT(*) FROM topics WHERE forum_id = {id}),
+                'page', {page},
+                'per_page', {per_page}
             )::json;",
-            id = id
+            id = id,
+            page = page,
+            per_page = per_page,
+            offset = offset
         )).map_err(server_error)?;
         Ok(data)
     }
     #[cfg(not(feature = "server"))]
     {
         let _ = id;
+        let _ = page;
         Err(ServerFnError::new("server only"))
     }
 }
 
-#[post("/api/topic/:id")]
-pub async fn load_topic_data(id: i32) -> Result<TopicData, ServerFnError> {
+#[post("/api/topic/:id/:page")]
+pub async fn load_topic_data(id: i32, page: i32) -> Result<TopicData, ServerFnError> {
     #[cfg(feature = "server")]
     {
+        let page = page.max(1);
+        let per_page = TOPIC_POSTS_PER_PAGE;
+        let offset = (page - 1) * per_page;
         let data = run_json_query::<TopicData>(&format!(
             "SELECT json_build_object(
                 'topic', (SELECT row_to_json(t) FROM topics t WHERE t.id = {id}),
                 'posts', (SELECT COALESCE(json_agg(row_to_json(p)), '[]'::json) FROM (
                     SELECT id, topic_id, author_id, posted_at, edited_at, body, signature, position
                     FROM posts WHERE topic_id = {id} ORDER BY position, id
+                    LIMIT {per_page} OFFSET {offset}
                 ) p),
                 'users', (SELECT COALESCE(json_agg(row_to_json(u)), '[]'::json) FROM (
                     SELECT id, username, title, status, joined_at, post_count, location, about, last_seen, email, group_id
                     FROM users WHERE id IN (SELECT author_id FROM posts WHERE topic_id = {id})
                 ) u),
-                'forum', (SELECT row_to_json(f) FROM forums f WHERE f.id = (SELECT forum_id FROM topics WHERE id = {id}))
+                'forum', (SELECT row_to_json(f) FROM forums f WHERE f.id = (SELECT forum_id FROM topics WHERE id = {id})),
+                'total_posts', (SELECT COUNT(*) FROM posts WHERE topic_id = {id}),
+                'page', {page},
+                'per_page', {per_page}
             )::json;",
-            id = id
+            id = id,
+            page = page,
+            per_page = per_page,
+            offset = offset
         )).map_err(server_error)?;
         Ok(data)
     }
     #[cfg(not(feature = "server"))]
     {
         let _ = id;
+        let _ = page;
         Err(ServerFnError::new("server only"))
     }
 }

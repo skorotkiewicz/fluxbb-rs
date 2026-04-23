@@ -11,6 +11,21 @@ use crate::{
 
 #[component]
 pub fn Topic(id: i32) -> Element {
+    let navigator = use_navigator();
+    use_effect(move || {
+        navigator.push(Route::TopicPage { id, page: 1 });
+    });
+    rsx! {
+        section { class: "page",
+            article { class: "empty-state",
+                h3 { "Redirecting…" }
+            }
+        }
+    }
+}
+
+#[component]
+pub fn TopicPage(id: i32, page: i32) -> Element {
     let current_user = use_context::<Signal<Option<SessionUser>>>();
     let mut refresh = use_context::<Signal<()>>();
 
@@ -19,21 +34,20 @@ pub fn Topic(id: i32) -> Element {
 
     let data_resource = use_resource(move || async move {
         refresh();
-        load_topic_data(id).await
+        load_topic_data(id, page).await
     });
 
     let data = if let Some(Ok(data)) = data_resource() {
-    data
-} else {
-    return rsx! {
-        section { class: "page",
-            article { class: "empty-state",
-                h3 { "Loading topic…" }
+        data
+    } else {
+        return rsx! {
+            section { class: "page",
+                article { class: "empty-state",
+                    h3 { "Loading topic…" }
+                }
             }
-        }
-    }
-        
-};
+        };
+    };
 
     let topic = data.topic.clone();
     let posts = data.posts.clone();
@@ -50,6 +64,9 @@ pub fn Topic(id: i32) -> Element {
         .as_ref()
         .is_some_and(|u| u.group_id == 1);
     let is_closed = matches!(topic.status, crate::data::TopicStatus::Closed);
+
+    let total_pages = ((data.total_posts + data.per_page - 1) / data.per_page).max(1);
+    let current_page = data.page;
 
     rsx! {
         section { class: "page",
@@ -103,6 +120,42 @@ pub fn Topic(id: i32) -> Element {
                         post: post.clone(),
                         current_user: current_user().clone(),
                         topic_id: id,
+                    }
+                }
+            }
+
+            if total_pages > 1 {
+                nav { class: "pagination",
+                    if current_page > 1 {
+                        Link {
+                            class: "page-button",
+                            to: Route::TopicPage {
+                                id,
+                                page: current_page - 1,
+                            },
+                            "← Prev"
+                        }
+                    }
+                    for p in 1..=total_pages {
+                        if p == current_page {
+                            span { class: "page-button active", "{p}" }
+                        } else {
+                            Link {
+                                class: "page-button",
+                                to: Route::TopicPage { id, page: p },
+                                "{p}"
+                            }
+                        }
+                    }
+                    if current_page < total_pages {
+                        Link {
+                            class: "page-button",
+                            to: Route::TopicPage {
+                                id,
+                                page: current_page + 1,
+                            },
+                            "Next →"
+                        }
                     }
                 }
             }

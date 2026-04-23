@@ -80,7 +80,11 @@ pub fn PostCard(
                                             refresh.set(());
                                         }
                                         Ok(topic_id) => {
-                                            navigator.push(Route::Forum { id: topic_id });
+                                            navigator
+                                                .push(Route::ForumPage {
+                                                    id: topic_id,
+                                                    page: 1,
+                                                });
                                         }
                                         Err(_) => {}
                                     }

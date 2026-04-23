@@ -14,7 +14,7 @@ pub fn NewTopic(id: i32) -> Element {
 
     let data_resource = use_resource(move || async move {
         refresh();
-        load_forum_data(id).await
+        load_forum_data(id, 1).await
     });
 
     let data = if let Some(Ok(data)) = data_resource() {
@@ -115,8 +115,9 @@ pub fn NewTopic(id: i32) -> Element {
                                 Ok(result) => {
                                     refresh.set(());
                                     navigator
-                                        .push(Route::Topic {
+                                        .push(Route::TopicPage {
                                             id: result.topic_id,
+                                            page: 1,
                                         });
                                 }
                                 Err(e) => {

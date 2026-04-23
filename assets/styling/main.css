@@ -752,3 +752,43 @@ textarea {
     background: rgba(231, 220, 199, 0.4);
     border-radius: 0 8px 8px 0;
 }
+
+/* ── Pagination ── */
+
+.pagination {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    justify-content: center;
+    padding: 16px 0 8px;
+    flex-wrap: wrap;
+}
+
+.page-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 36px;
+    height: 36px;
+    padding: 0 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 0.9rem;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.page-button:hover {
+    background: var(--surface-strong);
+    border-color: var(--border-strong);
+}
+
+.page-button.active {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+    font-weight: 600;
+}

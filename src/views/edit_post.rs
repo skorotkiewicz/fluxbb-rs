@@ -48,7 +48,7 @@ pub fn EditPost(id: i32) -> Element {
     };
 
     let topic_resource = use_resource(move || async move {
-        load_topic_data(post.topic_id).await.ok()
+        load_topic_data(post.topic_id, 1).await.ok()
     });
 
     let topic_data = match topic_resource().flatten() {
@@ -136,7 +136,11 @@ pub fn EditPost(id: i32) -> Element {
                                     is_error.set(false);
                                     status.set("Post updated.".to_string());
                                     refresh.set(());
-                                    navigator.push(Route::Topic { id: topic.id });
+                                    navigator
+                                        .push(Route::TopicPage {
+                                            id: topic.id,
+                                            page: 1,
+                                        });
                                 }
                                 Err(e) => {
                                     is_error.set(true);

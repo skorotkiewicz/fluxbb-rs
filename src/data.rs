@@ -526,21 +526,6 @@ impl TopicStatus {
     }
 }
 
-#[post("/api/board")]
-pub async fn load_board() -> Result<AppData, ServerFnError> {
-    #[cfg(feature = "server")]
-    {
-        load_board_from_postgres().map_err(server_error)
-    }
-
-    #[cfg(not(feature = "server"))]
-    {
-        Err(ServerFnError::new(
-            "Board loading requires the server feature.",
-        ))
-    }
-}
-
 // ── View-specific loaders ──
 
 #[post("/api/shell-data")]

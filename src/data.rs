@@ -107,6 +107,8 @@ pub struct Topic {
     pub activity_rank: i32,
     #[serde(default)]
     pub reply_count: i32,
+    #[serde(default)]
+    pub sticky: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -577,10 +579,10 @@ pub async fn load_index_data() -> Result<IndexData, ServerFnError> {
                         f.id AS forum_id,
                         (SELECT COUNT(*)::int FROM topics WHERE forum_id = f.id) AS topic_count,
                         COALESCE((SELECT COUNT(*)::int FROM posts WHERE topic_id IN (SELECT id FROM topics WHERE forum_id = f.id)), 0) AS post_count,
-                        COALESCE((SELECT id FROM topics WHERE forum_id = f.id ORDER BY activity_rank DESC, id LIMIT 1), 0) AS last_topic_id,
-                        COALESCE((SELECT subject FROM topics WHERE forum_id = f.id ORDER BY activity_rank DESC, id LIMIT 1), '') AS last_topic_subject,
-                        COALESCE((SELECT u.username FROM posts p JOIN users u ON u.id = p.author_id WHERE p.topic_id = (SELECT id FROM topics WHERE forum_id = f.id ORDER BY activity_rank DESC, id LIMIT 1) ORDER BY p.position DESC, p.id DESC LIMIT 1), '') AS last_post_author,
-                        COALESCE((SELECT p.posted_at FROM posts p WHERE p.topic_id = (SELECT id FROM topics WHERE forum_id = f.id ORDER BY activity_rank DESC, id LIMIT 1) ORDER BY p.position DESC, p.id DESC LIMIT 1), '') AS last_posted_at
+                        COALESCE((SELECT id FROM topics WHERE forum_id = f.id ORDER BY sticky DESC, activity_rank DESC, id LIMIT 1), 0) AS last_topic_id,
+                        COALESCE((SELECT subject FROM topics WHERE forum_id = f.id ORDER BY sticky DESC, activity_rank DESC, id LIMIT 1), '') AS last_topic_subject,
+                        COALESCE((SELECT u.username FROM posts p JOIN users u ON u.id = p.author_id WHERE p.topic_id = (SELECT id FROM topics WHERE forum_id = f.id ORDER BY sticky DESC, activity_rank DESC, id LIMIT 1) ORDER BY p.position DESC, p.id DESC LIMIT 1), '') AS last_post_author,
+                        COALESCE((SELECT p.posted_at FROM posts p WHERE p.topic_id = (SELECT id FROM topics WHERE forum_id = f.id ORDER BY sticky DESC, activity_rank DESC, id LIMIT 1) ORDER BY p.position DESC, p.id DESC LIMIT 1), '') AS last_posted_at
                     FROM forums f
                 ) fa),
                 'stats', json_build_object(
@@ -590,7 +592,7 @@ pub async fn load_index_data() -> Result<IndexData, ServerFnError> {
                     'newest_member', COALESCE((SELECT username FROM users ORDER BY id DESC LIMIT 1), '')
                 ),
                 'recent_topics', (SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json) FROM (
-                    SELECT id, forum_id, author_id, subject, status, views, tags, created_at, updated_at, activity_rank
+                    SELECT id, forum_id, author_id, subject, status, views, tags, created_at, updated_at, activity_rank, sticky
                     FROM topics ORDER BY activity_rank DESC, id LIMIT 4
                 ) t),
                 'recent_users', (SELECT COALESCE(json_agg(row_to_json(u)), '[]'::json) FROM (
@@ -600,6 +602,21 @@ pub async fn load_index_data() -> Result<IndexData, ServerFnError> {
             )::json;",
         ).map_err(server_error)?;
         Ok(data)
+    }
+    #[cfg(not(feature = "server"))]
+    {
+        Err(ServerFnError::new("server only"))
+    }
+}
+
+#[post("/api/forums")]
+pub async fn load_forums() -> Result<Vec<Forum>, ServerFnError> {
+    #[cfg(feature = "server")]
+    {
+        let forums = run_json_query::<Vec<Forum>>(
+            "SELECT COALESCE(json_agg(row_to_json(f)), '[]'::json) FROM (SELECT id, category_id, name, description, moderators, sort_order FROM forums ORDER BY category_id, sort_order, id) f;",
+        ).map_err(server_error)?;
+        Ok(forums)
     }
     #[cfg(not(feature = "server"))]
     {
@@ -618,9 +635,9 @@ pub async fn load_forum_data(id: i32, page: i32) -> Result<ForumData, ServerFnEr
             "SELECT json_build_object(
                 'forum', (SELECT row_to_json(f) FROM forums f WHERE f.id = {id}),
                 'topics', (SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json) FROM (
-                    SELECT id, forum_id, author_id, subject, status, views, tags, created_at, updated_at, activity_rank,
+                    SELECT id, forum_id, author_id, subject, status, views, tags, created_at, updated_at, activity_rank, sticky,
                         COALESCE((SELECT COUNT(*) FROM posts WHERE topic_id = t.id), 0) - 1 AS reply_count
-                    FROM topics t WHERE forum_id = {id} ORDER BY activity_rank DESC, id
+                    FROM topics t WHERE forum_id = {id} ORDER BY sticky DESC, activity_rank DESC, id
                     LIMIT {per_page} OFFSET {offset}
                 ) t),
                 'users', (SELECT COALESCE(json_agg(row_to_json(u)), '[]'::json) FROM (
@@ -696,7 +713,7 @@ pub async fn load_profile_data(id: i32) -> Result<ProfileData, ServerFnError> {
                     FROM users WHERE id = {id}
                 ) u),
                 'topics', (SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json) FROM (
-                    SELECT id, forum_id, author_id, subject, status, views, tags, created_at, updated_at, activity_rank
+                    SELECT id, forum_id, author_id, subject, status, views, tags, created_at, updated_at, activity_rank, sticky
                     FROM topics WHERE author_id = {id} ORDER BY activity_rank DESC, id LIMIT 10
                 ) t),
                 'posts', (SELECT COALESCE(json_agg(row_to_json(p)), '[]'::json) FROM (
@@ -745,7 +762,7 @@ pub async fn search_server(query: String) -> Result<SearchResults, ServerFnError
         let results = run_json_query::<SearchResults>(&format!(
             "SELECT json_build_object(
                 'topics', (SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json) FROM (
-                    SELECT id, forum_id, author_id, subject, status, views, tags, created_at, updated_at, activity_rank
+                    SELECT id, forum_id, author_id, subject, status, views, tags, created_at, updated_at, activity_rank, sticky
                     FROM topics
                     WHERE LOWER(subject) LIKE {}
                        OR EXISTS (SELECT 1 FROM unnest(tags) tag WHERE LOWER(tag) LIKE {})
@@ -796,7 +813,7 @@ pub async fn load_admin_data() -> Result<AdminData, ServerFnError> {
                 'categories', (SELECT COALESCE(json_agg(row_to_json(c)), '[]'::json) FROM (SELECT id, name, description, sort_order FROM categories ORDER BY sort_order, id) c),
                 'forums', (SELECT COALESCE(json_agg(row_to_json(f)), '[]'::json) FROM (SELECT id, category_id, name, description, moderators, sort_order FROM forums ORDER BY category_id, sort_order, id) f),
                 'users', (SELECT COALESCE(json_agg(row_to_json(u)), '[]'::json) FROM (SELECT id, username, title, status, joined_at, post_count, location, about, last_seen, email, group_id FROM users ORDER BY id) u),
-                'topics', (SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json) FROM (SELECT id, forum_id, author_id, subject, status, views, tags, created_at, updated_at, activity_rank FROM topics ORDER BY activity_rank DESC, id) t)
+                'topics', (SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json) FROM (SELECT id, forum_id, author_id, subject, status, views, tags, created_at, updated_at, activity_rank, sticky FROM topics ORDER BY sticky DESC, activity_rank DESC, id) t)
             )::json;",
         ).map_err(server_error)?;
         Ok(data)
@@ -1564,6 +1581,42 @@ pub async fn move_topic(input: MoveTopicForm) -> Result<(), ServerFnError> {
     }
 }
 
+#[post("/api/toggle-sticky", headers: HeaderMap)]
+pub async fn toggle_sticky(topic_id: i32) -> Result<bool, ServerFnError> {
+    #[cfg(feature = "server")]
+    {
+        let user = require_session(&headers).map_err(server_error)?;
+        if user.group_id != 1 {
+            return Err(server_error("Admin only.".into()));
+        }
+
+        #[derive(Deserialize)]
+        struct StickyRow {
+            sticky: bool,
+        }
+
+        let row = run_json_query::<StickyRow>(&format!(
+            "SELECT row_to_json(r) FROM (SELECT sticky FROM topics WHERE id = {}) AS r;",
+            topic_id
+        ))
+        .map_err(server_error)?;
+
+        let new_sticky = !row.sticky;
+        run_exec(&format!(
+            "UPDATE topics SET sticky = {} WHERE id = {};",
+            new_sticky, topic_id
+        ))
+        .map_err(server_error)?;
+
+        Ok(new_sticky)
+    }
+    #[cfg(not(feature = "server"))]
+    {
+        let _ = topic_id;
+        Err(ServerFnError::new("server only"))
+    }
+}
+
 #[post("/api/toggle-topic-status", headers: HeaderMap)]
 pub async fn toggle_topic_status(topic_id: i32) -> Result<String, ServerFnError> {
     #[cfg(feature = "server")]
@@ -1889,6 +1942,22 @@ fn get_group(group_id: i32) -> Result<Group, String> {
 }
 
 #[cfg(feature = "server")]
+fn check_flood(user_id: i32, is_admin: bool) -> Result<(), String> {
+    if is_admin {
+        return Ok(());
+    }
+    let last_post = run_scalar_i64(&format!(
+        "SELECT COALESCE(EXTRACT(EPOCH FROM MAX(posted_at::timestamp))::bigint, 0) FROM posts WHERE author_id = {};",
+        user_id
+    ))?;
+    let now = unix_now();
+    if last_post > 0 && now - last_post < 30 {
+        return Err("Please wait at least 30 seconds between posts.".to_string());
+    }
+    Ok(())
+}
+
+#[cfg(feature = "server")]
 fn require_permission(
     headers: &HeaderMap,
     perm: fn(&Group) -> bool,
@@ -1904,6 +1973,8 @@ fn require_permission(
 #[cfg(feature = "server")]
 fn create_topic_impl(input: NewTopicForm, headers: HeaderMap) -> Result<NewTopicResult, String> {
     let user = require_permission(&headers, |g| g.post_topics)?;
+    let group = get_group(user.group_id)?;
+    check_flood(user.id, group.is_admin)?;
     let subject = input.subject.trim();
     let message = input.message.trim();
     if subject.is_empty() {
@@ -1957,6 +2028,8 @@ fn create_topic_impl(input: NewTopicForm, headers: HeaderMap) -> Result<NewTopic
 #[cfg(feature = "server")]
 fn create_reply_impl(input: ReplyForm, headers: HeaderMap) -> Result<(), String> {
     let user = require_permission(&headers, |g| g.post_replies)?;
+    let group = get_group(user.group_id)?;
+    check_flood(user.id, group.is_admin)?;
     let message = input.message.trim();
     if message.is_empty() {
         return Err("Message is required.".to_string());
@@ -2052,9 +2125,9 @@ fn load_board_from_postgres() -> Result<AppData, String> {
     let topics = run_json_query::<Vec<Topic>>(
         "SELECT COALESCE(json_agg(row_to_json(topic_row)), '[]'::json)
          FROM (
-             SELECT id, forum_id, author_id, subject, status, views, tags, created_at, updated_at, activity_rank
-             FROM topics
-             ORDER BY activity_rank DESC, id
+             SELECT id, forum_id, author_id, subject, status, views, tags, created_at, updated_at, activity_rank, sticky
+              FROM topics
+              ORDER BY sticky DESC, activity_rank DESC, id
          ) AS topic_row;",
     )?;
 

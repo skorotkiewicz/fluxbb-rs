@@ -50,7 +50,8 @@ CREATE TABLE IF NOT EXISTS topics (
     tags TEXT[] NOT NULL DEFAULT '{}',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
-    activity_rank INTEGER NOT NULL DEFAULT 0
+    activity_rank INTEGER NOT NULL DEFAULT 0,
+    sticky BOOLEAN NOT NULL DEFAULT false
 );
 
 CREATE TABLE IF NOT EXISTS posts (

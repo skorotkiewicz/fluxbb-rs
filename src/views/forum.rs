@@ -2,7 +2,7 @@ use dioxus::prelude::*;
 
 use crate::{
     components::{EmptyState, SectionHeader, TopicStatusBadge},
-    data::{load_forum_data, ForumData, SessionUser},
+    data::{load_forum_data, mark_all_read, toggle_topic_status, ForumData, SessionUser},
     Route,
 };
 
@@ -51,6 +51,8 @@ pub fn ForumPage(id: i32, page: i32) -> Element {
     let total_pages = ((data.total_topics + data.per_page - 1) / data.per_page).max(1);
     let current_page = data.page;
 
+    let is_admin = current_user().as_ref().is_some_and(|u| u.group_id == 1);
+
     rsx! {
         section { class: "page",
             nav { class: "breadcrumbs",
@@ -69,7 +71,18 @@ pub fn ForumPage(id: i32, page: i32) -> Element {
             }
 
             if current_user().is_some() {
-                Link { class: "primary-button", to: Route::NewTopic { id }, "New topic" }
+                div { class: "forum-actions",
+                    Link { class: "primary-button", to: Route::NewTopic { id }, "New topic" }
+                    button {
+                        class: "secondary-button",
+                        onclick: move |_| {
+                            spawn(async move {
+                                let _ = mark_all_read().await;
+                            });
+                        },
+                        "Mark all as read"
+                    }
+                }
             }
 
             article { class: "panel",
@@ -93,12 +106,18 @@ pub fn ForumPage(id: i32, page: i32) -> Element {
 
                         for topic in topics {
                             if let Some(author) = users.get(&topic.author_id) {
-                                div { class: "topic-row",
+                                div { class: if topic.sticky { "topic-row topic-sticky" } else { "topic-row" },
                                     div { class: "topic-main",
                                         TopicStatusBadge { status: topic.status.clone() }
+                                        if topic.sticky {
+                                            span { class: "badge badge-pinned", "Sticky" }
+                                        }
                                         Link {
                                             class: "topic-link",
-                                            to: Route::Topic { id: topic.id },
+                                            to: Route::TopicPage {
+                                                id: topic.id,
+                                                page: 1,
+                                            },
                                             "{topic.subject}"
                                         }
                                         if !topic.tags.is_empty() {
@@ -106,6 +125,25 @@ pub fn ForumPage(id: i32, page: i32) -> Element {
                                         }
                                         p { class: "topic-meta",
                                             "by {author.username} · {topic.created_at}"
+                                        }
+                                        if is_admin {
+                                            div { class: "topic-admin-actions",
+                                                button {
+                                                    class: "tiny-button",
+                                                    onclick: move |_| {
+                                                        let tid = topic.id;
+                                                        spawn(async move {
+                                                            let _ = toggle_topic_status(tid).await;
+                                                            refresh.set(());
+                                                        });
+                                                    },
+                                                    if matches!(topic.status, crate::data::TopicStatus::Closed) {
+                                                        "Open"
+                                                    } else {
+                                                        "Close"
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                     p { class: "topic-metric", "{topic.reply_count()}" }

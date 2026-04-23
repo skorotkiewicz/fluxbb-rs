@@ -3,8 +3,9 @@ use dioxus::prelude::*;
 use crate::{
     components::{EmptyState, PostCard, TopicStatusBadge},
     data::{
-        create_reply, delete_topic, increment_topic_views, load_forum_data, load_topic_data,
-        move_topic, toggle_topic_status, MoveTopicForm, ReplyForm, SessionUser, TopicData,
+        create_reply, delete_topic, increment_topic_views, load_forums, load_topic_data,
+        move_topic, toggle_sticky, toggle_topic_status, MoveTopicForm, ReplyForm, SessionUser,
+        TopicData,
     },
     Route,
 };
@@ -72,13 +73,14 @@ pub fn TopicPage(id: i32, page: i32) -> Element {
 
     let forums_resource = use_resource(move || async move {
         if is_admin {
-            load_forum_data(0, 1).await.ok().map(|d| d.forum)
+            load_forums().await.unwrap_or_default()
         } else {
-            None
+            Vec::new()
         }
     });
 
     let forum_id = forum.as_ref().map(|f| f.id).unwrap_or(0);
+    let forums = forums_resource().unwrap_or_default();
 
     rsx! {
         section { class: "page",
@@ -101,6 +103,9 @@ pub fn TopicPage(id: i32, page: i32) -> Element {
             article { class: "hero-card compact-hero",
                 div { class: "topic-hero-topline",
                     TopicStatusBadge { status: topic.status.clone() }
+                    if topic.sticky {
+                        span { class: "badge badge-pinned", "Sticky" }
+                    }
                     if !topic.tags.is_empty() {
                         p { class: "topic-tags", "{topic.tags.join(\" | \")}" }
                     }
@@ -112,6 +117,67 @@ pub fn TopicPage(id: i32, page: i32) -> Element {
 
                 if is_admin {
                     div { class: "post-actions",
+                        if !forums.is_empty() {
+                            select {
+                                class: "small-select",
+                                value: "{move_forum_id}",
+                                onchange: move |e| {
+                                    if let Ok(v) = e.value().parse::<i32>() {
+                                        move_forum_id.set(v);
+                                    }
+                                },
+                                option { value: "0", "Move to forum…" }
+                                for f in forums {
+                                    if f.id != forum_id {
+                                        option { value: "{f.id}", "{f.name}" }
+                                    }
+                                }
+                            }
+                            button {
+                                class: "small-button",
+                                disabled: move_forum_id() == 0,
+                                onclick: move |_| {
+                                let tid = id;
+                                let fid = move_forum_id();
+                                if fid == 0 {
+                                    return;
+                                }
+                                let navigator = navigator.clone();
+                                spawn(async move {
+                                    match move_topic(MoveTopicForm {
+                                        topic_id: tid,
+                                        forum_id: fid,
+                                    }).await
+                                    {
+                                        Ok(_) => {
+                                            navigator
+                                                .push(Route::ForumPage {
+                                                    id: fid,
+                                                    page: 1,
+                                                });
+                                        }
+                                        Err(_) => {}
+                                    }
+                                });
+                                },
+                                "Move"
+                            }
+                        }
+                        button {
+                            class: "small-button",
+                            onclick: move |_| {
+                                let tid = id;
+                                spawn(async move {
+                                    let _ = toggle_sticky(tid).await;
+                                    refresh.set(());
+                                });
+                            },
+                            if topic.sticky {
+                                "Unstick topic"
+                            } else {
+                                "Stick topic"
+                            }
+                        }
                         button {
                             class: "small-button",
                             onclick: move |_| {

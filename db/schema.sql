@@ -31,7 +31,13 @@ CREATE TABLE IF NOT EXISTS users (
     post_count INTEGER NOT NULL DEFAULT 0,
     location TEXT NOT NULL,
     about TEXT NOT NULL,
-    last_seen TEXT NOT NULL
+    last_seen TEXT NOT NULL,
+    email TEXT NOT NULL DEFAULT '',
+    password_hash TEXT NOT NULL DEFAULT '',
+    group_id INTEGER NOT NULL DEFAULT 4,
+    registered_at BIGINT NOT NULL DEFAULT 0,
+    last_visit BIGINT NOT NULL DEFAULT 0,
+    registration_ip TEXT NOT NULL DEFAULT '127.0.0.1'
 );
 
 CREATE TABLE IF NOT EXISTS topics (
@@ -57,3 +63,20 @@ CREATE TABLE IF NOT EXISTS posts (
     signature TEXT,
     position INTEGER NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS forum_sessions (
+    token TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at BIGINT NOT NULL,
+    expires_at BIGINT NOT NULL,
+    last_seen BIGINT NOT NULL
+);
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT NOT NULL DEFAULT '';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT NOT NULL DEFAULT '';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS group_id INTEGER NOT NULL DEFAULT 4;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS registered_at BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS last_visit BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS registration_ip TEXT NOT NULL DEFAULT '127.0.0.1';
+
+CREATE INDEX IF NOT EXISTS forum_sessions_user_id_idx ON forum_sessions (user_id);

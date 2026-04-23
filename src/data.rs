@@ -1,9 +1,19 @@
-use std::{cmp::Reverse, process::Command};
+use std::{
+    cmp::Reverse,
+    net::IpAddr,
+    process::Command,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use dioxus::prelude::*;
+use http::HeaderMap;
+use rand::RngCore;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 const DATABASE_URL: &str = "postgresql://dev:password@localhost:5432/fluxbb";
+const SESSION_COOKIE: &str = "fluxbb_rs_session";
+const SESSION_MAX_AGE_SECS: i64 = 60 * 60 * 24 * 14;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct AppData {
@@ -114,378 +124,45 @@ pub struct SearchResults {
     pub users: Vec<UserProfile>,
 }
 
-impl AppData {
-    pub fn fallback() -> Self {
-        Self {
-            meta: BoardMeta {
-                title: "FluxBB RS".to_string(),
-                tagline: "FluxBB reimagined as a Dioxus 0.7 forum shell with Postgres-backed content.".to_string(),
-                announcement_title: "Migration alpha".to_string(),
-                announcement_body: "The board layout, topic browsing, member directory, and search now live in Rust. Posting and moderation flows are staged for the next slice.".to_string(),
-            },
-            categories: vec![
-                Category {
-                    id: 1,
-                    name: "Announcements".to_string(),
-                    description: "Project direction, release notes, and migration status.".to_string(),
-                    sort_order: 1,
-                },
-                Category {
-                    id: 2,
-                    name: "Community".to_string(),
-                    description: "Discussion spaces that mirror the core public FluxBB experience.".to_string(),
-                    sort_order: 2,
-                },
-                Category {
-                    id: 3,
-                    name: "Workshop".to_string(),
-                    description: "Implementation notes for the Dioxus and Rust rewrite.".to_string(),
-                    sort_order: 3,
-                },
-            ],
-            forums: vec![
-                Forum {
-                    id: 1,
-                    category_id: 1,
-                    name: "Release Notes".to_string(),
-                    description: "Track each migration milestone and the current web parity status.".to_string(),
-                    moderators: vec!["nora".to_string()],
-                    sort_order: 1,
-                },
-                Forum {
-                    id: 2,
-                    category_id: 1,
-                    name: "Migration Lab".to_string(),
-                    description: "Patterns for moving classic FluxBB screens into RSX and fullstack Rust.".to_string(),
-                    moderators: vec!["nora".to_string(), "ellis".to_string()],
-                    sort_order: 2,
-                },
-                Forum {
-                    id: 3,
-                    category_id: 2,
-                    name: "General Discussion".to_string(),
-                    description: "Open-ended board conversation and showcase threads.".to_string(),
-                    moderators: vec!["rhea".to_string()],
-                    sort_order: 1,
-                },
-                Forum {
-                    id: 4,
-                    category_id: 2,
-                    name: "Support".to_string(),
-                    description: "Configuration, deployment, and migration troubleshooting.".to_string(),
-                    moderators: vec!["kai".to_string()],
-                    sort_order: 2,
-                },
-                Forum {
-                    id: 5,
-                    category_id: 3,
-                    name: "Themes and Extensions".to_string(),
-                    description: "Style ports, plugin ideas, and frontend experiments.".to_string(),
-                    moderators: vec!["mira".to_string()],
-                    sort_order: 1,
-                },
-                Forum {
-                    id: 6,
-                    category_id: 3,
-                    name: "Backend Planning".to_string(),
-                    description: "Database, auth, and moderation architecture for the Rust stack.".to_string(),
-                    moderators: vec!["ellis".to_string()],
-                    sort_order: 2,
-                },
-            ],
-            users: vec![
-                UserProfile {
-                    id: 1,
-                    username: "nora".to_string(),
-                    title: "Administrator".to_string(),
-                    status: "Online".to_string(),
-                    joined_at: "2026-04-01".to_string(),
-                    post_count: 482,
-                    location: "Berlin".to_string(),
-                    about: "Maintains the Dioxus rewrite and release cadence.".to_string(),
-                    last_seen: "a minute ago".to_string(),
-                },
-                UserProfile {
-                    id: 2,
-                    username: "ellis".to_string(),
-                    title: "Core Maintainer".to_string(),
-                    status: "Online".to_string(),
-                    joined_at: "2026-04-02".to_string(),
-                    post_count: 318,
-                    location: "Copenhagen".to_string(),
-                    about: "Focuses on schema design, hydration safety, and deployment ergonomics.".to_string(),
-                    last_seen: "5 minutes ago".to_string(),
-                },
-                UserProfile {
-                    id: 3,
-                    username: "rhea".to_string(),
-                    title: "Moderator".to_string(),
-                    status: "Reviewing".to_string(),
-                    joined_at: "2026-04-03".to_string(),
-                    post_count: 211,
-                    location: "Amsterdam".to_string(),
-                    about: "Moderation lead and theme curator.".to_string(),
-                    last_seen: "20 minutes ago".to_string(),
-                },
-                UserProfile {
-                    id: 4,
-                    username: "kai".to_string(),
-                    title: "Support Lead".to_string(),
-                    status: "Available".to_string(),
-                    joined_at: "2026-04-05".to_string(),
-                    post_count: 177,
-                    location: "Lisbon".to_string(),
-                    about: "Handles onboarding, FAQ cleanup, and migration support.".to_string(),
-                    last_seen: "12 minutes ago".to_string(),
-                },
-                UserProfile {
-                    id: 5,
-                    username: "mira".to_string(),
-                    title: "Theme Builder".to_string(),
-                    status: "Designing".to_string(),
-                    joined_at: "2026-04-09".to_string(),
-                    post_count: 124,
-                    location: "Prague".to_string(),
-                    about: "Ports classic board themes into the new CSS system.".to_string(),
-                    last_seen: "an hour ago".to_string(),
-                },
-                UserProfile {
-                    id: 6,
-                    username: "sol".to_string(),
-                    title: "Member".to_string(),
-                    status: "Reading".to_string(),
-                    joined_at: "2026-04-20".to_string(),
-                    post_count: 14,
-                    location: "Warsaw".to_string(),
-                    about: "Testing the first public preview and reporting rough edges.".to_string(),
-                    last_seen: "just now".to_string(),
-                },
-            ],
-            topics: vec![
-                Topic {
-                    id: 101,
-                    forum_id: 1,
-                    author_id: 1,
-                    subject: "0.1 migration alpha is live".to_string(),
-                    status: TopicStatus::Pinned,
-                    views: 934,
-                    tags: vec!["release".to_string(), "migration".to_string()],
-                    created_at: "2026-04-20 09:15 UTC".to_string(),
-                    updated_at: "2026-04-23 19:40 UTC".to_string(),
-                    activity_rank: 400,
-                },
-                Topic {
-                    id: 102,
-                    forum_id: 2,
-                    author_id: 2,
-                    subject: "Mapping FluxBB templates to RSX".to_string(),
-                    status: TopicStatus::Hot,
-                    views: 486,
-                    tags: vec!["rsx".to_string(), "layout".to_string()],
-                    created_at: "2026-04-19 13:10 UTC".to_string(),
-                    updated_at: "2026-04-23 18:05 UTC".to_string(),
-                    activity_rank: 390,
-                },
-                Topic {
-                    id: 201,
-                    forum_id: 3,
-                    author_id: 3,
-                    subject: "Show your forum theme experiments".to_string(),
-                    status: TopicStatus::Fresh,
-                    views: 212,
-                    tags: vec!["theme".to_string(), "showcase".to_string()],
-                    created_at: "2026-04-18 17:45 UTC".to_string(),
-                    updated_at: "2026-04-22 16:55 UTC".to_string(),
-                    activity_rank: 360,
-                },
-                Topic {
-                    id: 202,
-                    forum_id: 4,
-                    author_id: 4,
-                    subject: "Session strategy for web-only deploys".to_string(),
-                    status: TopicStatus::Resolved,
-                    views: 305,
-                    tags: vec!["auth".to_string(), "deployment".to_string()],
-                    created_at: "2026-04-17 10:20 UTC".to_string(),
-                    updated_at: "2026-04-22 11:35 UTC".to_string(),
-                    activity_rank: 340,
-                },
-                Topic {
-                    id: 301,
-                    forum_id: 5,
-                    author_id: 5,
-                    subject: "Theme pack wishlist".to_string(),
-                    status: TopicStatus::Hot,
-                    views: 267,
-                    tags: vec!["css".to_string(), "theme".to_string()],
-                    created_at: "2026-04-16 15:00 UTC".to_string(),
-                    updated_at: "2026-04-21 20:20 UTC".to_string(),
-                    activity_rank: 320,
-                },
-                Topic {
-                    id: 302,
-                    forum_id: 6,
-                    author_id: 2,
-                    subject: "Persistence layer options for a post-PHP stack".to_string(),
-                    status: TopicStatus::Pinned,
-                    views: 522,
-                    tags: vec!["postgres".to_string(), "architecture".to_string()],
-                    created_at: "2026-04-15 08:55 UTC".to_string(),
-                    updated_at: "2026-04-23 17:25 UTC".to_string(),
-                    activity_rank: 380,
-                },
-            ],
-            posts: vec![
-                Post {
-                    id: 1001,
-                    topic_id: 101,
-                    author_id: 1,
-                    posted_at: "2026-04-20 09:15 UTC".to_string(),
-                    edited_at: Some("2026-04-23 19:05 UTC".to_string()),
-                    body: vec![
-                        "The first Rust and Dioxus web slice is up. Board index, forum view, topic view, search, and member directory are all wired.".to_string(),
-                        "Next up are posting workflows, session-backed authentication, and moderation actions.".to_string(),
-                    ],
-                    signature: Some("Keep migrations boring.".to_string()),
-                    position: 1,
-                },
-                Post {
-                    id: 1002,
-                    topic_id: 101,
-                    author_id: 6,
-                    posted_at: "2026-04-23 19:40 UTC".to_string(),
-                    edited_at: None,
-                    body: vec![
-                        "The browsing flow feels solid. The search page made it much easier to see where the PHP information architecture landed in the new app.".to_string(),
-                    ],
-                    signature: None,
-                    position: 2,
-                },
-                Post {
-                    id: 1101,
-                    topic_id: 102,
-                    author_id: 2,
-                    posted_at: "2026-04-19 13:10 UTC".to_string(),
-                    edited_at: None,
-                    body: vec![
-                        "The old header and body templates map cleanly to a shared shell plus route pages. The tricky part is keeping table-heavy layouts readable on mobile.".to_string(),
-                    ],
-                    signature: None,
-                    position: 1,
-                },
-                Post {
-                    id: 1102,
-                    topic_id: 102,
-                    author_id: 5,
-                    posted_at: "2026-04-23 18:05 UTC".to_string(),
-                    edited_at: None,
-                    body: vec![
-                        "I had the best results by preserving the forum-table mental model but shifting the last-post metadata into a stacked layout on narrow widths.".to_string(),
-                    ],
-                    signature: Some("Visual parity matters, but not at the expense of scan speed.".to_string()),
-                    position: 2,
-                },
-                Post {
-                    id: 1201,
-                    topic_id: 201,
-                    author_id: 3,
-                    posted_at: "2026-04-18 17:45 UTC".to_string(),
-                    edited_at: None,
-                    body: vec![
-                        "If you are testing theme ideas, post screenshots and note whether you are optimizing for nostalgia, readability, or moderation-heavy workflows.".to_string(),
-                    ],
-                    signature: None,
-                    position: 1,
-                },
-                Post {
-                    id: 1202,
-                    topic_id: 201,
-                    author_id: 5,
-                    posted_at: "2026-04-22 16:55 UTC".to_string(),
-                    edited_at: None,
-                    body: vec![
-                        "Copper accents plus parchment cards ended up closer to the old FluxBB tone than another dark dashboard treatment.".to_string(),
-                    ],
-                    signature: None,
-                    position: 2,
-                },
-                Post {
-                    id: 1301,
-                    topic_id: 202,
-                    author_id: 4,
-                    posted_at: "2026-04-17 10:20 UTC".to_string(),
-                    edited_at: None,
-                    body: vec![
-                        "For the first web deploy, I would keep auth server-backed and session cookie based. JWT would only add edge cases we do not need yet.".to_string(),
-                    ],
-                    signature: None,
-                    position: 1,
-                },
-                Post {
-                    id: 1302,
-                    topic_id: 202,
-                    author_id: 2,
-                    posted_at: "2026-04-22 11:35 UTC".to_string(),
-                    edited_at: None,
-                    body: vec![
-                        "Agreed. The app shell already centralizes enough data that classic session handling will be the lowest-risk path for the next increment.".to_string(),
-                    ],
-                    signature: None,
-                    position: 2,
-                },
-                Post {
-                    id: 1401,
-                    topic_id: 301,
-                    author_id: 5,
-                    posted_at: "2026-04-16 15:00 UTC".to_string(),
-                    edited_at: None,
-                    body: vec![
-                        "Current shortlist: Air-inspired light theme, a sharper editorial variant, and a contrast-first moderation skin.".to_string(),
-                    ],
-                    signature: None,
-                    position: 1,
-                },
-                Post {
-                    id: 1402,
-                    topic_id: 301,
-                    author_id: 3,
-                    posted_at: "2026-04-21 20:20 UTC".to_string(),
-                    edited_at: None,
-                    body: vec![
-                        "Please keep moderation cues strong. Reports, locked topics, and read state should stay obvious at a glance.".to_string(),
-                    ],
-                    signature: None,
-                    position: 2,
-                },
-                Post {
-                    id: 1501,
-                    topic_id: 302,
-                    author_id: 2,
-                    posted_at: "2026-04-15 08:55 UTC".to_string(),
-                    edited_at: Some("2026-04-23 16:10 UTC".to_string()),
-                    body: vec![
-                        "The migration stack needs normalized categories, forums, topics, posts, and users first. Anything more can layer on after the public flows are stable.".to_string(),
-                        "Postgres is enough for the first backend pass; the schema should stay friendly to future search indexing and moderation queues.".to_string(),
-                    ],
-                    signature: None,
-                    position: 1,
-                },
-                Post {
-                    id: 1502,
-                    topic_id: 302,
-                    author_id: 1,
-                    posted_at: "2026-04-23 17:25 UTC".to_string(),
-                    edited_at: None,
-                    body: vec![
-                        "That is the direction I am landing in this slice as well. Keep the schema obvious, then layer richer server functions on top.".to_string(),
-                    ],
-                    signature: Some("Correctness before cleverness.".to_string()),
-                    position: 2,
-                },
-            ],
-        }
-    }
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct SessionUser {
+    pub id: i32,
+    pub username: String,
+    pub title: String,
+}
 
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct AuthResponse {
+    pub user: SessionUser,
+    pub session_token: String,
+    pub message: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct RegisterForm {
+    pub username: String,
+    pub email: String,
+    pub password: String,
+    pub location: String,
+    pub about: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct LoginForm {
+    pub username: String,
+    pub password: String,
+    pub remember: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+struct StoredAuthUser {
+    pub id: i32,
+    pub username: String,
+    pub title: String,
+    pub password_hash: String,
+}
+
+impl AppData {
     pub fn board_stats(&self) -> BoardStats {
         let newest_member = self
             .users
@@ -648,27 +325,236 @@ impl TopicStatus {
     }
 }
 
-#[server]
+#[post("/api/board")]
 pub async fn load_board() -> Result<AppData, ServerFnError> {
     #[cfg(feature = "server")]
     {
-        Ok(load_board_from_postgres().unwrap_or_else(|_| AppData::fallback()))
+        load_board_from_postgres().map_err(server_error)
     }
 
     #[cfg(not(feature = "server"))]
     {
-        Ok(AppData::fallback())
+        Err(ServerFnError::new(
+            "Board loading requires the server feature.",
+        ))
+    }
+}
+
+#[post("/api/register")]
+pub async fn register_account(input: RegisterForm) -> Result<AuthResponse, ServerFnError> {
+    #[cfg(feature = "server")]
+    {
+        register_account_impl(input).map_err(server_error)
+    }
+
+    #[cfg(not(feature = "server"))]
+    {
+        let _ = input;
+        Err(ServerFnError::new(
+            "Registration requires the server feature.",
+        ))
+    }
+}
+
+#[post("/api/login")]
+pub async fn login_account(input: LoginForm) -> Result<AuthResponse, ServerFnError> {
+    #[cfg(feature = "server")]
+    {
+        login_account_impl(input).map_err(server_error)
+    }
+
+    #[cfg(not(feature = "server"))]
+    {
+        let _ = input;
+        Err(ServerFnError::new("Login requires the server feature."))
+    }
+}
+
+#[post("/api/current-session", headers: HeaderMap)]
+pub async fn current_session_user() -> Result<Option<SessionUser>, ServerFnError> {
+    #[cfg(feature = "server")]
+    {
+        current_session_user_impl(headers).map_err(server_error)
+    }
+
+    #[cfg(not(feature = "server"))]
+    {
+        Ok(None)
+    }
+}
+
+#[post("/api/logout", headers: HeaderMap)]
+pub async fn logout_account() -> Result<(), ServerFnError> {
+    #[cfg(feature = "server")]
+    {
+        logout_account_impl(headers).map_err(server_error)
+    }
+
+    #[cfg(not(feature = "server"))]
+    {
+        Ok(())
     }
 }
 
 #[cfg(feature = "server")]
+fn register_account_impl(input: RegisterForm) -> Result<AuthResponse, String> {
+    let username = normalize_username(&input.username);
+    let email = input.email.trim().to_lowercase();
+    let location = input.location.trim();
+    let about = input.about.trim();
+
+    validate_username(&username)?;
+    validate_email(&email)?;
+
+    if input.password.chars().count() < 9 {
+        return Err("Password must be at least 9 characters long.".to_string());
+    }
+
+    if username_exists(&username)? {
+        return Err("That username is already registered.".to_string());
+    }
+
+    if email_exists(&email)? {
+        return Err("That email address is already in use.".to_string());
+    }
+
+    let salt = random_hex(16);
+    let password_hash = hash_password(&input.password, &salt);
+
+    let user = run_json_query::<SessionUser>(&format!(
+        "WITH inserted AS (
+             INSERT INTO users (
+                 username, title, status, joined_at, post_count, location, about, last_seen,
+                 email, password_hash, group_id, registered_at, last_visit, registration_ip
+             )
+             VALUES (
+                 {username}, 'Member', 'Online',
+                 to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD'),
+                 0,
+                 {location},
+                 {about},
+                 'just now',
+                 {email},
+                 {password_hash},
+                 4,
+                 EXTRACT(EPOCH FROM now())::bigint,
+                 EXTRACT(EPOCH FROM now())::bigint,
+                 '127.0.0.1'
+             )
+             RETURNING id, username, title
+         )
+         SELECT row_to_json(inserted) FROM inserted;",
+        username = sql_literal(&username),
+        location = sql_literal(location),
+        about = sql_literal(about),
+        email = sql_literal(&email),
+        password_hash = sql_literal(&password_hash),
+    ))?;
+
+    let session_token = create_session(user.id)?;
+
+    Ok(AuthResponse {
+        user,
+        session_token,
+        message: "Registration complete. You are now signed in.".to_string(),
+    })
+}
+
+#[cfg(feature = "server")]
+fn login_account_impl(input: LoginForm) -> Result<AuthResponse, String> {
+    let username = normalize_username(&input.username);
+    if username.is_empty() || input.password.is_empty() {
+        return Err("Username and password are required.".to_string());
+    }
+
+    let user = run_json_query::<Option<StoredAuthUser>>(&format!(
+        "SELECT COALESCE((
+             SELECT row_to_json(user_row)
+             FROM (
+                 SELECT id, username, title, password_hash
+                 FROM users
+                 WHERE LOWER(username) = LOWER({username})
+                 LIMIT 1
+             ) AS user_row
+         ), 'null'::json);",
+        username = sql_literal(&username),
+    ))?
+    .ok_or_else(|| "Wrong username or password.".to_string())?;
+
+    if user.password_hash.is_empty() || !verify_password(&input.password, &user.password_hash) {
+        return Err("Wrong username or password.".to_string());
+    }
+
+    run_exec(&format!(
+        "UPDATE users
+         SET status = 'Online',
+             last_seen = 'just now',
+             last_visit = EXTRACT(EPOCH FROM now())::bigint
+         WHERE id = {};",
+        user.id
+    ))?;
+
+    let session_token = create_session(user.id)?;
+    let message = if input.remember {
+        "Signed in and this browser session was remembered.".to_string()
+    } else {
+        "Signed in successfully.".to_string()
+    };
+
+    Ok(AuthResponse {
+        user: SessionUser {
+            id: user.id,
+            username: user.username,
+            title: user.title,
+        },
+        session_token,
+        message,
+    })
+}
+
+#[cfg(feature = "server")]
+fn current_session_user_impl(headers: HeaderMap) -> Result<Option<SessionUser>, String> {
+    let Some(token) = parse_session_cookie(&headers) else {
+        return Ok(None);
+    };
+
+    run_json_query::<Option<SessionUser>>(&format!(
+        "SELECT COALESCE((
+             SELECT row_to_json(session_row)
+             FROM (
+                 SELECT u.id, u.username, u.title
+                 FROM forum_sessions AS s
+                 INNER JOIN users AS u ON u.id = s.user_id
+                 WHERE s.token = {token}
+                   AND s.expires_at > EXTRACT(EPOCH FROM now())::bigint
+                 LIMIT 1
+             ) AS session_row
+         ), 'null'::json);",
+        token = sql_literal(&token),
+    ))
+}
+
+#[cfg(feature = "server")]
+fn logout_account_impl(headers: HeaderMap) -> Result<(), String> {
+    if let Some(token) = parse_session_cookie(&headers) {
+        run_exec(&format!(
+            "DELETE FROM forum_sessions WHERE token = {token};",
+            token = sql_literal(&token)
+        ))?;
+    }
+
+    Ok(())
+}
+
+#[cfg(feature = "server")]
 fn load_board_from_postgres() -> Result<AppData, String> {
-    let meta = run_json_query::<Vec<BoardMeta>>(
-        "SELECT COALESCE(json_agg(row_to_json(meta_row)), '[]'::json)
+    let meta = run_json_query::<BoardMeta>(
+        "SELECT row_to_json(meta_row)
          FROM (
              SELECT title, tagline, announcement_title, announcement_body
              FROM board_meta
              ORDER BY id
+             LIMIT 1
          ) AS meta_row;",
     )?;
 
@@ -718,10 +604,7 @@ fn load_board_from_postgres() -> Result<AppData, String> {
     )?;
 
     Ok(AppData {
-        meta: meta
-            .into_iter()
-            .next()
-            .unwrap_or_else(|| AppData::fallback().meta),
+        meta,
         categories,
         forums,
         users,
@@ -731,13 +614,184 @@ fn load_board_from_postgres() -> Result<AppData, String> {
 }
 
 #[cfg(feature = "server")]
+fn username_exists(username: &str) -> Result<bool, String> {
+    let count = run_scalar_i64(&format!(
+        "SELECT COUNT(*) FROM users WHERE LOWER(username) = LOWER({username});",
+        username = sql_literal(username)
+    ))?;
+    Ok(count > 0)
+}
+
+#[cfg(feature = "server")]
+fn email_exists(email: &str) -> Result<bool, String> {
+    let count = run_scalar_i64(&format!(
+        "SELECT COUNT(*) FROM users WHERE LOWER(email) = LOWER({email});",
+        email = sql_literal(email)
+    ))?;
+    Ok(count > 0)
+}
+
+#[cfg(feature = "server")]
+fn create_session(user_id: i32) -> Result<String, String> {
+    let token = random_hex(32);
+    let now = unix_now();
+    let expires = now + SESSION_MAX_AGE_SECS;
+
+    run_exec(&format!(
+        "INSERT INTO forum_sessions (token, user_id, created_at, expires_at, last_seen)
+         VALUES ({token}, {user_id}, {now}, {expires}, {now});",
+        token = sql_literal(&token),
+        user_id = user_id,
+        now = now,
+        expires = expires,
+    ))?;
+
+    Ok(token)
+}
+
+#[cfg(feature = "server")]
+fn parse_session_cookie(headers: &HeaderMap) -> Option<String> {
+    let raw_cookie = headers.get("cookie")?.to_str().ok()?;
+
+    raw_cookie.split(';').find_map(|part| {
+        let trimmed = part.trim();
+        let (name, value) = trimmed.split_once('=')?;
+        if name == SESSION_COOKIE {
+            Some(value.to_string())
+        } else {
+            None
+        }
+    })
+}
+
+#[cfg(feature = "server")]
+fn validate_username(username: &str) -> Result<(), String> {
+    let length = username.chars().count();
+    if length < 2 {
+        return Err("Username must be at least 2 characters long.".to_string());
+    }
+
+    if length > 25 {
+        return Err("Username must be 25 characters or fewer.".to_string());
+    }
+
+    if username.eq_ignore_ascii_case("guest") {
+        return Err("The username Guest is reserved.".to_string());
+    }
+
+    if username.parse::<IpAddr>().is_ok() {
+        return Err("Usernames cannot be IP addresses.".to_string());
+    }
+
+    if username.contains('[')
+        || username.contains(']')
+        || username.contains('"')
+        || username.contains('\'')
+    {
+        return Err("Username contains reserved characters.".to_string());
+    }
+
+    let lower = username.to_lowercase();
+    for tag in [
+        "[b]", "[i]", "[u]", "[img]", "[url]", "[quote]", "[code]", "[email]", "[list]", "[topic]",
+        "[post]", "[forum]", "[user]",
+    ] {
+        if lower.contains(tag) {
+            return Err("Username cannot contain BBCode-like tags.".to_string());
+        }
+    }
+
+    Ok(())
+}
+
+#[cfg(feature = "server")]
+fn validate_email(email: &str) -> Result<(), String> {
+    if email.is_empty() || !email.contains('@') {
+        return Err("Enter a valid email address.".to_string());
+    }
+
+    let Some((local, domain)) = email.split_once('@') else {
+        return Err("Enter a valid email address.".to_string());
+    };
+
+    if local.is_empty() || domain.is_empty() || !domain.contains('.') {
+        return Err("Enter a valid email address.".to_string());
+    }
+
+    Ok(())
+}
+
+#[cfg(feature = "server")]
+fn normalize_username(username: &str) -> String {
+    username.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+#[cfg(feature = "server")]
+fn hash_password(password: &str, salt: &str) -> String {
+    let mut digest = Sha256::new();
+    digest.update(salt.as_bytes());
+    digest.update(password.as_bytes());
+    let bytes = digest.finalize();
+    format!("sha256${salt}${}", bytes_to_hex(&bytes))
+}
+
+#[cfg(feature = "server")]
+fn verify_password(password: &str, stored_hash: &str) -> bool {
+    let mut parts = stored_hash.split('$');
+    let algorithm = parts.next();
+    let salt = parts.next();
+    let hash = parts.next();
+
+    match (algorithm, salt, hash) {
+        (Some("sha256"), Some(salt), Some(hash)) => {
+            hash_password(password, salt) == format!("sha256${salt}${hash}")
+        }
+        _ => false,
+    }
+}
+
+#[cfg(feature = "server")]
+fn random_hex(size: usize) -> String {
+    let mut bytes = vec![0_u8; size];
+    rand::rng().fill_bytes(&mut bytes);
+    bytes_to_hex(&bytes)
+}
+
+#[cfg(feature = "server")]
+fn bytes_to_hex(bytes: &[u8]) -> String {
+    let mut output = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        output.push_str(&format!("{byte:02x}"));
+    }
+    output
+}
+
+#[cfg(feature = "server")]
+fn unix_now() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_secs() as i64)
+        .unwrap_or(0)
+}
+
+#[cfg(feature = "server")]
+fn sql_literal(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "''"))
+}
+
+#[cfg(feature = "server")]
+fn server_error(message: String) -> ServerFnError {
+    ServerFnError::new(message)
+}
+
+#[cfg(feature = "server")]
 fn run_json_query<T>(sql: &str) -> Result<T, String>
 where
     T: DeserializeOwned,
 {
     let output = Command::new("psql")
         .arg(DATABASE_URL)
-        .args(["-X", "-t", "-A", "-c", sql])
+        .args(["-X", "-v", "ON_ERROR_STOP=1", "-t", "-A", "-c", sql])
         .output()
         .map_err(|error| format!("failed to run psql: {error}"))?;
 
@@ -750,4 +804,48 @@ where
     let payload = stdout.trim();
 
     serde_json::from_str(payload).map_err(|error| format!("failed to parse postgres json: {error}"))
+}
+
+#[cfg(feature = "server")]
+fn run_scalar_i64(sql: &str) -> Result<i64, String> {
+    let output = Command::new("psql")
+        .arg(DATABASE_URL)
+        .args(["-X", "-v", "ON_ERROR_STOP=1", "-t", "-A", "-c", sql])
+        .output()
+        .map_err(|error| format!("failed to run psql: {error}"))?;
+
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
+    }
+
+    let stdout = String::from_utf8(output.stdout)
+        .map_err(|error| format!("psql returned non-utf8 output: {error}"))?;
+
+    stdout
+        .trim()
+        .parse::<i64>()
+        .map_err(|error| format!("failed to parse scalar result: {error}"))
+}
+
+#[cfg(feature = "server")]
+fn run_exec(sql: &str) -> Result<(), String> {
+    let output = Command::new("psql")
+        .arg(DATABASE_URL)
+        .args(["-X", "-v", "ON_ERROR_STOP=1", "-c", sql])
+        .output()
+        .map_err(|error| format!("failed to run psql: {error}"))?;
+
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
+    }
+
+    Ok(())
+}
+
+pub fn cookie_name() -> &'static str {
+    SESSION_COOKIE
+}
+
+pub fn cookie_max_age() -> i64 {
+    SESSION_MAX_AGE_SECS
 }

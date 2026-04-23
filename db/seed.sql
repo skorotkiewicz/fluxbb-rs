@@ -35,13 +35,16 @@ ON CONFLICT (id) DO UPDATE SET
     moderators = EXCLUDED.moderators,
     sort_order = EXCLUDED.sort_order;
 
-INSERT INTO users (id, username, title, status, joined_at, post_count, location, about, last_seen) VALUES
-    (1, 'nora', 'Administrator', 'Online', '2026-04-01', 482, 'Berlin', 'Maintains the Dioxus rewrite and release cadence.', 'a minute ago'),
-    (2, 'ellis', 'Core Maintainer', 'Online', '2026-04-02', 318, 'Copenhagen', 'Focuses on schema design, hydration safety, and deployment ergonomics.', '5 minutes ago'),
-    (3, 'rhea', 'Moderator', 'Reviewing', '2026-04-03', 211, 'Amsterdam', 'Moderation lead and theme curator.', '20 minutes ago'),
-    (4, 'kai', 'Support Lead', 'Available', '2026-04-05', 177, 'Lisbon', 'Handles onboarding, FAQ cleanup, and migration support.', '12 minutes ago'),
-    (5, 'mira', 'Theme Builder', 'Designing', '2026-04-09', 124, 'Prague', 'Ports classic board themes into the new CSS system.', 'an hour ago'),
-    (6, 'sol', 'Member', 'Reading', '2026-04-20', 14, 'Warsaw', 'Testing the first public preview and reporting rough edges.', 'just now')
+INSERT INTO users (
+    id, username, title, status, joined_at, post_count, location, about, last_seen,
+    email, password_hash, group_id, registered_at, last_visit, registration_ip
+) VALUES
+    (1, 'nora', 'Administrator', 'Online', '2026-04-01', 482, 'Berlin', 'Maintains the Dioxus rewrite and release cadence.', 'a minute ago', 'nora@example.com', 'sha256$boardseed$9491640339c346d357a0451891793308c0057ac7e65f52d15cf38b62cccdb19b', 1, 1713744000, 1714074000, '127.0.0.1'),
+    (2, 'ellis', 'Core Maintainer', 'Online', '2026-04-02', 318, 'Copenhagen', 'Focuses on schema design, hydration safety, and deployment ergonomics.', '5 minutes ago', 'ellis@example.com', 'sha256$boardseed$9491640339c346d357a0451891793308c0057ac7e65f52d15cf38b62cccdb19b', 4, 1713830400, 1714074000, '127.0.0.1'),
+    (3, 'rhea', 'Moderator', 'Reviewing', '2026-04-03', 211, 'Amsterdam', 'Moderation lead and theme curator.', '20 minutes ago', 'rhea@example.com', 'sha256$boardseed$9491640339c346d357a0451891793308c0057ac7e65f52d15cf38b62cccdb19b', 2, 1713916800, 1714074000, '127.0.0.1'),
+    (4, 'kai', 'Support Lead', 'Available', '2026-04-05', 177, 'Lisbon', 'Handles onboarding, FAQ cleanup, and migration support.', '12 minutes ago', 'kai@example.com', 'sha256$boardseed$9491640339c346d357a0451891793308c0057ac7e65f52d15cf38b62cccdb19b', 4, 1714089600, 1714074000, '127.0.0.1'),
+    (5, 'mira', 'Theme Builder', 'Designing', '2026-04-09', 124, 'Prague', 'Ports classic board themes into the new CSS system.', 'an hour ago', 'mira@example.com', 'sha256$boardseed$9491640339c346d357a0451891793308c0057ac7e65f52d15cf38b62cccdb19b', 4, 1714435200, 1714074000, '127.0.0.1'),
+    (6, 'sol', 'Member', 'Reading', '2026-04-20', 14, 'Warsaw', 'Testing the first public preview and reporting rough edges.', 'just now', 'sol@example.com', 'sha256$boardseed$9491640339c346d357a0451891793308c0057ac7e65f52d15cf38b62cccdb19b', 4, 1715472000, 1714074000, '127.0.0.1')
 ON CONFLICT (id) DO UPDATE SET
     username = EXCLUDED.username,
     title = EXCLUDED.title,
@@ -50,7 +53,15 @@ ON CONFLICT (id) DO UPDATE SET
     post_count = EXCLUDED.post_count,
     location = EXCLUDED.location,
     about = EXCLUDED.about,
-    last_seen = EXCLUDED.last_seen;
+    last_seen = EXCLUDED.last_seen,
+    email = EXCLUDED.email,
+    password_hash = EXCLUDED.password_hash,
+    group_id = EXCLUDED.group_id,
+    registered_at = EXCLUDED.registered_at,
+    last_visit = EXCLUDED.last_visit,
+    registration_ip = EXCLUDED.registration_ip;
+
+CREATE UNIQUE INDEX IF NOT EXISTS users_email_unique_idx ON users (LOWER(email));
 
 INSERT INTO topics (id, forum_id, author_id, subject, status, views, tags, created_at, updated_at, activity_rank) VALUES
     (101, 1, 1, '0.1 migration alpha is live', 'pinned', 934, ARRAY['release', 'migration'], '2026-04-20 09:15 UTC', '2026-04-23 19:40 UTC', 400),

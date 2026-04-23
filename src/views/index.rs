@@ -35,7 +35,7 @@ pub fn Index() -> Element {
                     StatCard {
                         label: "Posts".to_string(),
                         value: stats.posts.to_string(),
-                        detail: "Seeded from the migration bootstrap schema.".to_string(),
+                        detail: "Loaded from the Postgres forum tables.".to_string(),
                     }
                 }
             }

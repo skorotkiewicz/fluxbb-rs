@@ -118,10 +118,25 @@ textarea {
     transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
 }
 
+.nav-button {
+    font: inherit;
+    cursor: pointer;
+}
+
 .nav-link:hover {
     transform: translateY(-1px);
     border-color: var(--border-strong);
     background: var(--surface-strong);
+}
+
+.auth-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 10px 16px;
+    border-radius: 999px;
+    background: rgba(123, 52, 21, 0.1);
+    color: var(--accent-strong);
+    font-weight: 600;
 }
 
 .nav-link-muted {
@@ -496,6 +511,23 @@ textarea {
     display: flex;
     flex-direction: column;
     gap: 14px;
+}
+
+.form-message {
+    margin: 0;
+    padding: 12px 14px;
+    border-radius: 14px;
+    border: 1px solid var(--border);
+}
+
+.form-error {
+    background: rgba(176, 54, 38, 0.08);
+    color: #8d2f22;
+}
+
+.form-success {
+    background: rgba(36, 88, 61, 0.08);
+    color: #24583d;
 }
 
 .form-card label {

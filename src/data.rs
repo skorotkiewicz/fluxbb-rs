@@ -70,6 +70,19 @@ pub struct UserProfile {
     pub location: String,
     pub about: String,
     pub last_seen: String,
+    #[serde(default)]
+    pub email: String,
+    #[serde(default = "default_group_id")]
+    pub group_id: i32,
+}
+
+fn default_group_id() -> i32 { 4 }
+
+impl UserProfile {
+    pub fn group_id(&self) -> i32 { self.group_id }
+    pub fn email_display(&self) -> &str {
+        if self.email.is_empty() { "no email" } else { &self.email }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -188,6 +201,47 @@ pub struct ReplyForm {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct NewTopicResult {
     pub topic_id: i32,
+}
+
+// ── Admin forms ──
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct AdminCategoryForm {
+    pub name: String,
+    pub description: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct AdminForumForm {
+    pub category_id: i32,
+    pub name: String,
+    pub description: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct AdminUserUpdate {
+    pub user_id: i32,
+    pub group_id: i32,
+    pub title: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct AdminTopicUpdate {
+    pub topic_id: i32,
+    pub status: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct AdminBoardSettings {
+    pub title: String,
+    pub tagline: String,
+    pub announcement_title: String,
+    pub announcement_body: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct AdminDeleteItem {
+    pub id: i32,
 }
 
 #[cfg(feature = "server")]
@@ -482,6 +536,104 @@ pub async fn create_reply(input: ReplyForm) -> Result<(), ServerFnError> {
     {
         let _ = input;
         Err(ServerFnError::new("Posting requires the server feature."))
+    }
+}
+
+// ── Admin endpoints ──
+
+#[post("/api/admin/add-category", headers: HeaderMap)]
+pub async fn admin_add_category(input: AdminCategoryForm) -> Result<(), ServerFnError> {
+    #[cfg(feature = "server")]
+    { let u = require_session(&headers).map_err(server_error)?; if u.group_id != 1 { return Err(server_error("Admin only.".into())); }
+      run_exec(&format!("INSERT INTO categories (name, description, sort_order) VALUES ({}, {}, (SELECT COALESCE(MAX(sort_order),0)+1 FROM categories));",
+        sql_literal(input.name.trim()), sql_literal(input.description.trim()))).map_err(server_error) }
+    #[cfg(not(feature = "server"))] { let _ = input; Err(ServerFnError::new("server only")) }
+}
+
+#[post("/api/admin/add-forum", headers: HeaderMap)]
+pub async fn admin_add_forum(input: AdminForumForm) -> Result<(), ServerFnError> {
+    #[cfg(feature = "server")]
+    { let u = require_session(&headers).map_err(server_error)?; if u.group_id != 1 { return Err(server_error("Admin only.".into())); }
+      run_exec(&format!("INSERT INTO forums (category_id, name, description, sort_order) VALUES ({}, {}, {}, (SELECT COALESCE(MAX(sort_order),0)+1 FROM forums WHERE category_id={}));",
+        input.category_id, sql_literal(input.name.trim()), sql_literal(input.description.trim()), input.category_id)).map_err(server_error) }
+    #[cfg(not(feature = "server"))] { let _ = input; Err(ServerFnError::new("server only")) }
+}
+
+#[post("/api/admin/delete-category", headers: HeaderMap)]
+pub async fn admin_delete_category(input: AdminDeleteItem) -> Result<(), ServerFnError> {
+    #[cfg(feature = "server")]
+    { let u = require_session(&headers).map_err(server_error)?; if u.group_id != 1 { return Err(server_error("Admin only.".into())); }
+      run_exec(&format!("DELETE FROM categories WHERE id = {};", input.id)).map_err(server_error) }
+    #[cfg(not(feature = "server"))] { let _ = input; Err(ServerFnError::new("server only")) }
+}
+
+#[post("/api/admin/delete-forum", headers: HeaderMap)]
+pub async fn admin_delete_forum(input: AdminDeleteItem) -> Result<(), ServerFnError> {
+    #[cfg(feature = "server")]
+    { let u = require_session(&headers).map_err(server_error)?; if u.group_id != 1 { return Err(server_error("Admin only.".into())); }
+      run_exec(&format!("DELETE FROM forums WHERE id = {};", input.id)).map_err(server_error) }
+    #[cfg(not(feature = "server"))] { let _ = input; Err(ServerFnError::new("server only")) }
+}
+
+#[post("/api/admin/update-user", headers: HeaderMap)]
+pub async fn admin_update_user(input: AdminUserUpdate) -> Result<(), ServerFnError> {
+    #[cfg(feature = "server")]
+    { let u = require_session(&headers).map_err(server_error)?; if u.group_id != 1 { return Err(server_error("Admin only.".into())); }
+      run_exec(&format!("UPDATE users SET group_id = {}, title = {} WHERE id = {};",
+        input.group_id, sql_literal(input.title.trim()), input.user_id)).map_err(server_error) }
+    #[cfg(not(feature = "server"))] { let _ = input; Err(ServerFnError::new("server only")) }
+}
+
+#[post("/api/admin/delete-user", headers: HeaderMap)]
+pub async fn admin_delete_user(input: AdminDeleteItem) -> Result<(), ServerFnError> {
+    #[cfg(feature = "server")]
+    { let u = require_session(&headers).map_err(server_error)?; if u.group_id != 1 { return Err(server_error("Admin only.".into())); }
+      if input.id == u.id { return Err(server_error("Cannot delete yourself.".into())); }
+      run_exec(&format!("DELETE FROM forum_sessions WHERE user_id = {};", input.id)).map_err(server_error)?;
+      run_exec(&format!("DELETE FROM users WHERE id = {};", input.id)).map_err(server_error) }
+    #[cfg(not(feature = "server"))] { let _ = input; Err(ServerFnError::new("server only")) }
+}
+
+#[post("/api/admin/update-topic", headers: HeaderMap)]
+pub async fn admin_update_topic(input: AdminTopicUpdate) -> Result<(), ServerFnError> {
+    #[cfg(feature = "server")]
+    { let u = require_session(&headers).map_err(server_error)?; if u.group_id != 1 { return Err(server_error("Admin only.".into())); }
+      run_exec(&format!("UPDATE topics SET status = {} WHERE id = {};",
+        sql_literal(input.status.trim()), input.topic_id)).map_err(server_error) }
+    #[cfg(not(feature = "server"))] { let _ = input; Err(ServerFnError::new("server only")) }
+}
+
+#[post("/api/admin/delete-topic", headers: HeaderMap)]
+pub async fn admin_delete_topic(input: AdminDeleteItem) -> Result<(), ServerFnError> {
+    #[cfg(feature = "server")]
+    { let u = require_session(&headers).map_err(server_error)?; if u.group_id != 1 { return Err(server_error("Admin only.".into())); }
+      run_exec(&format!("DELETE FROM topics WHERE id = {};", input.id)).map_err(server_error) }
+    #[cfg(not(feature = "server"))] { let _ = input; Err(ServerFnError::new("server only")) }
+}
+
+#[post("/api/admin/update-board", headers: HeaderMap)]
+pub async fn admin_update_board(input: AdminBoardSettings) -> Result<(), ServerFnError> {
+    #[cfg(feature = "server")]
+    { let u = require_session(&headers).map_err(server_error)?; if u.group_id != 1 { return Err(server_error("Admin only.".into())); }
+      run_exec(&format!("UPDATE board_meta SET title = {}, tagline = {}, announcement_title = {}, announcement_body = {} WHERE id = 1;",
+        sql_literal(input.title.trim()), sql_literal(input.tagline.trim()),
+        sql_literal(input.announcement_title.trim()), sql_literal(input.announcement_body.trim()))).map_err(server_error) }
+    #[cfg(not(feature = "server"))] { let _ = input; Err(ServerFnError::new("server only")) }
+}
+
+// ── View counter ──
+
+#[post("/api/view-topic")]
+pub async fn increment_topic_views(topic_id: i32) -> Result<(), ServerFnError> {
+    #[cfg(feature = "server")]
+    {
+        run_exec(&format!("UPDATE topics SET views = views + 1 WHERE id = {};", topic_id))
+            .map_err(server_error)
+    }
+    #[cfg(not(feature = "server"))]
+    {
+        let _ = topic_id;
+        Ok(())
     }
 }
 
@@ -846,7 +998,7 @@ fn load_board_from_postgres() -> Result<AppData, String> {
     let users = run_json_query::<Vec<UserProfile>>(
         "SELECT COALESCE(json_agg(row_to_json(user_row)), '[]'::json)
          FROM (
-             SELECT id, username, title, status, joined_at, post_count, location, about, last_seen
+             SELECT id, username, title, status, joined_at, post_count, location, about, last_seen, email, group_id
              FROM users
              ORDER BY id
          ) AS user_row;",

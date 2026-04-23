@@ -2,7 +2,7 @@ use dioxus::prelude::*;
 
 use crate::{
     components::{EmptyState, PostCard, TopicStatusBadge},
-    data::{create_reply, AppData, ReplyForm, SessionUser},
+    data::{create_reply, increment_topic_views, AppData, ReplyForm, SessionUser},
     Route,
 };
 
@@ -10,6 +10,9 @@ use crate::{
 pub fn Topic(id: i32) -> Element {
     let board = use_context::<AppData>();
     let current_user = use_context::<Signal<Option<SessionUser>>>();
+
+    // Increment view counter once when topic loads
+    use_resource(move || async move { let _ = increment_topic_views(id).await; });
 
     let Some(topic) = board.topic(id) else {
         return rsx! {

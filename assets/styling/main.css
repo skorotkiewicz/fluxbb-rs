@@ -604,3 +604,95 @@ textarea {
         border-bottom: 1px solid var(--border);
     }
 }
+
+/* ── Admin panel ── */
+
+.admin-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 20px;
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 0;
+}
+
+.admin-tab {
+    padding: 10px 20px;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 500;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition: all 0.2s ease;
+}
+
+.admin-tab:hover {
+    color: var(--accent);
+}
+
+.admin-tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+}
+
+.admin-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.small-button {
+    padding: 4px 10px;
+    font-size: 0.78rem;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.small-button:hover {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+}
+
+.small-button.active {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+}
+
+.danger-button {
+    background: #dc2626;
+    color: #fff;
+    border: 1px solid #dc2626;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.danger-button:hover {
+    background: #b91c1c;
+    border-color: #b91c1c;
+}
+
+.danger-button.small-button {
+    padding: 4px 10px;
+    font-size: 0.78rem;
+    border-radius: 4px;
+}
+
+.user-link {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--accent);
+    text-decoration: none;
+}
+
+.user-link:hover {
+    text-decoration: underline;
+}

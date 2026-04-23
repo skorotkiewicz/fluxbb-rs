@@ -411,6 +411,11 @@ textarea {
     color: #374870;
 }
 
+.badge-closed {
+    background: #e8e8e8;
+    color: #555;
+}
+
 .breadcrumbs {
     display: flex;
     flex-wrap: wrap;
@@ -695,4 +700,55 @@ textarea {
 
 .user-link:hover {
     text-decoration: underline;
+}
+
+/* ── Post actions ── */
+
+.post-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+}
+
+/* ── Help page ── */
+
+.help-content {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.help-content h4 {
+    margin: 8px 0 4px;
+    font-size: 1.1rem;
+    color: var(--accent-strong);
+}
+
+.help-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: rgba(255, 253, 248, 0.6);
+}
+
+.help-row code {
+    padding: 4px 8px;
+    border-radius: 6px;
+    background: rgba(94, 67, 40, 0.08);
+    font-size: 0.9rem;
+}
+
+.help-row span {
+    color: var(--muted);
+}
+
+.help-row blockquote {
+    margin: 0;
+    padding: 8px 12px;
+    border-left: 3px solid var(--accent-soft);
+    background: rgba(231, 220, 199, 0.4);
+    border-radius: 0 8px 8px 0;
 }

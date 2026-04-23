@@ -1,6 +1,6 @@
 use dioxus::prelude::*;
 
-use views::{Admin, AppShell, Forum, Index, Install, Login, NewTopic, Profile, Register, Search, Topic, Users};
+use views::{Admin, AppShell, EditPost, Forum, Help, Index, Install, Login, NewTopic, Profile, ProfileEdit, Register, Rules, Search, Topic, Users};
 
 mod components;
 mod data;
@@ -23,8 +23,12 @@ enum Route {
         NewTopic { id: i32 },
         #[route("/topic/:id")]
         Topic { id: i32 },
+        #[route("/post/:id/edit")]
+        EditPost { id: i32 },
         #[route("/user/:id")]
         Profile { id: i32 },
+        #[route("/user/:id/edit")]
+        ProfileEdit { id: i32 },
         #[route("/users")]
         Users {},
         #[route("/search")]
@@ -35,6 +39,10 @@ enum Route {
         Register {},
         #[route("/admin")]
         Admin {},
+        #[route("/help")]
+        Help {},
+        #[route("/rules")]
+        Rules {},
 }
 
 fn main() {

@@ -2,7 +2,7 @@ use dioxus::{document, prelude::*};
 
 use crate::{
     data::{
-        cookie_name, current_session_user, load_board, logout_account, AppData, SessionUser,
+        cookie_name, current_session_user, load_board, logout_account, SessionUser,
     },
     Route,
 };
@@ -85,6 +85,8 @@ pub fn AppShell() -> Element {
                 Link { class: "nav-link", to: Route::Index {}, "Forums" }
                 Link { class: "nav-link", to: Route::Search {}, "Search" }
                 Link { class: "nav-link", to: Route::Users {}, "Users" }
+                Link { class: "nav-link", to: Route::Help {}, "Help" }
+                Link { class: "nav-link", to: Route::Rules {}, "Rules" }
 
                 if is_admin {
                     Link { class: "nav-link", to: Route::Admin {}, "Admin" }
@@ -101,10 +103,12 @@ pub fn AppShell() -> Element {
                         onclick: move |_| {
                             spawn(async move {
                                 let _ = logout_account().await;
-                                let _ = document::eval(&format!(
-                                    "document.cookie = '{}=; path=/; max-age=0; samesite=lax';",
-                                    cookie_name()
-                                ));
+                                let _ = document::eval(
+                                    &format!(
+                                        "document.cookie = '{}=; path=/; max-age=0; samesite=lax';",
+                                        cookie_name(),
+                                    ),
+                                );
                                 current_user.set(None);
                             });
                         },
@@ -112,7 +116,11 @@ pub fn AppShell() -> Element {
                     }
                 } else {
                     Link { class: "nav-link nav-link-muted", to: Route::Login {}, "Login" }
-                    Link { class: "nav-link nav-link-strong", to: Route::Register {}, "Register" }
+                    Link {
+                        class: "nav-link nav-link-strong",
+                        to: Route::Register {},
+                        "Register"
+                    }
                 }
             }
 
@@ -123,9 +131,7 @@ pub fn AppShell() -> Element {
                 p { "Newest: {stats.newest_member}" }
             }
 
-            main { class: "page-wrap",
-                Outlet::<Route> {}
-            }
+            main { class: "page-wrap", Outlet::<Route> {} }
 
             footer { class: "site-footer",
                 p { "Powered by FluxBB RS" }

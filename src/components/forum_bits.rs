@@ -1,6 +1,7 @@
 use dioxus::prelude::*;
 
-use crate::data::{Post, TopicStatus};
+use crate::data::{delete_post, Post, SessionUser, TopicStatus};
+use crate::Route;
 
 #[component]
 pub fn SectionHeader(kicker: String, title: String, subtitle: String) -> Element {
@@ -32,15 +33,62 @@ pub fn TopicStatusBadge(status: TopicStatus) -> Element {
 }
 
 #[component]
-pub fn PostCard(author_name: String, author_role: String, author_id: i32, post: Post) -> Element {
+pub fn PostCard(
+    author_name: String,
+    author_role: String,
+    author_id: i32,
+    post: Post,
+    current_user: Option<SessionUser>,
+    topic_id: i32,
+) -> Element {
+    let mut refresh = use_context::<Signal<()>>();
+    let navigator = use_navigator();
+
+    let can_edit = current_user
+        .as_ref()
+        .is_some_and(|u| u.id == author_id || u.group_id == 1);
+
+    let post_id = post.id;
+
     rsx! {
         article { class: "post-card",
             aside { class: "post-aside",
-                Link { class: "post-author", to: crate::Route::Profile { id: author_id }, "{author_name}" }
+                Link {
+                    class: "post-author",
+                    to: Route::Profile { id: author_id },
+                    "{author_name}"
+                }
                 p { class: "post-role", "{author_role}" }
                 p { class: "post-timestamp", "{post.posted_at}" }
                 if let Some(edited_at) = post.edited_at.clone() {
                     p { class: "post-edited", "Edited {edited_at}" }
+                }
+
+                if can_edit {
+                    div { class: "post-actions",
+                        Link {
+                            class: "small-button",
+                            to: Route::EditPost { id: post_id },
+                            "Edit"
+                        }
+                        button {
+                            class: "danger-button small-button",
+                            onclick: move |_| {
+                                spawn(async move {
+                                    match delete_post(post_id).await {
+                                        Ok(0) => {
+                                            refresh.set(());
+                                        }
+                                        Ok(topic_id) => {
+                                            navigator.push(Route::Forum { id: topic_id });
+                                        }
+                                        Err(_) => {}
+                                    }
+                                });
+                            },
+                            "Delete"
+                        }
+                    }
                 }
             }
 

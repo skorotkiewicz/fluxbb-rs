@@ -118,6 +118,7 @@ pub enum TopicStatus {
     Hot,
     Resolved,
     Fresh,
+    Closed,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -201,6 +202,21 @@ pub struct ReplyForm {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct NewTopicResult {
     pub topic_id: i32,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct EditPostForm {
+    pub post_id: i32,
+    pub message: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct UpdateProfileForm {
+    pub user_id: i32,
+    pub email: String,
+    pub location: String,
+    pub about: String,
+    pub title: String,
 }
 
 // ── Admin forms ──
@@ -423,6 +439,7 @@ impl TopicStatus {
             Self::Hot => "Hot",
             Self::Resolved => "Resolved",
             Self::Fresh => "Fresh",
+            Self::Closed => "Closed",
         }
     }
 
@@ -432,6 +449,7 @@ impl TopicStatus {
             Self::Hot => "badge badge-hot",
             Self::Resolved => "badge badge-resolved",
             Self::Fresh => "badge badge-fresh",
+            Self::Closed => "badge badge-closed",
         }
     }
 }
@@ -638,6 +656,216 @@ pub async fn admin_update_board(input: AdminBoardSettings) -> Result<(), ServerF
         sql_literal(input.title.trim()), sql_literal(input.tagline.trim()),
         sql_literal(input.announcement_title.trim()), sql_literal(input.announcement_body.trim()))).map_err(server_error) }
     #[cfg(not(feature = "server"))] { let _ = input; Err(ServerFnError::new("server only")) }
+}
+
+// ── Post editing ──
+
+#[post("/api/post/:id", headers: HeaderMap)]
+pub async fn load_post(id: i32) -> Result<Post, ServerFnError> {
+    #[cfg(feature = "server")]
+    {
+        let post = run_json_query::<Post>(&format!(
+            "SELECT row_to_json(post_row) FROM (SELECT id, topic_id, author_id, posted_at, edited_at, body, signature, position FROM posts WHERE id = {}) AS post_row;",
+            id
+        )).map_err(server_error)?;
+        Ok(post)
+    }
+    #[cfg(not(feature = "server"))]
+    {
+        let _ = id;
+        Err(ServerFnError::new("server only"))
+    }
+}
+
+#[post("/api/edit-post", headers: HeaderMap)]
+pub async fn edit_post(input: EditPostForm) -> Result<(), ServerFnError> {
+    #[cfg(feature = "server")]
+    {
+        let user = require_session(&headers).map_err(server_error)?;
+        let post = run_json_query::<Option<Post>>(&format!(
+            "SELECT COALESCE((SELECT row_to_json(post_row) FROM (SELECT id, topic_id, author_id, posted_at, edited_at, body, signature, position FROM posts WHERE id = {}) AS post_row), 'null'::json);",
+            input.post_id
+        )).map_err(server_error)?;
+
+        let Some(post) = post else {
+            return Err(server_error("Post not found.".into()));
+        };
+
+        if post.author_id != user.id && user.group_id != 1 {
+            return Err(server_error("You can only edit your own posts.".into()));
+        }
+
+        let message = input.message.trim();
+        if message.is_empty() {
+            return Err(server_error("Message is required.".into()));
+        }
+
+        let now_str = "to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI UTC')";
+        run_exec(&format!(
+            "UPDATE posts SET body = ARRAY[{msg}], edited_at = {now} WHERE id = {pid};",
+            msg = sql_literal(message),
+            now = now_str,
+            pid = input.post_id,
+        )).map_err(server_error)?;
+
+        // Update topic activity
+        run_exec(&format!(
+            "UPDATE topics SET updated_at = {now}, activity_rank = EXTRACT(EPOCH FROM now())::integer WHERE id = {tid};",
+            now = now_str,
+            tid = post.topic_id,
+        )).map_err(server_error)?;
+
+        Ok(())
+    }
+    #[cfg(not(feature = "server"))]
+    {
+        let _ = input;
+        Err(ServerFnError::new("server only"))
+    }
+}
+
+#[post("/api/delete-post", headers: HeaderMap)]
+pub async fn delete_post(post_id: i32) -> Result<i32, ServerFnError> {
+    #[cfg(feature = "server")]
+    {
+        let user = require_session(&headers).map_err(server_error)?;
+
+        #[derive(Deserialize)]
+        struct PostInfo { topic_id: i32, author_id: i32, is_first: bool }
+
+        let info = run_json_query::<PostInfo>(&format!(
+            "SELECT row_to_json(r) FROM (
+                SELECT p.topic_id, p.author_id,
+                       CASE WHEN p.id = (SELECT MIN(id) FROM posts WHERE topic_id = p.topic_id) THEN true ELSE false END AS is_first
+                FROM posts p
+                WHERE p.id = {}
+            ) r;",
+            post_id
+        )).map_err(server_error)?;
+
+        if info.author_id != user.id && user.group_id != 1 {
+            return Err(server_error("You can only delete your own posts.".into()));
+        }
+
+        if info.is_first {
+            #[derive(Deserialize)]
+            struct PostCount { author_id: i32, cnt: i64 }
+            // Count posts to subtract from user post counts
+            let post_counts = run_json_query::<Vec<PostCount>>(&format!(
+                "SELECT COALESCE(json_agg(row_to_json(r)), '[]'::json) FROM (SELECT author_id, COUNT(*)::bigint AS cnt FROM posts WHERE topic_id = {} GROUP BY author_id) r;",
+                info.topic_id
+            )).map_err(server_error)?;
+            for pc in post_counts {
+                run_exec(&format!("UPDATE users SET post_count = GREATEST(post_count - {}, 0) WHERE id = {};", pc.cnt, pc.author_id))
+                    .map_err(server_error)?;
+            }
+            // Delete topic and all posts
+            run_exec(&format!("DELETE FROM posts WHERE topic_id = {};", info.topic_id)).map_err(server_error)?;
+            run_exec(&format!("DELETE FROM topics WHERE id = {};", info.topic_id)).map_err(server_error)?;
+            Ok(info.topic_id)
+        } else {
+            run_exec(&format!("UPDATE users SET post_count = GREATEST(post_count - 1, 0) WHERE id = {};", info.author_id))
+                .map_err(server_error)?;
+            run_exec(&format!("DELETE FROM posts WHERE id = {};", post_id)).map_err(server_error)?;
+            Ok(0)
+        }
+    }
+    #[cfg(not(feature = "server"))]
+    {
+        let _ = post_id;
+        Err(ServerFnError::new("server only"))
+    }
+}
+
+// ── Mark all as read ──
+
+#[post("/api/mark-read", headers: HeaderMap)]
+pub async fn mark_all_read() -> Result<(), ServerFnError> {
+    #[cfg(feature = "server")]
+    {
+        let user = require_session(&headers).map_err(server_error)?;
+        run_exec(&format!(
+            "UPDATE users SET last_visit = EXTRACT(EPOCH FROM now())::bigint WHERE id = {};",
+            user.id
+        ))
+        .map_err(server_error)?;
+        Ok(())
+    }
+    #[cfg(not(feature = "server"))]
+    {
+        Err(ServerFnError::new("server only"))
+    }
+}
+
+// ── Profile editing ──
+
+#[post("/api/update-profile", headers: HeaderMap)]
+pub async fn update_profile(input: UpdateProfileForm) -> Result<(), ServerFnError> {
+    #[cfg(feature = "server")]
+    {
+        let user = require_session(&headers).map_err(server_error)?;
+        if input.user_id != user.id && user.group_id != 1 {
+            return Err(server_error("You can only edit your own profile.".into()));
+        }
+
+        let email = input.email.trim().to_lowercase();
+        if email.is_empty() || !email.contains('@') {
+            return Err(server_error("Enter a valid email address.".into()));
+        }
+
+        run_exec(&format!(
+            "UPDATE users SET email = {}, location = {}, about = {}, title = {} WHERE id = {};",
+            sql_literal(&email),
+            sql_literal(input.location.trim()),
+            sql_literal(input.about.trim()),
+            sql_literal(input.title.trim()),
+            input.user_id,
+        )).map_err(server_error)?;
+
+        Ok(())
+    }
+    #[cfg(not(feature = "server"))]
+    {
+        let _ = input;
+        Err(ServerFnError::new("server only"))
+    }
+}
+
+// ── Topic moderation ──
+
+#[post("/api/toggle-topic-status", headers: HeaderMap)]
+pub async fn toggle_topic_status(topic_id: i32) -> Result<String, ServerFnError> {
+    #[cfg(feature = "server")]
+    {
+        let user = require_session(&headers).map_err(server_error)?;
+        if user.group_id != 1 {
+            return Err(server_error("Admin only.".into()));
+        }
+
+        #[derive(Deserialize)]
+        struct StatusRow { status: String }
+
+        let row = run_json_query::<StatusRow>(&format!(
+            "SELECT row_to_json(r) FROM (SELECT status FROM topics WHERE id = {}) AS r;",
+            topic_id
+        ))
+        .map_err(server_error)?;
+
+        let new_status = if row.status == "closed" { "fresh" } else { "closed" };
+        run_exec(&format!(
+            "UPDATE topics SET status = {} WHERE id = {};",
+            sql_literal(new_status),
+            topic_id
+        ))
+        .map_err(server_error)?;
+
+        Ok(new_status.to_string())
+    }
+    #[cfg(not(feature = "server"))]
+    {
+        let _ = topic_id;
+        Err(ServerFnError::new("server only"))
+    }
 }
 
 // ── View counter ──
@@ -953,6 +1181,17 @@ fn create_reply_impl(input: ReplyForm, headers: HeaderMap) -> Result<(), String>
     }
 
     let now_str = "to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI UTC')";
+
+    // Check topic is not closed
+    #[derive(Deserialize)]
+    struct TopicCheck { status: String }
+    let topic = run_json_query::<TopicCheck>(&format!(
+        "SELECT row_to_json(r) FROM (SELECT status FROM topics WHERE id = {}) AS r;",
+        input.topic_id
+    ))?;
+    if topic.status == "closed" {
+        return Err("This topic is closed. No new replies are allowed.".to_string());
+    }
 
     // Get next position
     let pos = run_scalar_i64(&format!(

@@ -61,13 +61,13 @@ pub fn NewTopic(id: i32) -> Element {
 
             article { class: "form-card",
                 if !status().is_empty() {
-                    p {
-                        class: if is_error() { "form-message form-error" } else { "form-message form-success" },
+                    p { class: if is_error() { "form-message form-error" } else { "form-message form-success" },
                         "{status}"
                     }
                 }
 
-                label { "Subject"
+                label {
+                    "Subject"
                     input {
                         class: "text-input",
                         value: "{subject}",
@@ -75,7 +75,8 @@ pub fn NewTopic(id: i32) -> Element {
                         placeholder: "Topic subject (max 70 characters)",
                     }
                 }
-                label { "Message"
+                label {
+                    "Message"
                     textarea {
                         class: "text-area",
                         rows: "10",
@@ -108,7 +109,11 @@ pub fn NewTopic(id: i32) -> Element {
                             submitting.set(false);
                         });
                     },
-                    if submitting() { "Posting…" } else { "Post topic" }
+                    if submitting() {
+                        "Posting…"
+                    } else {
+                        "Post topic"
+                    }
                 }
             }
         }

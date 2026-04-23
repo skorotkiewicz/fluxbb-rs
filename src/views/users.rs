@@ -21,7 +21,11 @@ pub fn Users() -> Element {
                 for user in users {
                     article { class: "user-card",
                         div { class: "user-card-top",
-                            Link { class: "user-link", to: Route::Profile { id: user.id }, "{user.username}" }
+                            Link {
+                                class: "user-link",
+                                to: Route::Profile { id: user.id },
+                                "{user.username}"
+                            }
                             p { class: "user-title", "{user.title}" }
                         }
                         p { class: "user-status", "{user.status}" }

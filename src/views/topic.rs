@@ -2,7 +2,7 @@ use dioxus::prelude::*;
 
 use crate::{
     components::{EmptyState, PostCard, TopicStatusBadge},
-    data::{create_reply, increment_topic_views, AppData, ReplyForm, SessionUser},
+    data::{create_reply, increment_topic_views, toggle_topic_status, AppData, ReplyForm, SessionUser},
     Route,
 };
 
@@ -34,6 +34,11 @@ pub fn Topic(id: i32) -> Element {
     let mut reply_error = use_signal(|| false);
     let mut replying = use_signal(|| false);
 
+    let is_admin = current_user()
+        .as_ref()
+        .is_some_and(|u| u.group_id == 1);
+    let is_closed = matches!(topic.status, crate::data::TopicStatus::Closed);
+
     rsx! {
         section { class: "page",
             nav { class: "breadcrumbs",
@@ -54,7 +59,27 @@ pub fn Topic(id: i32) -> Element {
                     }
                 }
                 h2 { class: "topic-title", "{topic.subject}" }
-                p { class: "topic-summary", "Views: {topic.views} · Replies: {topic.reply_count(&board)} · Updated: {topic.updated_at}" }
+                p { class: "topic-summary",
+                    "Views: {topic.views} · Replies: {topic.reply_count(&board)} · Updated: {topic.updated_at}"
+                }
+
+                if is_admin {
+                    button {
+                        class: "small-button",
+                        onclick: move |_| {
+                            let tid = id;
+                            spawn(async move {
+                                let _ = toggle_topic_status(tid).await;
+                                refresh.set(());
+                            });
+                        },
+                        if is_closed {
+                            "Open topic"
+                        } else {
+                            "Close topic"
+                        }
+                    }
+                }
             }
 
             for post in posts {
@@ -63,23 +88,25 @@ pub fn Topic(id: i32) -> Element {
                         author_name: author.username.clone(),
                         author_role: author.title.clone(),
                         author_id: author.id,
-                        post,
+                        post: post.clone(),
+                        current_user: current_user().clone(),
+                        topic_id: id,
                     }
                 }
             }
 
-            if current_user().is_some() {
+            if current_user().is_some() && !is_closed {
                 article { class: "form-card",
                     h3 { "Post a reply" }
 
                     if !reply_status().is_empty() {
-                        p {
-                            class: if reply_error() { "form-message form-error" } else { "form-message form-success" },
+                        p { class: if reply_error() { "form-message form-error" } else { "form-message form-success" },
                             "{reply_status}"
                         }
                     }
 
-                    label { "Message"
+                    label {
+                        "Message"
                         textarea {
                             class: "text-area",
                             rows: "6",
@@ -113,7 +140,18 @@ pub fn Topic(id: i32) -> Element {
                                 replying.set(false);
                             });
                         },
-                        if replying() { "Posting…" } else { "Post reply" }
+                        if replying() {
+                            "Posting…"
+                        } else {
+                            "Post reply"
+                        }
+                    }
+                }
+            } else if is_closed {
+                article { class: "panel",
+                    div { class: "panel-heading",
+                        h3 { "Topic closed" }
+                        p { "This topic has been closed. No new replies are allowed." }
                     }
                 }
             } else {

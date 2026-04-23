@@ -42,11 +42,7 @@ pub fn Forum(id: i32) -> Element {
             }
 
             if current_user().is_some() {
-                Link {
-                    class: "primary-button",
-                    to: Route::NewTopic { id },
-                    "New topic"
-                }
+                Link { class: "primary-button", to: Route::NewTopic { id }, "New topic" }
             }
 
             article { class: "panel",
@@ -73,11 +69,17 @@ pub fn Forum(id: i32) -> Element {
                                 div { class: "topic-row",
                                     div { class: "topic-main",
                                         TopicStatusBadge { status: topic.status.clone() }
-                                        Link { class: "topic-link", to: Route::Topic { id: topic.id }, "{topic.subject}" }
+                                        Link {
+                                            class: "topic-link",
+                                            to: Route::Topic { id: topic.id },
+                                            "{topic.subject}"
+                                        }
                                         if !topic.tags.is_empty() {
                                             p { class: "topic-tags", "{topic.tags.join(\" | \")}" }
                                         }
-                                        p { class: "topic-meta", "by {author.username} · {topic.created_at}" }
+                                        p { class: "topic-meta",
+                                            "by {author.username} · {topic.created_at}"
+                                        }
                                     }
                                     p { class: "topic-metric", "{topic.reply_count(&board)}" }
                                     p { class: "topic-metric", "{topic.views}" }

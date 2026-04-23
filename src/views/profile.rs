@@ -2,12 +2,14 @@ use dioxus::prelude::*;
 
 use crate::{
     components::{EmptyState, SectionHeader},
-    data::AppData,
+    data::{AppData, SessionUser},
+    Route,
 };
 
 #[component]
 pub fn Profile(id: i32) -> Element {
     let board = use_context::<AppData>();
+    let current_user = use_context::<Signal<Option<SessionUser>>>();
 
     let Some(user) = board.user(id) else {
         return rsx! {
@@ -43,6 +45,14 @@ pub fn Profile(id: i32) -> Element {
                     p { class: "user-meta", "Joined: {user.joined_at}" }
                     p { class: "user-meta", "Posts: {user.post_count}" }
                     p { class: "user-meta", "Last seen: {user.last_seen}" }
+
+                    if current_user().as_ref().is_some_and(|u| u.id == id || u.group_id == 1) {
+                        Link {
+                            class: "small-button",
+                            to: Route::ProfileEdit { id },
+                            "Edit profile"
+                        }
+                    }
                 }
 
                 article { class: "user-card",
@@ -61,7 +71,13 @@ pub fn Profile(id: i32) -> Element {
                         for topic in user_topics.iter().take(10) {
                             div { class: "search-result-row",
                                 div { class: "search-result-copy",
-                                    Link { class: "topic-link", to: crate::Route::Topic { id: topic.id }, "{topic.subject}" }
+                                    Link {
+                                        class: "topic-link",
+                                        to: crate::Route::Topic {
+                                            id: topic.id,
+                                        },
+                                        "{topic.subject}"
+                                    }
                                     p { class: "topic-meta", "{topic.created_at}" }
                                 }
                             }

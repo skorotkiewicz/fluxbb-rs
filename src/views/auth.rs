@@ -35,13 +35,13 @@ pub fn Login() -> Element {
                     h3 { "Sign in" }
 
                     if !status().is_empty() {
-                        p {
-                            class: if is_error() { "form-message form-error" } else { "form-message form-success" },
+                        p { class: if is_error() { "form-message form-error" } else { "form-message form-success" },
                             "{status}"
                         }
                     }
 
-                    label { "Username"
+                    label {
+                        "Username"
                         input {
                             class: "text-input",
                             value: "{username}",
@@ -49,7 +49,8 @@ pub fn Login() -> Element {
                             placeholder: "Your username",
                         }
                     }
-                    label { "Password"
+                    label {
+                        "Password"
                         input {
                             class: "text-input",
                             r#type: "password",
@@ -100,7 +101,11 @@ pub fn Login() -> Element {
                                 submitting.set(false);
                             });
                         },
-                        if submitting() { "Signing in…" } else { "Sign in" }
+                        if submitting() {
+                            "Signing in…"
+                        } else {
+                            "Sign in"
+                        }
                     }
                 }
 
@@ -142,13 +147,13 @@ pub fn Register() -> Element {
                     h3 { "Create account" }
 
                     if !status().is_empty() {
-                        p {
-                            class: if is_error() { "form-message form-error" } else { "form-message form-success" },
+                        p { class: if is_error() { "form-message form-error" } else { "form-message form-success" },
                             "{status}"
                         }
                     }
 
-                    label { "Username"
+                    label {
+                        "Username"
                         input {
                             class: "text-input",
                             value: "{username}",
@@ -156,7 +161,8 @@ pub fn Register() -> Element {
                             placeholder: "Pick a username",
                         }
                     }
-                    label { "Email"
+                    label {
+                        "Email"
                         input {
                             class: "text-input",
                             value: "{email}",
@@ -164,7 +170,8 @@ pub fn Register() -> Element {
                             placeholder: "you@example.com",
                         }
                     }
-                    label { "Password"
+                    label {
+                        "Password"
                         input {
                             class: "text-input",
                             r#type: "password",
@@ -173,7 +180,8 @@ pub fn Register() -> Element {
                             placeholder: "Minimum 9 characters",
                         }
                     }
-                    label { "Location"
+                    label {
+                        "Location"
                         input {
                             class: "text-input",
                             value: "{location}",
@@ -181,7 +189,8 @@ pub fn Register() -> Element {
                             placeholder: "Optional",
                         }
                     }
-                    label { "About"
+                    label {
+                        "About"
                         textarea {
                             class: "text-area",
                             rows: "5",
@@ -226,7 +235,11 @@ pub fn Register() -> Element {
                                 submitting.set(false);
                             });
                         },
-                        if submitting() { "Creating account…" } else { "Create account" }
+                        if submitting() {
+                            "Creating account…"
+                        } else {
+                            "Create account"
+                        }
                     }
                 }
 

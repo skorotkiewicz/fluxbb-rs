@@ -29,7 +29,7 @@ pub fn Admin() -> Element {
     let mut tab = use_signal(|| "structure");
     let status = use_signal(String::new);
     let is_error = use_signal(|| false);
-    let mut refresh = use_context::<Signal<()>>();
+    let refresh = use_context::<Signal<()>>();
 
     rsx! {
         section { class: "page",
@@ -42,28 +42,67 @@ pub fn Admin() -> Element {
             }
 
             nav { class: "admin-tabs",
-                button { class: if tab() == "structure" { "admin-tab active" } else { "admin-tab" },
-                    onclick: move |_| tab.set("structure"), "Structure" }
-                button { class: if tab() == "users" { "admin-tab active" } else { "admin-tab" },
-                    onclick: move |_| tab.set("users"), "Users" }
-                button { class: if tab() == "moderation" { "admin-tab active" } else { "admin-tab" },
-                    onclick: move |_| tab.set("moderation"), "Moderation" }
-                button { class: if tab() == "settings" { "admin-tab active" } else { "admin-tab" },
-                    onclick: move |_| tab.set("settings"), "Settings" }
+                button {
+                    class: if tab() == "structure" { "admin-tab active" } else { "admin-tab" },
+                    onclick: move |_| tab.set("structure"),
+                    "Structure"
+                }
+                button {
+                    class: if tab() == "users" { "admin-tab active" } else { "admin-tab" },
+                    onclick: move |_| tab.set("users"),
+                    "Users"
+                }
+                button {
+                    class: if tab() == "moderation" { "admin-tab active" } else { "admin-tab" },
+                    onclick: move |_| tab.set("moderation"),
+                    "Moderation"
+                }
+                button {
+                    class: if tab() == "settings" { "admin-tab active" } else { "admin-tab" },
+                    onclick: move |_| tab.set("settings"),
+                    "Settings"
+                }
             }
 
             if !status().is_empty() {
-                p {
-                    class: if is_error() { "form-message form-error" } else { "form-message form-success" },
+                p { class: if is_error() { "form-message form-error" } else { "form-message form-success" },
                     "{status}"
                 }
             }
 
             match tab().as_ref() {
-                "structure" => rsx! { StructurePanel { board: board.clone(), status, is_error, refresh } },
-                "users" => rsx! { UsersPanel { board: board.clone(), status, is_error, refresh } },
-                "moderation" => rsx! { ModerationPanel { board: board.clone(), status, is_error, refresh } },
-                "settings" => rsx! { SettingsPanel { board: board.clone(), status, is_error, refresh } },
+                "structure" => rsx! {
+                    StructurePanel {
+                        board: board.clone(),
+                        status,
+                        is_error,
+                        refresh,
+                    }
+                },
+                "users" => rsx! {
+                    UsersPanel {
+                        board: board.clone(),
+                        status,
+                        is_error,
+                        refresh,
+                    }
+                },
+                "moderation" => rsx! {
+                    ModerationPanel {
+                        board: board.clone(),
+                        status,
+                        is_error,
+                        refresh,
+                    }
+                },
+                "settings" => rsx! {
+                    SettingsPanel {
+                        board: board.clone(),
+                        status,
+                        is_error,
+                        refresh,
+                    }
+                },
                 _ => rsx! {},
             }
         }
@@ -94,8 +133,14 @@ fn StructurePanel(board: AppData, mut status: Signal<String>, mut is_error: Sign
                             move |_| {
                                 spawn(async move {
                                     match admin_delete_category(AdminDeleteItem { id: cid }).await {
-                                        Ok(_) => { is_error.set(false); status.set(format!("Category deleted. Refresh to see changes.")); }
-                                        Err(e) => { is_error.set(true); status.set(e.to_string()); }
+                                        Ok(_) => {
+                                            is_error.set(false);
+                                            status.set(format!("Category deleted. Refresh to see changes."));
+                                        }
+                                        Err(e) => {
+                                            is_error.set(true);
+                                            status.set(e.to_string());
+                                        }
                                     }
                                 });
                             }
@@ -106,7 +151,11 @@ fn StructurePanel(board: AppData, mut status: Signal<String>, mut is_error: Sign
                 for forum in board.forums_in_category(cat.id) {
                     div { class: "forum-row",
                         div { class: "forum-main",
-                            Link { class: "forum-link", to: Route::Forum { id: forum.id }, "{forum.name}" }
+                            Link {
+                                class: "forum-link",
+                                to: Route::Forum { id: forum.id },
+                                "{forum.name}"
+                            }
                             p { class: "forum-description", "{forum.description}" }
                         }
                         button {
@@ -116,8 +165,14 @@ fn StructurePanel(board: AppData, mut status: Signal<String>, mut is_error: Sign
                                 move |_| {
                                     spawn(async move {
                                         match admin_delete_forum(AdminDeleteItem { id: fid }).await {
-                                            Ok(_) => { is_error.set(false); status.set("Forum deleted. Refresh to see changes.".into()); }
-                                            Err(e) => { is_error.set(true); status.set(e.to_string()); }
+                                            Ok(_) => {
+                                                is_error.set(false);
+                                                status.set("Forum deleted. Refresh to see changes.".into());
+                                            }
+                                            Err(e) => {
+                                                is_error.set(true);
+                                                status.set(e.to_string());
+                                            }
                                         }
                                     });
                                 }
@@ -132,20 +187,43 @@ fn StructurePanel(board: AppData, mut status: Signal<String>, mut is_error: Sign
         // ── Add category ──
         article { class: "form-card",
             h3 { "Add category" }
-            label { "Name"
-                input { class: "text-input", value: "{cat_name}", oninput: move |e| cat_name.set(e.value()), placeholder: "Category name" }
+            label {
+                "Name"
+                input {
+                    class: "text-input",
+                    value: "{cat_name}",
+                    oninput: move |e| cat_name.set(e.value()),
+                    placeholder: "Category name",
+                }
             }
-            label { "Description"
-                input { class: "text-input", value: "{cat_desc}", oninput: move |e| cat_desc.set(e.value()), placeholder: "Short description" }
+            label {
+                "Description"
+                input {
+                    class: "text-input",
+                    value: "{cat_desc}",
+                    oninput: move |e| cat_desc.set(e.value()),
+                    placeholder: "Short description",
+                }
             }
             button {
                 class: "primary-button",
                 onclick: move |_| {
-                    let form = AdminCategoryForm { name: cat_name(), description: cat_desc() };
+                    let form = AdminCategoryForm {
+                        name: cat_name(),
+                        description: cat_desc(),
+                    };
                     spawn(async move {
                         match admin_add_category(form).await {
-                            Ok(_) => { is_error.set(false); status.set("Category created. Refresh to see it.".into()); cat_name.set(String::new()); cat_desc.set(String::new()); }
-                            Err(e) => { is_error.set(true); status.set(e.to_string()); }
+                            Ok(_) => {
+                                is_error.set(false);
+                                status.set("Category created. Refresh to see it.".into());
+                                cat_name.set(String::new());
+                                cat_desc.set(String::new());
+                            }
+                            Err(e) => {
+                                is_error.set(true);
+                                status.set(e.to_string());
+                            }
                         }
                     });
                 },
@@ -156,30 +234,59 @@ fn StructurePanel(board: AppData, mut status: Signal<String>, mut is_error: Sign
         // ── Add forum ──
         article { class: "form-card",
             h3 { "Add forum" }
-            label { "Category"
+            label {
+                "Category"
                 select {
                     class: "text-input",
-                    onchange: move |e| { if let Ok(v) = e.value().parse::<i32>() { forum_cat_id.set(v); } },
+                    onchange: move |e| {
+                        if let Ok(v) = e.value().parse::<i32>() {
+                            forum_cat_id.set(v);
+                        }
+                    },
                     option { value: "0", "Select category…" }
                     for cat in board.categories_sorted() {
                         option { value: "{cat.id}", "{cat.name}" }
                     }
                 }
             }
-            label { "Forum name"
-                input { class: "text-input", value: "{forum_name}", oninput: move |e| forum_name.set(e.value()), placeholder: "Forum name" }
+            label {
+                "Forum name"
+                input {
+                    class: "text-input",
+                    value: "{forum_name}",
+                    oninput: move |e| forum_name.set(e.value()),
+                    placeholder: "Forum name",
+                }
             }
-            label { "Description"
-                input { class: "text-input", value: "{forum_desc}", oninput: move |e| forum_desc.set(e.value()), placeholder: "Short description" }
+            label {
+                "Description"
+                input {
+                    class: "text-input",
+                    value: "{forum_desc}",
+                    oninput: move |e| forum_desc.set(e.value()),
+                    placeholder: "Short description",
+                }
             }
             button {
                 class: "primary-button",
                 onclick: move |_| {
-                    let form = AdminForumForm { category_id: forum_cat_id(), name: forum_name(), description: forum_desc() };
+                    let form = AdminForumForm {
+                        category_id: forum_cat_id(),
+                        name: forum_name(),
+                        description: forum_desc(),
+                    };
                     spawn(async move {
                         match admin_add_forum(form).await {
-                            Ok(_) => { is_error.set(false); status.set("Forum created. Refresh to see it.".into()); forum_name.set(String::new()); forum_desc.set(String::new()); }
-                            Err(e) => { is_error.set(true); status.set(e.to_string()); }
+                            Ok(_) => {
+                                is_error.set(false);
+                                status.set("Forum created. Refresh to see it.".into());
+                                forum_name.set(String::new());
+                                forum_desc.set(String::new());
+                            }
+                            Err(e) => {
+                                is_error.set(true);
+                                status.set(e.to_string());
+                            }
                         }
                     });
                 },
@@ -213,8 +320,14 @@ fn UsersPanel(board: AppData, mut status: Signal<String>, mut is_error: Signal<b
                 for user in board.users.iter() {
                     div { class: "topic-row",
                         div { class: "topic-main",
-                            Link { class: "topic-link", to: Route::Profile { id: user.id }, "{user.username}" }
-                            p { class: "topic-meta", "Joined {user.joined_at} · {user.email_display()}" }
+                            Link {
+                                class: "topic-link",
+                                to: Route::Profile { id: user.id },
+                                "{user.username}"
+                            }
+                            p { class: "topic-meta",
+                                "Joined {user.joined_at} · {user.email_display()}"
+                            }
                         }
                         p { class: "topic-metric", "{group_label(user.group_id())}" }
                         p { class: "topic-metric", "{user.post_count}" }
@@ -229,9 +342,21 @@ fn UsersPanel(board: AppData, mut status: Signal<String>, mut is_error: Signal<b
                                         move |_| {
                                             let uname = uname.clone();
                                             spawn(async move {
-                                                match admin_update_user(AdminUserUpdate { user_id: uid, group_id: 1, title: "Administrator".into() }).await {
-                                                    Ok(_) => { is_error.set(false); status.set(format!("{uname} promoted to admin. Refresh.")); }
-                                                    Err(e) => { is_error.set(true); status.set(e.to_string()); }
+                                                match admin_update_user(AdminUserUpdate {
+                                                        user_id: uid,
+                                                        group_id: 1,
+                                                        title: "Administrator".into(),
+                                                    })
+                                                    .await
+                                                {
+                                                    Ok(_) => {
+                                                        is_error.set(false);
+                                                        status.set(format!("{uname} promoted to admin. Refresh."));
+                                                    }
+                                                    Err(e) => {
+                                                        is_error.set(true);
+                                                        status.set(e.to_string());
+                                                    }
                                                 }
                                             });
                                         }
@@ -249,9 +374,21 @@ fn UsersPanel(board: AppData, mut status: Signal<String>, mut is_error: Signal<b
                                         move |_| {
                                             let uname = uname.clone();
                                             spawn(async move {
-                                                match admin_update_user(AdminUserUpdate { user_id: uid, group_id: 4, title: "Member".into() }).await {
-                                                    Ok(_) => { is_error.set(false); status.set(format!("{uname} demoted to member. Refresh.")); }
-                                                    Err(e) => { is_error.set(true); status.set(e.to_string()); }
+                                                match admin_update_user(AdminUserUpdate {
+                                                        user_id: uid,
+                                                        group_id: 4,
+                                                        title: "Member".into(),
+                                                    })
+                                                    .await
+                                                {
+                                                    Ok(_) => {
+                                                        is_error.set(false);
+                                                        status.set(format!("{uname} demoted to member. Refresh."));
+                                                    }
+                                                    Err(e) => {
+                                                        is_error.set(true);
+                                                        status.set(e.to_string());
+                                                    }
                                                 }
                                             });
                                         }
@@ -267,8 +404,14 @@ fn UsersPanel(board: AppData, mut status: Signal<String>, mut is_error: Signal<b
                                     move |_| {
                                         spawn(async move {
                                             match admin_delete_user(AdminDeleteItem { id: uid }).await {
-                                                Ok(_) => { is_error.set(false); status.set("User deleted. Refresh.".into()); }
-                                                Err(e) => { is_error.set(true); status.set(e.to_string()); }
+                                                Ok(_) => {
+                                                    is_error.set(false);
+                                                    status.set("User deleted. Refresh.".into());
+                                                }
+                                                Err(e) => {
+                                                    is_error.set(true);
+                                                    status.set(e.to_string());
+                                                }
                                             }
                                         });
                                     }
@@ -305,7 +448,11 @@ fn ModerationPanel(board: AppData, mut status: Signal<String>, mut is_error: Sig
                 for topic in board.topics.iter() {
                     div { class: "topic-row",
                         div { class: "topic-main",
-                            Link { class: "topic-link", to: Route::Topic { id: topic.id }, "{topic.subject}" }
+                            Link {
+                                class: "topic-link",
+                                to: Route::Topic { id: topic.id },
+                                "{topic.subject}"
+                            }
                             p { class: "topic-meta",
                                 if let Some(author) = board.user(topic.author_id) {
                                     "by {author.username} · {topic.created_at}"
@@ -324,9 +471,18 @@ fn ModerationPanel(board: AppData, mut status: Signal<String>, mut is_error: Sig
                                         move |_| {
                                             let st = st.clone();
                                             spawn(async move {
-                                                match admin_update_topic(AdminTopicUpdate { topic_id: tid, status: st }).await {
-                                                    Ok(_) => { is_error.set(false); status.set("Topic status updated. Refresh.".into()); }
-                                                    Err(e) => { is_error.set(true); status.set(e.to_string()); }
+                                                match admin_update_topic(AdminTopicUpdate {
+                                                topic_id: tid,
+                                                status: st,
+                                            }).await {
+                                                    Ok(_) => {
+                                                        is_error.set(false);
+                                                        status.set("Topic status updated. Refresh.".into());
+                                                    }
+                                                    Err(e) => {
+                                                        is_error.set(true);
+                                                        status.set(e.to_string());
+                                                    }
                                                 }
                                             });
                                         }
@@ -341,8 +497,14 @@ fn ModerationPanel(board: AppData, mut status: Signal<String>, mut is_error: Sig
                                     move |_| {
                                         spawn(async move {
                                             match admin_delete_topic(AdminDeleteItem { id: tid }).await {
-                                                Ok(_) => { is_error.set(false); status.set("Topic deleted. Refresh.".into()); }
-                                                Err(e) => { is_error.set(true); status.set(e.to_string()); }
+                                                Ok(_) => {
+                                                    is_error.set(false);
+                                                    status.set("Topic deleted. Refresh.".into());
+                                                }
+                                                Err(e) => {
+                                                    is_error.set(true);
+                                                    status.set(e.to_string());
+                                                }
                                             }
                                         });
                                     }
@@ -369,17 +531,38 @@ fn SettingsPanel(board: AppData, mut status: Signal<String>, mut is_error: Signa
     rsx! {
         article { class: "form-card",
             h3 { "Board settings" }
-            label { "Board title"
-                input { class: "text-input", value: "{title}", oninput: move |e| title.set(e.value()) }
+            label {
+                "Board title"
+                input {
+                    class: "text-input",
+                    value: "{title}",
+                    oninput: move |e| title.set(e.value()),
+                }
             }
-            label { "Tagline"
-                input { class: "text-input", value: "{tagline}", oninput: move |e| tagline.set(e.value()) }
+            label {
+                "Tagline"
+                input {
+                    class: "text-input",
+                    value: "{tagline}",
+                    oninput: move |e| tagline.set(e.value()),
+                }
             }
-            label { "Announcement title"
-                input { class: "text-input", value: "{ann_title}", oninput: move |e| ann_title.set(e.value()) }
+            label {
+                "Announcement title"
+                input {
+                    class: "text-input",
+                    value: "{ann_title}",
+                    oninput: move |e| ann_title.set(e.value()),
+                }
             }
-            label { "Announcement body"
-                textarea { class: "text-area", rows: "4", value: "{ann_body}", oninput: move |e| ann_body.set(e.value()) }
+            label {
+                "Announcement body"
+                textarea {
+                    class: "text-area",
+                    rows: "4",
+                    value: "{ann_body}",
+                    oninput: move |e| ann_body.set(e.value()),
+                }
             }
             button {
                 class: "primary-button",
@@ -392,8 +575,14 @@ fn SettingsPanel(board: AppData, mut status: Signal<String>, mut is_error: Signa
                     };
                     spawn(async move {
                         match admin_update_board(form).await {
-                            Ok(_) => { is_error.set(false); status.set("Board settings saved. Refresh to see changes.".into()); }
-                            Err(e) => { is_error.set(true); status.set(e.to_string()); }
+                            Ok(_) => {
+                                is_error.set(false);
+                                status.set("Board settings saved. Refresh to see changes.".into());
+                            }
+                            Err(e) => {
+                                is_error.set(true);
+                                status.set(e.to_string());
+                            }
                         }
                     });
                 },

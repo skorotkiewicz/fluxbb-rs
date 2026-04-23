@@ -48,8 +48,14 @@ pub fn Search() -> Element {
                                 div { class: "search-result-row",
                                     TopicStatusBadge { status: topic.status.clone() }
                                     div { class: "search-result-copy",
-                                        Link { class: "topic-link", to: Route::Topic { id: topic.id }, "{topic.subject}" }
-                                        p { class: "topic-meta", "{topic.tags.join(\" | \")} · {topic.updated_at}" }
+                                        Link {
+                                            class: "topic-link",
+                                            to: Route::Topic { id: topic.id },
+                                            "{topic.subject}"
+                                        }
+                                        p { class: "topic-meta",
+                                            "{topic.tags.join(\" | \")} · {topic.updated_at}"
+                                        }
                                     }
                                 }
                             }

@@ -2,13 +2,15 @@ use dioxus::prelude::*;
 
 use crate::{
     components::{SectionHeader, StatCard, TopicStatusBadge},
-    data::AppData,
+    data::{mark_all_read, AppData, SessionUser},
     Route,
 };
 
 #[component]
 pub fn Index() -> Element {
     let board = use_context::<AppData>();
+    let current_user = use_context::<Signal<Option<SessionUser>>>();
+    let mut refresh = use_context::<Signal<()>>();
     let stats = board.board_stats();
     let recent_topics = board.recent_topics(4);
 
@@ -38,6 +40,20 @@ pub fn Index() -> Element {
                         detail: "Total contributions".to_string(),
                     }
                 }
+
+                if current_user().is_some() {
+                    button {
+                        class: "small-button",
+                        style: "margin-top: 12px; align-self: start;",
+                        onclick: move |_| {
+                            spawn(async move {
+                                let _ = mark_all_read().await;
+                                refresh.set(());
+                            });
+                        },
+                        "Mark all as read"
+                    }
+                }
             }
 
             for category in board.categories_sorted() {
@@ -59,14 +75,26 @@ pub fn Index() -> Element {
                             if let Some(snapshot) = board.forum_snapshot(forum.id) {
                                 div { class: "forum-row",
                                     div { class: "forum-main",
-                                        Link { class: "forum-link", to: Route::Forum { id: forum.id }, "{forum.name}" }
+                                        Link {
+                                            class: "forum-link",
+                                            to: Route::Forum { id: forum.id },
+                                            "{forum.name}"
+                                        }
                                         p { class: "forum-description", "{forum.description}" }
-                                        p { class: "forum-moderators", "Moderators: {forum.moderators.join(\", \")}" }
+                                        p { class: "forum-moderators",
+                                            "Moderators: {forum.moderators.join(\", \")}"
+                                        }
                                     }
                                     p { class: "forum-count", "{snapshot.topic_count}" }
                                     p { class: "forum-count", "{snapshot.post_count}" }
                                     div { class: "forum-last",
-                                        Link { class: "last-topic-link", to: Route::Topic { id: snapshot.last_topic_id }, "{snapshot.last_topic_subject}" }
+                                        Link {
+                                            class: "last-topic-link",
+                                            to: Route::Topic {
+                                                id: snapshot.last_topic_id,
+                                            },
+                                            "{snapshot.last_topic_subject}"
+                                        }
                                         p { "{snapshot.last_post_author} on {snapshot.last_posted_at}" }
                                     }
                                 }
@@ -87,9 +115,15 @@ pub fn Index() -> Element {
                             div { class: "recent-row",
                                 div { class: "recent-main",
                                     TopicStatusBadge { status: topic.status.clone() }
-                                    Link { class: "recent-topic-link", to: Route::Topic { id: topic.id }, "{topic.subject}" }
+                                    Link {
+                                        class: "recent-topic-link",
+                                        to: Route::Topic { id: topic.id },
+                                        "{topic.subject}"
+                                    }
                                 }
-                                p { class: "recent-meta", "by {author.username} · {topic.updated_at}" }
+                                p { class: "recent-meta",
+                                    "by {author.username} · {topic.updated_at}"
+                                }
                             }
                         }
                     }

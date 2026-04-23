@@ -35,7 +35,9 @@ pub fn Install() -> Element {
                 div { class: "masthead-copy",
                     p { class: "eyebrow", "Installation" }
                     h1 { "FluxBB RS Setup" }
-                    p { class: "masthead-tagline", "Configure your forum and create the administrator account." }
+                    p { class: "masthead-tagline",
+                        "Configure your forum and create the administrator account."
+                    }
                 }
             }
 
@@ -55,27 +57,29 @@ pub fn Install() -> Element {
                                 h3 { "Board setup" }
 
                                 if !status().is_empty() {
-                                    p {
-                                        class: if is_error() { "form-message form-error" } else { "form-message form-success" },
+                                    p { class: if is_error() { "form-message form-error" } else { "form-message form-success" },
                                         "{status}"
                                     }
                                 }
 
-                                label { "Board title"
+                                label {
+                                    "Board title"
                                     input {
                                         class: "text-input",
                                         value: "{board_title}",
                                         oninput: move |e| board_title.set(e.value()),
                                     }
                                 }
-                                label { "Board tagline"
+                                label {
+                                    "Board tagline"
                                     input {
                                         class: "text-input",
                                         value: "{board_tagline}",
                                         oninput: move |e| board_tagline.set(e.value()),
                                     }
                                 }
-                                label { "Admin username"
+                                label {
+                                    "Admin username"
                                     input {
                                         class: "text-input",
                                         value: "{admin_username}",
@@ -83,7 +87,8 @@ pub fn Install() -> Element {
                                         placeholder: "admin",
                                     }
                                 }
-                                label { "Admin email"
+                                label {
+                                    "Admin email"
                                     input {
                                         class: "text-input",
                                         value: "{admin_email}",
@@ -91,7 +96,8 @@ pub fn Install() -> Element {
                                         placeholder: "admin@example.com",
                                     }
                                 }
-                                label { "Admin password"
+                                label {
+                                    "Admin password"
                                     input {
                                         class: "text-input",
                                         r#type: "password",
@@ -117,7 +123,9 @@ pub fn Install() -> Element {
                                                 Ok(resp) => {
                                                     let script = format!(
                                                         "document.cookie = '{}={}; path=/; max-age={}; samesite=lax';",
-                                                        cookie_name(), resp.session_token, cookie_max_age(),
+                                                        cookie_name(),
+                                                        resp.session_token,
+                                                        cookie_max_age(),
                                                     );
                                                     let _ = document::eval(&script);
                                                     is_error.set(false);
@@ -132,14 +140,22 @@ pub fn Install() -> Element {
                                             submitting.set(false);
                                         });
                                     },
-                                    if submitting() { "Installing…" } else { "Install forum" }
+                                    if submitting() {
+                                        "Installing…"
+                                    } else {
+                                        "Install forum"
+                                    }
                                 }
                             }
 
                             article { class: "panel side-note",
                                 h3 { "What happens" }
-                                p { "This will create the database tables, an administrator account, and a default forum category." }
-                                p { "You can add more categories and forums from the admin panel after installation." }
+                                p {
+                                    "This will create the database tables, an administrator account, and a default forum category."
+                                }
+                                p {
+                                    "You can add more categories and forums from the admin panel after installation."
+                                }
                             }
                         }
                     }

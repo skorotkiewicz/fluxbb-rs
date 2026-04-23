@@ -2,27 +2,42 @@ use dioxus::prelude::*;
 
 use crate::{
     components::{EmptyState, SectionHeader},
-    data::{create_topic, AppData, NewTopicForm, SessionUser},
+    data::{create_topic, load_forum_data, NewTopicForm, SessionUser},
     Route,
 };
 
 #[component]
 pub fn NewTopic(id: i32) -> Element {
-    let board = use_context::<AppData>();
     let current_user = use_context::<Signal<Option<SessionUser>>>();
     let navigator = use_navigator();
     let mut refresh = use_context::<Signal<()>>();
 
-    let Some(forum) = board.forum(id) else {
-        return rsx! {
-            section { class: "page",
+    let data_resource = use_resource(move || async move {
+        refresh();
+        load_forum_data(id).await
+    });
+
+    let data = if let Some(Ok(data)) = data_resource() {
+    data
+} else {
+    return rsx! {
+        section { class: "page",
+            if data_resource().is_none() {
+                article { class: "empty-state",
+                    h3 { "Loading forum…" }
+                }
+            } else {
                 EmptyState {
                     title: "Forum not found".to_string(),
                     body: "The requested forum does not exist.".to_string(),
                 }
             }
-        };
-    };
+        }
+    }
+        
+};
+
+    let forum = data.forum.clone();
 
     if current_user().is_none() {
         return rsx! {
@@ -99,7 +114,10 @@ pub fn NewTopic(id: i32) -> Element {
                             match create_topic(form).await {
                                 Ok(result) => {
                                     refresh.set(());
-                                    navigator.push(Route::Topic { id: result.topic_id });
+                                    navigator
+                                        .push(Route::Topic {
+                                            id: result.topic_id,
+                                        });
                                 }
                                 Err(e) => {
                                     is_error.set(true);

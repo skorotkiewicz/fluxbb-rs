@@ -2,25 +2,61 @@ use dioxus::prelude::*;
 
 use crate::{
     components::{SectionHeader, StatCard, TopicStatusBadge},
-    data::{mark_all_read, AppData, SessionUser},
+    data::{load_index_data, mark_all_read, SessionUser},
     Route,
 };
 
 #[component]
 pub fn Index() -> Element {
-    let board = use_context::<AppData>();
     let current_user = use_context::<Signal<Option<SessionUser>>>();
     let mut refresh = use_context::<Signal<()>>();
-    let stats = board.board_stats();
-    let recent_topics = board.recent_topics(4);
+
+    let data_resource = use_resource(move || async move {
+        refresh();
+        load_index_data().await
+    });
+
+    let data = if let Some(Ok(data)) = data_resource() {
+        data
+    } else {
+        return rsx! {
+            section { class: "page",
+                article { class: "empty-state",
+                    h3 { "Loading board…" }
+                }
+            }
+        };
+    };
+
+    let stats = data.stats.clone();
+    let categories = data.categories.clone();
+    let forums = data.forums.clone();
+    let forum_stats: std::collections::HashMap<i32, crate::data::ForumStats> =
+        data.forum_stats.iter().map(|fs| (fs.forum_id, fs.clone())).collect();
+    let recent_topics = data.recent_topics.clone();
+    let recent_users: std::collections::HashMap<i32, crate::data::UserProfile> =
+        data.recent_users.iter().map(|u| (u.id, u.clone())).collect();
+
+    let cat_items: Vec<_> = categories
+        .iter()
+        .map(|cat| {
+            let cat_forums: Vec<_> = forums
+                .iter()
+                .filter(|f| f.category_id == cat.id)
+                .cloned()
+                .collect();
+            (cat.clone(), cat_forums)
+        })
+        .filter(|(_, cat_forums)| !cat_forums.is_empty())
+        .collect();
 
     rsx! {
         section { class: "page",
             article { class: "hero-card",
                 SectionHeader {
                     kicker: "Board index".to_string(),
-                    title: board.meta.announcement_title.clone(),
-                    subtitle: board.meta.announcement_body.clone(),
+                    title: data.meta.announcement_title.clone(),
+                    subtitle: data.meta.announcement_body.clone(),
                 }
 
                 div { class: "stat-grid",
@@ -56,11 +92,11 @@ pub fn Index() -> Element {
                 }
             }
 
-            for category in board.categories_sorted() {
+            for (cat, cat_forums) in cat_items {
                 article { class: "panel",
                     div { class: "panel-heading",
-                        h3 { "{category.name}" }
-                        p { "{category.description}" }
+                        h3 { "{cat.name}" }
+                        p { "{cat.description}" }
                     }
 
                     div { class: "forum-table",
@@ -71,8 +107,8 @@ pub fn Index() -> Element {
                             span { "Last post" }
                         }
 
-                        for forum in board.forums_in_category(category.id) {
-                            if let Some(snapshot) = board.forum_snapshot(forum.id) {
+                        for forum in cat_forums {
+                            if let Some(fs) = forum_stats.get(&forum.id) {
                                 div { class: "forum-row",
                                     div { class: "forum-main",
                                         Link {
@@ -85,17 +121,17 @@ pub fn Index() -> Element {
                                             "Moderators: {forum.moderators.join(\", \")}"
                                         }
                                     }
-                                    p { class: "forum-count", "{snapshot.topic_count}" }
-                                    p { class: "forum-count", "{snapshot.post_count}" }
+                                    p { class: "forum-count", "{fs.topic_count}" }
+                                    p { class: "forum-count", "{fs.post_count}" }
                                     div { class: "forum-last",
                                         Link {
                                             class: "last-topic-link",
                                             to: Route::Topic {
-                                                id: snapshot.last_topic_id,
+                                                id: fs.last_topic_id,
                                             },
-                                            "{snapshot.last_topic_subject}"
+                                            "{fs.last_topic_subject}"
                                         }
-                                        p { "{snapshot.last_post_author} on {snapshot.last_posted_at}" }
+                                        p { "{fs.last_post_author} on {fs.last_posted_at}" }
                                     }
                                 }
                             }
@@ -111,7 +147,7 @@ pub fn Index() -> Element {
 
                 div { class: "recent-list",
                     for topic in recent_topics {
-                        if let Some(author) = board.user(topic.author_id) {
+                        if let Some(author) = recent_users.get(&topic.author_id) {
                             div { class: "recent-row",
                                 div { class: "recent-main",
                                     TopicStatusBadge { status: topic.status.clone() }

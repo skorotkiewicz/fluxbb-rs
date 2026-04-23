@@ -2,14 +2,25 @@ use dioxus::prelude::*;
 
 use crate::{
     components::SectionHeader,
-    data::*,
+    data::{
+        admin_add_category, admin_add_forum, admin_delete_category, admin_delete_forum,
+        admin_delete_topic, admin_delete_user, admin_update_board, admin_update_topic,
+        admin_update_user, load_admin_data, AdminBoardSettings, AdminCategoryForm,
+        AdminDeleteItem, AdminForumForm, AdminTopicUpdate, AdminUserUpdate, AdminData,
+        SessionUser,
+    },
     Route,
 };
 
 #[component]
 pub fn Admin() -> Element {
     let current_user = use_context::<Signal<Option<SessionUser>>>();
-    let board = use_context::<AppData>();
+    let mut refresh = use_context::<Signal<()>>();
+
+    let data_resource = use_resource(move || async move {
+        refresh();
+        load_admin_data().await
+    });
 
     let is_admin = current_user()
         .as_ref()
@@ -26,10 +37,22 @@ pub fn Admin() -> Element {
         };
     }
 
+    let data = if let Some(Ok(data)) = data_resource() {
+    data
+} else {
+    return rsx! {
+        section { class: "page",
+            article { class: "empty-state",
+                h3 { "Loading admin data…" }
+            }
+        }
+    }
+        
+};
+
     let mut tab = use_signal(|| "structure");
     let status = use_signal(String::new);
     let is_error = use_signal(|| false);
-    let refresh = use_context::<Signal<()>>();
 
     rsx! {
         section { class: "page",
@@ -73,7 +96,7 @@ pub fn Admin() -> Element {
             match tab().as_ref() {
                 "structure" => rsx! {
                     StructurePanel {
-                        board: board.clone(),
+                        data: data.clone(),
                         status,
                         is_error,
                         refresh,
@@ -81,7 +104,7 @@ pub fn Admin() -> Element {
                 },
                 "users" => rsx! {
                     UsersPanel {
-                        board: board.clone(),
+                        data: data.clone(),
                         status,
                         is_error,
                         refresh,
@@ -89,7 +112,7 @@ pub fn Admin() -> Element {
                 },
                 "moderation" => rsx! {
                     ModerationPanel {
-                        board: board.clone(),
+                        data: data.clone(),
                         status,
                         is_error,
                         refresh,
@@ -97,7 +120,7 @@ pub fn Admin() -> Element {
                 },
                 "settings" => rsx! {
                     SettingsPanel {
-                        board: board.clone(),
+                        data: data.clone(),
                         status,
                         is_error,
                         refresh,
@@ -112,16 +135,33 @@ pub fn Admin() -> Element {
 // ── Structure panel: categories & forums ──
 
 #[component]
-fn StructurePanel(board: AppData, mut status: Signal<String>, mut is_error: Signal<bool>, mut refresh: Signal<()>) -> Element {
+fn StructurePanel(data: AdminData, mut status: Signal<String>, mut is_error: Signal<bool>, mut refresh: Signal<()>) -> Element {
     let mut cat_name = use_signal(String::new);
     let mut cat_desc = use_signal(String::new);
     let mut forum_name = use_signal(String::new);
     let mut forum_desc = use_signal(String::new);
     let mut forum_cat_id = use_signal(|| 0_i32);
 
+    let mut categories = data.categories.clone();
+    categories.sort_by_key(|c| c.sort_order);
+    let forums = data.forums.clone();
+
+    let cat_items: Vec<_> = categories
+        .iter()
+        .map(|cat| {
+            let cat_forums: Vec<_> = forums
+                .iter()
+                .filter(|f| f.category_id == cat.id)
+                .cloned()
+                .collect();
+            (cat.clone(), cat_forums)
+        })
+        .filter(|(_, cat_forums)| !cat_forums.is_empty())
+        .collect();
+
     rsx! {
         // ── Existing categories & forums ──
-        for cat in board.categories_sorted() {
+        for (cat, cat_forums) in cat_items {
             article { class: "panel",
                 div { class: "panel-heading",
                     h3 { "{cat.name}" }
@@ -135,7 +175,7 @@ fn StructurePanel(board: AppData, mut status: Signal<String>, mut is_error: Sign
                                     match admin_delete_category(AdminDeleteItem { id: cid }).await {
                                         Ok(_) => {
                                             is_error.set(false);
-                                            status.set(format!("Category deleted. Refresh to see changes."));
+                                            status.set("Category deleted. Refresh to see changes.".into());
                                         }
                                         Err(e) => {
                                             is_error.set(true);
@@ -148,7 +188,7 @@ fn StructurePanel(board: AppData, mut status: Signal<String>, mut is_error: Sign
                         "Delete category"
                     }
                 }
-                for forum in board.forums_in_category(cat.id) {
+                for forum in cat_forums {
                     div { class: "forum-row",
                         div { class: "forum-main",
                             Link {
@@ -244,7 +284,7 @@ fn StructurePanel(board: AppData, mut status: Signal<String>, mut is_error: Sign
                         }
                     },
                     option { value: "0", "Select category…" }
-                    for cat in board.categories_sorted() {
+                    for cat in categories.clone() {
                         option { value: "{cat.id}", "{cat.name}" }
                     }
                 }
@@ -299,7 +339,7 @@ fn StructurePanel(board: AppData, mut status: Signal<String>, mut is_error: Sign
 // ── Users panel ──
 
 #[component]
-fn UsersPanel(board: AppData, mut status: Signal<String>, mut is_error: Signal<bool>, mut refresh: Signal<()>) -> Element {
+fn UsersPanel(data: AdminData, mut status: Signal<String>, mut is_error: Signal<bool>, mut refresh: Signal<()>) -> Element {
     fn group_label(gid: i32) -> &'static str {
         match gid { 1 => "Admin", 2 => "Moderator", 3 => "Guest", _ => "Member" }
     }
@@ -308,7 +348,7 @@ fn UsersPanel(board: AppData, mut status: Signal<String>, mut is_error: Signal<b
         article { class: "panel",
             div { class: "panel-heading",
                 h3 { "All members" }
-                p { "{board.users.len()} users" }
+                p { "{data.users.len()} users" }
             }
             div { class: "topic-table",
                 div { class: "topic-table-head",
@@ -317,7 +357,7 @@ fn UsersPanel(board: AppData, mut status: Signal<String>, mut is_error: Signal<b
                     span { "Posts" }
                     span { "Actions" }
                 }
-                for user in board.users.iter() {
+                for user in data.users.iter() {
                     div { class: "topic-row",
                         div { class: "topic-main",
                             Link {
@@ -429,14 +469,16 @@ fn UsersPanel(board: AppData, mut status: Signal<String>, mut is_error: Signal<b
 // ── Moderation panel ──
 
 #[component]
-fn ModerationPanel(board: AppData, mut status: Signal<String>, mut is_error: Signal<bool>, mut refresh: Signal<()>) -> Element {
+fn ModerationPanel(data: AdminData, mut status: Signal<String>, mut is_error: Signal<bool>, mut refresh: Signal<()>) -> Element {
     let statuses = ["pinned", "hot", "resolved", "fresh"];
+    let users_map: std::collections::HashMap<i32, crate::data::UserProfile> =
+        data.users.iter().map(|u| (u.id, u.clone())).collect();
 
     rsx! {
         article { class: "panel",
             div { class: "panel-heading",
                 h3 { "All topics" }
-                p { "{board.topics.len()} topics" }
+                p { "{data.topics.len()} topics" }
             }
             div { class: "topic-table",
                 div { class: "topic-table-head",
@@ -445,7 +487,7 @@ fn ModerationPanel(board: AppData, mut status: Signal<String>, mut is_error: Sig
                     span { "Views" }
                     span { "Actions" }
                 }
-                for topic in board.topics.iter() {
+                for topic in data.topics.iter() {
                     div { class: "topic-row",
                         div { class: "topic-main",
                             Link {
@@ -454,7 +496,7 @@ fn ModerationPanel(board: AppData, mut status: Signal<String>, mut is_error: Sig
                                 "{topic.subject}"
                             }
                             p { class: "topic-meta",
-                                if let Some(author) = board.user(topic.author_id) {
+                                if let Some(author) = users_map.get(&topic.author_id) {
                                     "by {author.username} · {topic.created_at}"
                                 }
                             }
@@ -472,9 +514,11 @@ fn ModerationPanel(board: AppData, mut status: Signal<String>, mut is_error: Sig
                                             let st = st.clone();
                                             spawn(async move {
                                                 match admin_update_topic(AdminTopicUpdate {
-                                                topic_id: tid,
-                                                status: st,
-                                            }).await {
+                                                        topic_id: tid,
+                                                        status: st,
+                                                    })
+                                                    .await
+                                                {
                                                     Ok(_) => {
                                                         is_error.set(false);
                                                         status.set("Topic status updated. Refresh.".into());
@@ -522,11 +566,11 @@ fn ModerationPanel(board: AppData, mut status: Signal<String>, mut is_error: Sig
 // ── Settings panel ──
 
 #[component]
-fn SettingsPanel(board: AppData, mut status: Signal<String>, mut is_error: Signal<bool>, mut refresh: Signal<()>) -> Element {
-    let mut title = use_signal(|| board.meta.title.clone());
-    let mut tagline = use_signal(|| board.meta.tagline.clone());
-    let mut ann_title = use_signal(|| board.meta.announcement_title.clone());
-    let mut ann_body = use_signal(|| board.meta.announcement_body.clone());
+fn SettingsPanel(data: AdminData, mut status: Signal<String>, mut is_error: Signal<bool>, mut refresh: Signal<()>) -> Element {
+    let mut title = use_signal(|| data.meta.title.clone());
+    let mut tagline = use_signal(|| data.meta.tagline.clone());
+    let mut ann_title = use_signal(|| data.meta.announcement_title.clone());
+    let mut ann_body = use_signal(|| data.meta.announcement_body.clone());
 
     rsx! {
         article { class: "form-card",

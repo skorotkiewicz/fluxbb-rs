@@ -2,17 +2,28 @@ use dioxus::prelude::*;
 
 use crate::{
     components::{EmptyState, SectionHeader, TopicStatusBadge},
-    data::AppData,
+    data::{search_server, SearchResults},
     Route,
 };
 
 #[component]
 pub fn Search() -> Element {
-    let board = use_context::<AppData>();
     let mut query = use_signal(String::new);
-    let board_clone = board.clone();
-    let results = use_memo(move || board_clone.search(&query()));
-    let matches = results().clone();
+
+    let results_resource = use_resource(move || async move {
+        let q = query();
+        if q.trim().is_empty() {
+            Ok(SearchResults::default())
+        } else {
+            search_server(q).await
+        }
+    });
+
+    let matches = match results_resource() {
+        Some(Ok(r)) => r,
+        Some(Err(_)) => SearchResults::default(),
+        None => SearchResults::default(),
+    };
 
     rsx! {
         section { class: "page",
@@ -40,7 +51,7 @@ pub fn Search() -> Element {
                     if matches.topics.is_empty() {
                         EmptyState {
                             title: "No topics found".to_string(),
-                            body: "Try a different search term.".to_string(),
+                            body: if query().trim().is_empty() { "Type a search term to find topics.".to_string() } else { "Try a different search term.".to_string() },
                         }
                     } else {
                         div { class: "search-results",
@@ -70,7 +81,7 @@ pub fn Search() -> Element {
                     if matches.users.is_empty() {
                         EmptyState {
                             title: "No members found".to_string(),
-                            body: "Search by username, role, or location.".to_string(),
+                            body: if query().trim().is_empty() { "Type a search term to find members.".to_string() } else { "Search by username, role, or location.".to_string() },
                         }
                     } else {
                         div { class: "search-results",

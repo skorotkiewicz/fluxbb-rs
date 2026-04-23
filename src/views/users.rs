@@ -1,12 +1,20 @@
 use dioxus::prelude::*;
 
-use crate::{components::SectionHeader, data::AppData, Route};
+use crate::{components::SectionHeader, data::load_users_data, Route};
 
 #[component]
 pub fn Users() -> Element {
-    let board = use_context::<AppData>();
-    let mut users = board.users.clone();
-    users.sort_by_key(|u| std::cmp::Reverse(u.post_count));
+    let mut refresh = use_context::<Signal<()>>();
+
+    let data_resource = use_resource(move || async move {
+        refresh();
+        load_users_data().await
+    });
+
+    let users = match data_resource() {
+        Some(Ok(u)) => u,
+        _ => vec![],
+    };
 
     rsx! {
         section { class: "page",

@@ -2,27 +2,35 @@ use dioxus::prelude::*;
 
 use crate::{
     components::{EmptyState, SectionHeader},
-    data::{update_profile, AppData, SessionUser, UpdateProfileForm},
+    data::{load_profile_data, update_profile, SessionUser, UpdateProfileForm},
     Route,
 };
 
 #[component]
 pub fn ProfileEdit(id: i32) -> Element {
-    let board = use_context::<AppData>();
     let current_user = use_context::<Signal<Option<SessionUser>>>();
     let navigator = use_navigator();
     let mut refresh = use_context::<Signal<()>>();
 
-    let Some(user) = board.user(id) else {
-        return rsx! {
-            section { class: "page",
-                EmptyState {
-                    title: "User not found".to_string(),
-                    body: "This user does not exist.".to_string(),
-                }
+    let data_resource = use_resource(move || async move {
+        refresh();
+        load_profile_data(id).await
+    });
+
+    let data = if let Some(Ok(data)) = data_resource() {
+    data
+} else {
+    return rsx! {
+        section { class: "page",
+            article { class: "empty-state",
+                h3 { "Loading profile…" }
             }
-        };
-    };
+        }
+    }
+        
+};
+
+    let user = data.user.clone();
 
     let can_edit = current_user()
         .as_ref()

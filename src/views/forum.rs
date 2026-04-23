@@ -2,27 +2,37 @@ use dioxus::prelude::*;
 
 use crate::{
     components::{EmptyState, SectionHeader, TopicStatusBadge},
-    data::{AppData, SessionUser},
+    data::{load_forum_data, ForumData, SessionUser},
     Route,
 };
 
 #[component]
 pub fn Forum(id: i32) -> Element {
-    let board = use_context::<AppData>();
     let current_user = use_context::<Signal<Option<SessionUser>>>();
+    let mut refresh = use_context::<Signal<()>>();
 
-    let Some(forum) = board.forum(id) else {
-        return rsx! {
-            section { class: "page",
-                EmptyState {
-                    title: "Forum not found".to_string(),
-                    body: "The requested forum does not exist.".to_string(),
-                }
+    let data_resource = use_resource(move || async move {
+        refresh();
+        load_forum_data(id).await
+    });
+
+    let data = if let Some(Ok(data)) = data_resource() {
+    data
+} else {
+    return rsx! {
+        section { class: "page",
+            article { class: "empty-state",
+                h3 { "Loading forum…" }
             }
-        };
-    };
+        }
+    }
+        
+};
 
-    let topics = board.topics_for_forum(id);
+    let forum = data.forum.clone();
+    let topics = data.topics.clone();
+    let users: std::collections::HashMap<i32, crate::data::UserProfile> =
+        data.users.iter().map(|u| (u.id, u.clone())).collect();
 
     rsx! {
         section { class: "page",
@@ -65,7 +75,7 @@ pub fn Forum(id: i32) -> Element {
                         }
 
                         for topic in topics {
-                            if let Some(author) = board.user(topic.author_id) {
+                            if let Some(author) = users.get(&topic.author_id) {
                                 div { class: "topic-row",
                                     div { class: "topic-main",
                                         TopicStatusBadge { status: topic.status.clone() }
@@ -81,7 +91,7 @@ pub fn Forum(id: i32) -> Element {
                                             "by {author.username} · {topic.created_at}"
                                         }
                                     }
-                                    p { class: "topic-metric", "{topic.reply_count(&board)}" }
+                                    p { class: "topic-metric", "{topic.reply_count()}" }
                                     p { class: "topic-metric", "{topic.views}" }
                                     p { class: "topic-metric topic-update", "{topic.updated_at}" }
                                 }

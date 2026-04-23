@@ -2,13 +2,12 @@ use dioxus::prelude::*;
 
 use crate::{
     components::{EmptyState, SectionHeader},
-    data::{edit_post, load_post, AppData, EditPostForm, SessionUser},
+    data::{edit_post, load_post, load_topic_data, EditPostForm, SessionUser},
     Route,
 };
 
 #[component]
 pub fn EditPost(id: i32) -> Element {
-    let board = use_context::<AppData>();
     let current_user = use_context::<Signal<Option<SessionUser>>>();
     let navigator = use_navigator();
     let mut refresh = use_context::<Signal<()>>();
@@ -28,33 +27,45 @@ pub fn EditPost(id: i32) -> Element {
         }
     });
 
-    let Some(post) = post_resource().flatten() else {
-        return rsx! {
-            section { class: "page",
-                if post_resource().is_none() {
-                    article { class: "empty-state",
-                        h3 { "Loading…" }
-                    }
-                } else {
-                    EmptyState {
-                        title: "Post not found".to_string(),
-                        body: "The post you are trying to edit does not exist.".to_string(),
+    let post = match post_resource().flatten() {
+        Some(p) => p,
+        None => {
+            return rsx! {
+                section { class: "page",
+                    if post_resource().is_none() {
+                        article { class: "empty-state",
+                            h3 { "Loading…" }
+                        }
+                    } else {
+                        EmptyState {
+                            title: "Post not found".to_string(),
+                            body: "The post you are trying to edit does not exist.".to_string(),
+                        }
                     }
                 }
             }
-        };
+        }
     };
 
-    let Some(topic) = board.topic(post.topic_id) else {
-        return rsx! {
-            section { class: "page",
-                EmptyState {
-                    title: "Topic not found".to_string(),
-                    body: "This post belongs to a topic that no longer exists.".to_string(),
+    let topic_resource = use_resource(move || async move {
+        load_topic_data(post.topic_id).await.ok()
+    });
+
+    let topic_data = match topic_resource().flatten() {
+        Some(td) => td,
+        None => {
+            return rsx! {
+                section { class: "page",
+                    article { class: "empty-state",
+                        h3 { "Loading topic…" }
+                    }
                 }
             }
-        };
+        }
     };
+
+    let topic = topic_data.topic.clone();
+    let forum = topic_data.forum.clone();
 
     let can_edit = current_user()
         .as_ref()
@@ -70,8 +81,6 @@ pub fn EditPost(id: i32) -> Element {
             }
         };
     }
-
-    let forum = board.forum(topic.forum_id);
 
     rsx! {
         section { class: "page",

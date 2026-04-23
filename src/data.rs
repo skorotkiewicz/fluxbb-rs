@@ -97,6 +97,8 @@ pub struct Topic {
     pub created_at: String,
     pub updated_at: String,
     pub activity_rank: i32,
+    #[serde(default)]
+    pub reply_count: i32,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -121,7 +123,7 @@ pub enum TopicStatus {
     Closed,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct BoardStats {
     pub members: usize,
     pub topics: usize,
@@ -140,10 +142,71 @@ pub struct ForumSnapshot {
     pub last_posted_at: String,
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct SearchResults {
     pub topics: Vec<Topic>,
     pub users: Vec<UserProfile>,
+}
+
+// ── View-specific data structs ──
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ShellData {
+    pub meta: BoardMeta,
+    pub stats: BoardStats,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ForumStats {
+    pub forum_id: i32,
+    pub topic_count: usize,
+    pub post_count: usize,
+    pub last_topic_id: i32,
+    pub last_topic_subject: String,
+    pub last_post_author: String,
+    pub last_posted_at: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct IndexData {
+    pub meta: BoardMeta,
+    pub categories: Vec<Category>,
+    pub forums: Vec<Forum>,
+    pub forum_stats: Vec<ForumStats>,
+    pub stats: BoardStats,
+    pub recent_topics: Vec<Topic>,
+    pub recent_users: Vec<UserProfile>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ForumData {
+    pub forum: Forum,
+    pub topics: Vec<Topic>,
+    pub users: Vec<UserProfile>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct TopicData {
+    pub topic: Topic,
+    pub posts: Vec<Post>,
+    pub users: Vec<UserProfile>,
+    pub forum: Option<Forum>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ProfileData {
+    pub user: UserProfile,
+    pub topics: Vec<Topic>,
+    pub posts: Vec<Post>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct AdminData {
+    pub meta: BoardMeta,
+    pub categories: Vec<Category>,
+    pub forums: Vec<Forum>,
+    pub users: Vec<UserProfile>,
+    pub topics: Vec<Topic>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -427,8 +490,8 @@ impl AppData {
 }
 
 impl Topic {
-    pub fn reply_count(&self, board: &AppData) -> usize {
-        board.posts_for_topic(self.id).len().saturating_sub(1)
+    pub fn reply_count(&self) -> i32 {
+        self.reply_count
     }
 }
 
@@ -466,6 +529,253 @@ pub async fn load_board() -> Result<AppData, ServerFnError> {
         Err(ServerFnError::new(
             "Board loading requires the server feature.",
         ))
+    }
+}
+
+// ── View-specific loaders ──
+
+#[post("/api/shell-data")]
+pub async fn load_shell_data() -> Result<ShellData, ServerFnError> {
+    #[cfg(feature = "server")]
+    {
+        let data = run_json_query::<ShellData>(
+            "SELECT json_build_object(
+                'meta', (SELECT row_to_json(m) FROM (SELECT title, tagline, announcement_title, announcement_body FROM board_meta LIMIT 1) m),
+                'stats', json_build_object(
+                    'members', (SELECT COUNT(*)::int FROM users),
+                    'topics', (SELECT COUNT(*)::int FROM topics),
+                    'posts', (SELECT COUNT(*)::int FROM posts),
+                    'newest_member', COALESCE((SELECT username FROM users ORDER BY id DESC LIMIT 1), '')
+                )
+            )::json;",
+        ).map_err(server_error)?;
+        Ok(data)
+    }
+    #[cfg(not(feature = "server"))]
+    {
+        Err(ServerFnError::new("server only"))
+    }
+}
+
+#[post("/api/index-data")]
+pub async fn load_index_data() -> Result<IndexData, ServerFnError> {
+    #[cfg(feature = "server")]
+    {
+        let data = run_json_query::<IndexData>(
+            "SELECT json_build_object(
+                'meta', (SELECT row_to_json(m) FROM (SELECT title, tagline, announcement_title, announcement_body FROM board_meta LIMIT 1) m),
+                'categories', (SELECT COALESCE(json_agg(row_to_json(c)), '[]'::json) FROM (SELECT id, name, description, sort_order FROM categories ORDER BY sort_order, id) c),
+                'forums', (SELECT COALESCE(json_agg(row_to_json(f)), '[]'::json) FROM (SELECT id, category_id, name, description, moderators, sort_order FROM forums ORDER BY category_id, sort_order, id) f),
+                'forum_stats', (SELECT COALESCE(json_agg(row_to_json(fa)), '[]'::json) FROM (
+                    SELECT
+                        f.id AS forum_id,
+                        (SELECT COUNT(*)::int FROM topics WHERE forum_id = f.id) AS topic_count,
+                        COALESCE((SELECT COUNT(*)::int FROM posts WHERE topic_id IN (SELECT id FROM topics WHERE forum_id = f.id)), 0) AS post_count,
+                        COALESCE((SELECT id FROM topics WHERE forum_id = f.id ORDER BY activity_rank DESC, id LIMIT 1), 0) AS last_topic_id,
+                        COALESCE((SELECT subject FROM topics WHERE forum_id = f.id ORDER BY activity_rank DESC, id LIMIT 1), '') AS last_topic_subject,
+                        COALESCE((SELECT u.username FROM posts p JOIN users u ON u.id = p.author_id WHERE p.topic_id = (SELECT id FROM topics WHERE forum_id = f.id ORDER BY activity_rank DESC, id LIMIT 1) ORDER BY p.position DESC, p.id DESC LIMIT 1), '') AS last_post_author,
+                        COALESCE((SELECT p.posted_at FROM posts p WHERE p.topic_id = (SELECT id FROM topics WHERE forum_id = f.id ORDER BY activity_rank DESC, id LIMIT 1) ORDER BY p.position DESC, p.id DESC LIMIT 1), '') AS last_posted_at
+                    FROM forums f
+                ) fa),
+                'stats', json_build_object(
+                    'members', (SELECT COUNT(*)::int FROM users),
+                    'topics', (SELECT COUNT(*)::int FROM topics),
+                    'posts', (SELECT COUNT(*)::int FROM posts),
+                    'newest_member', COALESCE((SELECT username FROM users ORDER BY id DESC LIMIT 1), '')
+                ),
+                'recent_topics', (SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json) FROM (
+                    SELECT id, forum_id, author_id, subject, status, views, tags, created_at, updated_at, activity_rank
+                    FROM topics ORDER BY activity_rank DESC, id LIMIT 4
+                ) t),
+                'recent_users', (SELECT COALESCE(json_agg(row_to_json(u)), '[]'::json) FROM (
+                    SELECT id, username, title, status, joined_at, post_count, location, about, last_seen, email, group_id
+                    FROM users WHERE id IN (SELECT author_id FROM topics ORDER BY activity_rank DESC, id LIMIT 4)
+                ) u)
+            )::json;",
+        ).map_err(server_error)?;
+        Ok(data)
+    }
+    #[cfg(not(feature = "server"))]
+    {
+        Err(ServerFnError::new("server only"))
+    }
+}
+
+#[post("/api/forum/:id")]
+pub async fn load_forum_data(id: i32) -> Result<ForumData, ServerFnError> {
+    #[cfg(feature = "server")]
+    {
+        let data = run_json_query::<ForumData>(&format!(
+            "SELECT json_build_object(
+                'forum', (SELECT row_to_json(f) FROM forums f WHERE f.id = {id}),
+                'topics', (SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json) FROM (
+                    SELECT id, forum_id, author_id, subject, status, views, tags, created_at, updated_at, activity_rank,
+                        COALESCE((SELECT COUNT(*) FROM posts WHERE topic_id = t.id), 0) - 1 AS reply_count
+                    FROM topics t WHERE forum_id = {id} ORDER BY activity_rank DESC, id
+                ) t),
+                'users', (SELECT COALESCE(json_agg(row_to_json(u)), '[]'::json) FROM (
+                    SELECT id, username, title, status, joined_at, post_count, location, about, last_seen, email, group_id
+                    FROM users WHERE id IN (SELECT author_id FROM topics WHERE forum_id = {id})
+                ) u)
+            )::json;",
+            id = id
+        )).map_err(server_error)?;
+        Ok(data)
+    }
+    #[cfg(not(feature = "server"))]
+    {
+        let _ = id;
+        Err(ServerFnError::new("server only"))
+    }
+}
+
+#[post("/api/topic/:id")]
+pub async fn load_topic_data(id: i32) -> Result<TopicData, ServerFnError> {
+    #[cfg(feature = "server")]
+    {
+        let data = run_json_query::<TopicData>(&format!(
+            "SELECT json_build_object(
+                'topic', (SELECT row_to_json(t) FROM topics t WHERE t.id = {id}),
+                'posts', (SELECT COALESCE(json_agg(row_to_json(p)), '[]'::json) FROM (
+                    SELECT id, topic_id, author_id, posted_at, edited_at, body, signature, position
+                    FROM posts WHERE topic_id = {id} ORDER BY position, id
+                ) p),
+                'users', (SELECT COALESCE(json_agg(row_to_json(u)), '[]'::json) FROM (
+                    SELECT id, username, title, status, joined_at, post_count, location, about, last_seen, email, group_id
+                    FROM users WHERE id IN (SELECT author_id FROM posts WHERE topic_id = {id})
+                ) u),
+                'forum', (SELECT row_to_json(f) FROM forums f WHERE f.id = (SELECT forum_id FROM topics WHERE id = {id}))
+            )::json;",
+            id = id
+        )).map_err(server_error)?;
+        Ok(data)
+    }
+    #[cfg(not(feature = "server"))]
+    {
+        let _ = id;
+        Err(ServerFnError::new("server only"))
+    }
+}
+
+#[post("/api/profile/:id")]
+pub async fn load_profile_data(id: i32) -> Result<ProfileData, ServerFnError> {
+    #[cfg(feature = "server")]
+    {
+        let data = run_json_query::<ProfileData>(&format!(
+            "SELECT json_build_object(
+                'user', (SELECT row_to_json(u) FROM (
+                    SELECT id, username, title, status, joined_at, post_count, location, about, last_seen, email, group_id
+                    FROM users WHERE id = {id}
+                ) u),
+                'topics', (SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json) FROM (
+                    SELECT id, forum_id, author_id, subject, status, views, tags, created_at, updated_at, activity_rank
+                    FROM topics WHERE author_id = {id} ORDER BY activity_rank DESC, id LIMIT 10
+                ) t),
+                'posts', (SELECT COALESCE(json_agg(row_to_json(p)), '[]'::json) FROM (
+                    SELECT id, topic_id, author_id, posted_at, edited_at, body, signature, position
+                    FROM posts WHERE author_id = {id} ORDER BY posted_at DESC LIMIT 10
+                ) p)
+            )::json;",
+            id = id
+        )).map_err(server_error)?;
+        Ok(data)
+    }
+    #[cfg(not(feature = "server"))]
+    {
+        let _ = id;
+        Err(ServerFnError::new("server only"))
+    }
+}
+
+#[post("/api/users")]
+pub async fn load_users_data() -> Result<Vec<UserProfile>, ServerFnError> {
+    #[cfg(feature = "server")]
+    {
+        let users = run_json_query::<Vec<UserProfile>>(
+            "SELECT COALESCE(json_agg(row_to_json(u)), '[]'::json) FROM (
+                SELECT id, username, title, status, joined_at, post_count, location, about, last_seen, email, group_id
+                FROM users ORDER BY post_count DESC, id
+            ) u;",
+        ).map_err(server_error)?;
+        Ok(users)
+    }
+    #[cfg(not(feature = "server"))]
+    {
+        Err(ServerFnError::new("server only"))
+    }
+}
+
+#[post("/api/search")]
+pub async fn search_server(query: String) -> Result<SearchResults, ServerFnError> {
+    #[cfg(feature = "server")]
+    {
+        let needle = query.trim().to_lowercase();
+        if needle.is_empty() {
+            return Ok(SearchResults::default());
+        }
+        let like = format!("%{}%", needle.replace('%', "\\%").replace('_', "\\_"));
+        let results = run_json_query::<SearchResults>(&format!(
+            "SELECT json_build_object(
+                'topics', (SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json) FROM (
+                    SELECT id, forum_id, author_id, subject, status, views, tags, created_at, updated_at, activity_rank
+                    FROM topics
+                    WHERE LOWER(subject) LIKE {}
+                       OR EXISTS (SELECT 1 FROM unnest(tags) tag WHERE LOWER(tag) LIKE {})
+                       OR id IN (SELECT DISTINCT topic_id FROM posts p WHERE EXISTS (
+                           SELECT 1 FROM unnest(p.body) para WHERE LOWER(para) LIKE {}
+                       ))
+                    ORDER BY activity_rank DESC
+                    LIMIT 20
+                ) t),
+                'users', (SELECT COALESCE(json_agg(row_to_json(u)), '[]'::json) FROM (
+                    SELECT id, username, title, status, joined_at, post_count, location, about, last_seen, email, group_id
+                    FROM users
+                    WHERE LOWER(username) LIKE {}
+                       OR LOWER(title) LIKE {}
+                       OR LOWER(about) LIKE {}
+                       OR LOWER(location) LIKE {}
+                    LIMIT 20
+                ) u)
+            )::json;",
+            sql_literal(&like),
+            sql_literal(&like),
+            sql_literal(&like),
+            sql_literal(&like),
+            sql_literal(&like),
+            sql_literal(&like),
+            sql_literal(&like),
+        )).map_err(server_error)?;
+        Ok(results)
+    }
+    #[cfg(not(feature = "server"))]
+    {
+        let _ = query;
+        Err(ServerFnError::new("server only"))
+    }
+}
+
+#[post("/api/admin-data", headers: HeaderMap)]
+pub async fn load_admin_data() -> Result<AdminData, ServerFnError> {
+    #[cfg(feature = "server")]
+    {
+        let u = require_session(&headers).map_err(server_error)?;
+        if u.group_id != 1 {
+            return Err(server_error("Admin only.".into()));
+        }
+        let data = run_json_query::<AdminData>(
+            "SELECT json_build_object(
+                'meta', (SELECT row_to_json(m) FROM (SELECT title, tagline, announcement_title, announcement_body FROM board_meta LIMIT 1) m),
+                'categories', (SELECT COALESCE(json_agg(row_to_json(c)), '[]'::json) FROM (SELECT id, name, description, sort_order FROM categories ORDER BY sort_order, id) c),
+                'forums', (SELECT COALESCE(json_agg(row_to_json(f)), '[]'::json) FROM (SELECT id, category_id, name, description, moderators, sort_order FROM forums ORDER BY category_id, sort_order, id) f),
+                'users', (SELECT COALESCE(json_agg(row_to_json(u)), '[]'::json) FROM (SELECT id, username, title, status, joined_at, post_count, location, about, last_seen, email, group_id FROM users ORDER BY id) u),
+                'topics', (SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json) FROM (SELECT id, forum_id, author_id, subject, status, views, tags, created_at, updated_at, activity_rank FROM topics ORDER BY activity_rank DESC, id) t)
+            )::json;",
+        ).map_err(server_error)?;
+        Ok(data)
+    }
+    #[cfg(not(feature = "server"))]
+    {
+        Err(ServerFnError::new("server only"))
     }
 }
 

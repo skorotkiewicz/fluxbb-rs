@@ -2,28 +2,36 @@ use dioxus::prelude::*;
 
 use crate::{
     components::{EmptyState, SectionHeader},
-    data::{AppData, SessionUser},
+    data::{load_profile_data, ProfileData, SessionUser},
     Route,
 };
 
 #[component]
 pub fn Profile(id: i32) -> Element {
-    let board = use_context::<AppData>();
     let current_user = use_context::<Signal<Option<SessionUser>>>();
+    let mut refresh = use_context::<Signal<()>>();
 
-    let Some(user) = board.user(id) else {
-        return rsx! {
-            section { class: "page",
-                EmptyState {
-                    title: "User not found".to_string(),
-                    body: "This user does not exist.".to_string(),
-                }
+    let data_resource = use_resource(move || async move {
+        refresh();
+        load_profile_data(id).await
+    });
+
+    let data = if let Some(Ok(data)) = data_resource() {
+    data
+} else {
+    return rsx! {
+        section { class: "page",
+            article { class: "empty-state",
+                h3 { "Loading profile…" }
             }
-        };
-    };
+        }
+    }
+        
+};
 
-    let user_topics: Vec<_> = board.topics.iter().filter(|t| t.author_id == id).cloned().collect();
-    let user_posts: Vec<_> = board.posts.iter().filter(|p| p.author_id == id).cloned().collect();
+    let user = data.user.clone();
+    let topics = data.topics.clone();
+    let posts = data.posts.clone();
 
     rsx! {
         section { class: "page",
@@ -57,25 +65,23 @@ pub fn Profile(id: i32) -> Element {
 
                 article { class: "user-card",
                     h3 { "Activity" }
-                    p { class: "user-meta", "Topics started: {user_topics.len()}" }
-                    p { class: "user-meta", "Posts written: {user_posts.len()}" }
+                    p { class: "user-meta", "Topics started: {topics.len()}" }
+                    p { class: "user-meta", "Posts written: {posts.len()}" }
                 }
             }
 
-            if !user_topics.is_empty() {
+            if !topics.is_empty() {
                 article { class: "panel",
                     div { class: "panel-heading",
                         h3 { "Recent topics" }
                     }
                     div { class: "search-results",
-                        for topic in user_topics.iter().take(10) {
+                        for topic in topics.iter().take(10) {
                             div { class: "search-result-row",
                                 div { class: "search-result-copy",
                                     Link {
                                         class: "topic-link",
-                                        to: crate::Route::Topic {
-                                            id: topic.id,
-                                        },
+                                        to: Route::Topic { id: topic.id },
                                         "{topic.subject}"
                                     }
                                     p { class: "topic-meta", "{topic.created_at}" }

@@ -2,7 +2,7 @@ use dioxus::{document, prelude::*};
 
 use crate::{
     data::{
-        cookie_name, current_session_user, load_board, logout_account, SessionUser,
+        cookie_name, current_session_user, load_shell_data, logout_account, ShellData, SessionUser,
     },
     Route,
 };
@@ -11,7 +11,7 @@ const HEADER_ART: Asset = asset!("/assets/header.svg");
 
 #[component]
 pub fn AppShell() -> Element {
-    let mut board_resource = use_resource(|| async move { load_board().await });
+    let mut shell_resource = use_resource(|| async move { load_shell_data().await });
     let session_resource =
         use_resource(|| async move { current_session_user().await.unwrap_or(None) });
     let mut current_user = use_signal(|| None::<SessionUser>);
@@ -26,8 +26,8 @@ pub fn AppShell() -> Element {
     let refresh = use_signal(|| ());
     use_context_provider(|| refresh);
 
-    let board = match board_resource() {
-        Some(Ok(board)) => board,
+    let shell = match shell_resource() {
+        Some(Ok(shell)) => shell,
         Some(Err(_error)) => {
             return rsx! {
                 section { class: "page",
@@ -51,18 +51,18 @@ pub fn AppShell() -> Element {
         }
     };
 
-    let stats = board.board_stats();
+    let stats = shell.stats.clone();
     let is_admin = current_user()
         .as_ref()
         .is_some_and(|u| u.group_id == 1);
 
-    use_context_provider(|| board.clone());
+    use_context_provider(|| shell.clone());
     use_context_provider(|| current_user);
 
     // Watch for refresh trigger
     use_effect(move || {
         refresh();
-        board_resource.restart();
+        shell_resource.restart();
     });
 
     rsx! {
@@ -70,8 +70,8 @@ pub fn AppShell() -> Element {
             header { class: "masthead",
                 div { class: "masthead-copy",
                     p { class: "eyebrow", "Community Forum" }
-                    h1 { "{board.meta.title}" }
-                    p { class: "masthead-tagline", "{board.meta.tagline}" }
+                    h1 { "{shell.meta.title}" }
+                    p { class: "masthead-tagline", "{shell.meta.tagline}" }
                 }
 
                 img {

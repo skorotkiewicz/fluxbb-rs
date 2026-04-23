@@ -2,32 +2,44 @@ use dioxus::prelude::*;
 
 use crate::{
     components::{EmptyState, PostCard, TopicStatusBadge},
-    data::{create_reply, increment_topic_views, toggle_topic_status, AppData, ReplyForm, SessionUser},
+    data::{
+        create_reply, increment_topic_views, load_topic_data, toggle_topic_status, ReplyForm,
+        SessionUser, TopicData,
+    },
     Route,
 };
 
 #[component]
 pub fn Topic(id: i32) -> Element {
-    let board = use_context::<AppData>();
     let current_user = use_context::<Signal<Option<SessionUser>>>();
     let mut refresh = use_context::<Signal<()>>();
 
     // Increment view counter once when topic loads
     use_resource(move || async move { let _ = increment_topic_views(id).await; });
 
-    let Some(topic) = board.topic(id) else {
-        return rsx! {
-            section { class: "page",
-                EmptyState {
-                    title: "Topic not found".to_string(),
-                    body: "The requested topic does not exist.".to_string(),
-                }
-            }
-        };
-    };
+    let data_resource = use_resource(move || async move {
+        refresh();
+        load_topic_data(id).await
+    });
 
-    let forum = board.forum(topic.forum_id);
-    let posts = board.posts_for_topic(id);
+    let data = if let Some(Ok(data)) = data_resource() {
+    data
+} else {
+    return rsx! {
+        section { class: "page",
+            article { class: "empty-state",
+                h3 { "Loading topic…" }
+            }
+        }
+    }
+        
+};
+
+    let topic = data.topic.clone();
+    let posts = data.posts.clone();
+    let users: std::collections::HashMap<i32, crate::data::UserProfile> =
+        data.users.iter().map(|u| (u.id, u.clone())).collect();
+    let forum = data.forum.clone();
 
     let mut reply_text = use_signal(String::new);
     let mut reply_status = use_signal(String::new);
@@ -60,7 +72,7 @@ pub fn Topic(id: i32) -> Element {
                 }
                 h2 { class: "topic-title", "{topic.subject}" }
                 p { class: "topic-summary",
-                    "Views: {topic.views} · Replies: {topic.reply_count(&board)} · Updated: {topic.updated_at}"
+                    "Views: {topic.views} · Replies: {topic.reply_count()} · Updated: {topic.updated_at}"
                 }
 
                 if is_admin {
@@ -83,7 +95,7 @@ pub fn Topic(id: i32) -> Element {
             }
 
             for post in posts {
-                if let Some(author) = board.user(post.author_id) {
+                if let Some(author) = users.get(&post.author_id) {
                     PostCard {
                         author_name: author.username.clone(),
                         author_role: author.title.clone(),

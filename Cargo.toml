@@ -19,6 +19,7 @@ getrandom = { version = "0.3.4", features = ["wasm_js"], optional = true }
 
 # Only needed for server builds
 sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "sqlite"], optional = true }
+dotenvy = "0.15"
 
 [features]
 default = ["web"]

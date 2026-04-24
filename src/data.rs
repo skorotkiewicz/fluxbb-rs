@@ -16,7 +16,10 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 #[cfg(feature = "server")]
-const DATABASE_URL: &str = "postgresql://dev:password@localhost:5432/fluxbb";
+fn database_url() -> String {
+    std::env::var("DATABASE_URL")
+        .expect("DATABASE_URL not set. Create a .env file or set the environment variable.")
+}
 const SESSION_COOKIE: &str = "fluxbb_rs_session";
 const CSRF_COOKIE: &str = "fluxbb_rs_csrf";
 const SESSION_MAX_AGE_SECS: i64 = 60 * 60 * 24 * 14;
@@ -34,9 +37,10 @@ async fn db_pool() -> Result<&'static sqlx::PgPool, String> {
     if let Some(pool) = DB_POOL.get() {
         return Ok(pool);
     }
+    let url = database_url();
     let pool = sqlx::postgres::PgPoolOptions::new()
         .max_connections(5)
-        .connect(DATABASE_URL)
+        .connect(&url)
         .await
         .map_err(|e| format!("DB connection failed: {e}"))?;
     let _ = DB_POOL.set(pool);
@@ -266,6 +270,11 @@ pub struct InstallForm {
     pub admin_username: String,
     pub admin_email: String,
     pub admin_password: String,
+    pub db_host: String,
+    pub db_port: String,
+    pub db_name: String,
+    pub db_user: String,
+    pub db_password: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -1725,6 +1734,21 @@ async fn install_board_impl(input: InstallForm) -> Result<AuthResponse, String> 
     validate_email(&email)?;
     if input.admin_password.chars().count() < 9 {
         return Err("Password must be at least 9 characters.".to_string());
+    }
+
+    // Build and store database URL
+    let db_url = format!(
+        "postgresql://{}:{}@{}:{}/{}",
+        input.db_user.trim(),
+        input.db_password,
+        input.db_host.trim(),
+        input.db_port.trim(),
+        input.db_name.trim(),
+    );
+    std::env::set_var("DATABASE_URL", &db_url);
+    let env_content = format!("DATABASE_URL={db_url}\n");
+    if let Err(e) = std::fs::write(".env", env_content) {
+        return Err(format!("Failed to write .env file: {e}"));
     }
 
     // Run schema — split into individual statements because sqlx

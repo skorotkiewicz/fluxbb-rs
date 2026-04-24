@@ -348,6 +348,7 @@ struct StoredAuthUser {
     pub username: String,
     pub title: String,
     pub group_id: i32,
+    pub email: String,
     pub password_hash: String,
 }
 
@@ -1352,7 +1353,7 @@ fn check_ban(username: &str, email: &str) -> Result<Option<String>, String> {
         message: String,
     }
     let ban = run_json_query::<Option<BanRow>>(&format!(
-        "SELECT COALESCE((SELECT row_to_json(r) FROM (SELECT message FROM bans WHERE (LOWER(username) = LOWER({u}) OR LOWER(email) = LOWER({e})) AND (expires_at IS NULL OR expires_at > {now}) LIMIT 1) r), 'null'::json);",
+        "SELECT COALESCE((SELECT row_to_json(r) FROM (SELECT message FROM bans WHERE ((username <> '' AND LOWER(username) = LOWER({u})) OR (email <> '' AND LOWER(email) = LOWER({e}))) AND (expires_at IS NULL OR expires_at > {now}) LIMIT 1) r), 'null'::json);",
         u = sql_literal(username),
         e = sql_literal(email),
         now = now,
@@ -1713,7 +1714,7 @@ fn login_account_impl(input: LoginForm) -> Result<AuthResponse, String> {
         "SELECT COALESCE((
              SELECT row_to_json(user_row)
              FROM (
-                 SELECT id, username, title, group_id, password_hash
+                 SELECT id, username, title, group_id, email, password_hash
                  FROM users
                  WHERE LOWER(username) = LOWER({username})
                  LIMIT 1
@@ -1727,7 +1728,7 @@ fn login_account_impl(input: LoginForm) -> Result<AuthResponse, String> {
         return Err("Wrong username or password.".to_string());
     }
 
-    if let Some(msg) = check_ban(&user.username, "")? {
+    if let Some(msg) = check_ban(&user.username, &user.email)? {
         return Err(format!("Your account has been banned. Reason: {msg}"));
     }
 

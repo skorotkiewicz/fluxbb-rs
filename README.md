@@ -55,6 +55,7 @@ dx build --release
 
 Visit `http://localhost:8080` and run the installer.
 
+> The installer will create a .env file with your database credentials."
 ---
 
 ## Development

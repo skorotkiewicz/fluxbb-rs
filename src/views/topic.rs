@@ -61,6 +61,7 @@ pub fn TopicPage(id: i32, page: i32) -> Element {
 
     let topic = data.topic.clone();
     let posts = data.posts.clone();
+    let review_posts: Vec<_> = posts.iter().rev().take(3).rev().cloned().collect();
     let users: std::collections::HashMap<i32, crate::data::UserProfile> =
         data.users.iter().map(|u| (u.id, u.clone())).collect();
     let forum = data.forum.clone();
@@ -277,6 +278,32 @@ pub fn TopicPage(id: i32, page: i32) -> Element {
             }
 
             if current_user().is_some() && !is_closed {
+                if !review_posts.is_empty() {
+                    article { class: "panel topic-review",
+                        div { class: "panel-heading",
+                            h4 { "Topic review" }
+                            p { class: "panel-meta", "Last {review_posts.len()} posts" }
+                        }
+                        for post in review_posts {
+                            if let Some(author) = users.get(&post.author_id) {
+                                div { class: "review-post",
+                                    div { class: "review-post-header",
+                                        Link {
+                                            to: Route::Profile { id: author.id },
+                                            class: "review-author",
+                                            "{author.username}"
+                                        }
+                                        span { class: "review-date", "{post.posted_at}" }
+                                    }
+                                    for line in post.body.clone() {
+                                        p { class: "review-body", "{line}" }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 article { class: "form-card",
                     h3 { "Post a reply" }
 

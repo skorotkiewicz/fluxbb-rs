@@ -57,10 +57,13 @@ fn main() {
     dioxus::launch(App);
 
     #[cfg(feature = "server")]
-    dioxus::serve(|| async move {
-        let router = dioxus::server::router(App);
-        Ok(router)
-    });
+    {
+        std::env::set_var("RUST_LOG", "warn");
+        dioxus::serve(|| async move {
+            let router = dioxus::server::router(App);
+            Ok(router)
+        });
+    }
 }
 
 #[component]

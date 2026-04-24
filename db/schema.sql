@@ -71,7 +71,8 @@ CREATE TABLE IF NOT EXISTS forum_sessions (
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     created_at BIGINT NOT NULL,
     expires_at BIGINT NOT NULL,
-    last_seen BIGINT NOT NULL
+    last_seen BIGINT NOT NULL,
+    csrf_token TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS groups (

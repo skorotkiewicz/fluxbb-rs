@@ -18,6 +18,7 @@ use sha2::{Digest, Sha256};
 #[cfg(feature = "server")]
 const DATABASE_URL: &str = "postgresql://dev:password@localhost:5432/fluxbb";
 const SESSION_COOKIE: &str = "fluxbb_rs_session";
+const CSRF_COOKIE: &str = "fluxbb_rs_csrf";
 const SESSION_MAX_AGE_SECS: i64 = 60 * 60 * 24 * 14;
 
 #[cfg(feature = "server")]
@@ -231,6 +232,8 @@ pub struct SessionUser {
     pub email: String,
     pub title: String,
     pub group_id: i32,
+    #[serde(default)]
+    pub csrf_token: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -786,7 +789,7 @@ pub async fn create_reply(input: ReplyForm) -> Result<(), ServerFnError> {
 pub async fn admin_add_category(input: AdminCategoryForm) -> Result<(), ServerFnError> {
     #[cfg(feature = "server")]
     {
-        let u = require_session(&headers).await.map_err(server_error)?;
+        let u = require_session_csrf(&headers).await.map_err(server_error)?;
         if u.group_id != 1 {
             return Err(server_error("Admin only.".into()));
         }
@@ -804,7 +807,7 @@ pub async fn admin_add_category(input: AdminCategoryForm) -> Result<(), ServerFn
 pub async fn admin_add_forum(input: AdminForumForm) -> Result<(), ServerFnError> {
     #[cfg(feature = "server")]
     {
-        let u = require_session(&headers).await.map_err(server_error)?;
+        let u = require_session_csrf(&headers).await.map_err(server_error)?;
         if u.group_id != 1 {
             return Err(server_error("Admin only.".into()));
         }
@@ -822,7 +825,7 @@ pub async fn admin_add_forum(input: AdminForumForm) -> Result<(), ServerFnError>
 pub async fn admin_delete_category(input: AdminDeleteItem) -> Result<(), ServerFnError> {
     #[cfg(feature = "server")]
     {
-        let u = require_session(&headers).await.map_err(server_error)?;
+        let u = require_session_csrf(&headers).await.map_err(server_error)?;
         if u.group_id != 1 {
             return Err(server_error("Admin only.".into()));
         }
@@ -839,7 +842,7 @@ pub async fn admin_delete_category(input: AdminDeleteItem) -> Result<(), ServerF
 pub async fn admin_delete_forum(input: AdminDeleteItem) -> Result<(), ServerFnError> {
     #[cfg(feature = "server")]
     {
-        let u = require_session(&headers).await.map_err(server_error)?;
+        let u = require_session_csrf(&headers).await.map_err(server_error)?;
         if u.group_id != 1 {
             return Err(server_error("Admin only.".into()));
         }
@@ -856,7 +859,7 @@ pub async fn admin_delete_forum(input: AdminDeleteItem) -> Result<(), ServerFnEr
 pub async fn admin_update_user(input: AdminUserUpdate) -> Result<(), ServerFnError> {
     #[cfg(feature = "server")]
     {
-        let u = require_session(&headers).await.map_err(server_error)?;
+        let u = require_session_csrf(&headers).await.map_err(server_error)?;
         if u.group_id != 1 {
             return Err(server_error("Admin only.".into()));
         }
@@ -879,7 +882,7 @@ pub async fn admin_update_user(input: AdminUserUpdate) -> Result<(), ServerFnErr
 pub async fn admin_delete_user(input: AdminDeleteItem) -> Result<(), ServerFnError> {
     #[cfg(feature = "server")]
     {
-        let u = require_session(&headers).await.map_err(server_error)?;
+        let u = require_session_csrf(&headers).await.map_err(server_error)?;
         if u.group_id != 1 {
             return Err(server_error("Admin only.".into()));
         }
@@ -904,7 +907,7 @@ pub async fn admin_delete_user(input: AdminDeleteItem) -> Result<(), ServerFnErr
 pub async fn admin_update_topic(input: AdminTopicUpdate) -> Result<(), ServerFnError> {
     #[cfg(feature = "server")]
     {
-        let u = require_session(&headers).await.map_err(server_error)?;
+        let u = require_session_csrf(&headers).await.map_err(server_error)?;
         if u.group_id != 1 {
             return Err(server_error("Admin only.".into()));
         }
@@ -925,7 +928,7 @@ pub async fn admin_update_topic(input: AdminTopicUpdate) -> Result<(), ServerFnE
 pub async fn admin_delete_topic(input: AdminDeleteItem) -> Result<(), ServerFnError> {
     #[cfg(feature = "server")]
     {
-        let u = require_session(&headers).await.map_err(server_error)?;
+        let u = require_session_csrf(&headers).await.map_err(server_error)?;
         if u.group_id != 1 {
             return Err(server_error("Admin only.".into()));
         }
@@ -942,7 +945,7 @@ pub async fn admin_delete_topic(input: AdminDeleteItem) -> Result<(), ServerFnEr
 pub async fn admin_update_board(input: AdminBoardSettings) -> Result<(), ServerFnError> {
     #[cfg(feature = "server")]
     {
-        let u = require_session(&headers).await.map_err(server_error)?;
+        let u = require_session_csrf(&headers).await.map_err(server_error)?;
         if u.group_id != 1 {
             return Err(server_error("Admin only.".into()));
         }
@@ -980,7 +983,7 @@ pub async fn load_post(id: i32) -> Result<Post, ServerFnError> {
 pub async fn edit_post(input: EditPostForm) -> Result<(), ServerFnError> {
     #[cfg(feature = "server")]
     {
-        let user = require_session(&headers).await.map_err(server_error)?;
+        let user = require_session_csrf(&headers).await.map_err(server_error)?;
         if let Some(msg) = check_ban(&user.username, &user.email).await.map_err(server_error)? {
             return Err(server_error(format!("You are banned: {msg}")));
         }
@@ -1032,7 +1035,7 @@ pub async fn edit_post(input: EditPostForm) -> Result<(), ServerFnError> {
 pub async fn delete_post(post_id: i32) -> Result<i32, ServerFnError> {
     #[cfg(feature = "server")]
     {
-        let user = require_session(&headers).await.map_err(server_error)?;
+        let user = require_session_csrf(&headers).await.map_err(server_error)?;
         if let Some(msg) = check_ban(&user.username, &user.email).await.map_err(server_error)? {
             return Err(server_error(format!("You are banned: {msg}")));
         }
@@ -1136,7 +1139,7 @@ pub async fn load_groups() -> Result<Vec<Group>, ServerFnError> {
 pub async fn update_group(input: GroupUpdateForm) -> Result<(), ServerFnError> {
     #[cfg(feature = "server")]
     {
-        let user = require_session(&headers).await.map_err(server_error)?;
+        let user = require_session_csrf(&headers).await.map_err(server_error)?;
         if user.group_id != 1 {
             return Err(server_error("Admin only.".into()));
         }
@@ -1182,7 +1185,7 @@ pub async fn load_bans() -> Result<Vec<Ban>, ServerFnError> {
 pub async fn add_ban(input: BanForm) -> Result<(), ServerFnError> {
     #[cfg(feature = "server")]
     {
-        let user = require_session(&headers).await.map_err(server_error)?;
+        let user = require_session_csrf(&headers).await.map_err(server_error)?;
         if user.group_id != 1 {
             return Err(server_error("Admin only.".into()));
         }
@@ -1216,7 +1219,7 @@ pub async fn add_ban(input: BanForm) -> Result<(), ServerFnError> {
 pub async fn remove_ban(ban_id: i32) -> Result<(), ServerFnError> {
     #[cfg(feature = "server")]
     {
-        let user = require_session(&headers).await.map_err(server_error)?;
+        let user = require_session_csrf(&headers).await.map_err(server_error)?;
         if user.group_id != 1 {
             return Err(server_error("Admin only.".into()));
         }
@@ -1255,7 +1258,7 @@ async fn check_ban(username: &str, email: &str) -> Result<Option<String>, String
 pub async fn mark_all_read() -> Result<(), ServerFnError> {
     #[cfg(feature = "server")]
     {
-        let user = require_session(&headers).await.map_err(server_error)?;
+        let user = require_session_csrf(&headers).await.map_err(server_error)?;
         run_exec(&format!(
             "UPDATE users SET last_visit = EXTRACT(EPOCH FROM now())::bigint WHERE id = {};",
             user.id
@@ -1275,7 +1278,7 @@ pub async fn mark_all_read() -> Result<(), ServerFnError> {
 pub async fn update_profile(input: UpdateProfileForm) -> Result<(), ServerFnError> {
     #[cfg(feature = "server")]
     {
-        let user = require_session(&headers).await.map_err(server_error)?;
+        let user = require_session_csrf(&headers).await.map_err(server_error)?;
         if input.user_id != user.id && user.group_id != 1 {
             return Err(server_error("You can only edit your own profile.".into()));
         }
@@ -1307,7 +1310,7 @@ pub async fn update_profile(input: UpdateProfileForm) -> Result<(), ServerFnErro
 pub async fn change_password(input: ChangePasswordForm) -> Result<(), ServerFnError> {
     #[cfg(feature = "server")]
     {
-        let user = require_session(&headers).await.map_err(server_error)?;
+        let user = require_session_csrf(&headers).await.map_err(server_error)?;
         if input.user_id != user.id && user.group_id != 1 {
             return Err(server_error(
                 "You can only change your own password.".into(),
@@ -1379,7 +1382,7 @@ pub struct BanForm {
 pub async fn delete_topic(topic_id: i32) -> Result<(), ServerFnError> {
     #[cfg(feature = "server")]
     {
-        let user = require_session(&headers).await.map_err(server_error)?;
+        let user = require_session_csrf(&headers).await.map_err(server_error)?;
         if user.group_id != 1 {
             return Err(server_error("Admin only.".into()));
         }
@@ -1416,7 +1419,7 @@ pub async fn delete_topic(topic_id: i32) -> Result<(), ServerFnError> {
 pub async fn move_topic(input: MoveTopicForm) -> Result<(), ServerFnError> {
     #[cfg(feature = "server")]
     {
-        let user = require_session(&headers).await.map_err(server_error)?;
+        let user = require_session_csrf(&headers).await.map_err(server_error)?;
         if user.group_id != 1 {
             return Err(server_error("Admin only.".into()));
         }
@@ -1438,7 +1441,7 @@ pub async fn move_topic(input: MoveTopicForm) -> Result<(), ServerFnError> {
 pub async fn toggle_sticky(topic_id: i32) -> Result<bool, ServerFnError> {
     #[cfg(feature = "server")]
     {
-        let user = require_session(&headers).await.map_err(server_error)?;
+        let user = require_session_csrf(&headers).await.map_err(server_error)?;
         if user.group_id != 1 {
             return Err(server_error("Admin only.".into()));
         }
@@ -1474,7 +1477,7 @@ pub async fn toggle_sticky(topic_id: i32) -> Result<bool, ServerFnError> {
 pub async fn toggle_topic_status(topic_id: i32) -> Result<String, ServerFnError> {
     #[cfg(feature = "server")]
     {
-        let user = require_session(&headers).await.map_err(server_error)?;
+        let user = require_session_csrf(&headers).await.map_err(server_error)?;
         if user.group_id != 1 {
             return Err(server_error("Admin only.".into()));
         }
@@ -1550,7 +1553,7 @@ async fn register_account_impl(input: RegisterForm) -> Result<AuthResponse, Stri
     let salt = random_hex(16);
     let password_hash = hash_password(&input.password, &salt);
 
-    let user = run_json_query::<SessionUser>(&format!(
+    let mut user = run_json_query::<SessionUser>(&format!(
         "WITH inserted AS (
              INSERT INTO users (
                  username, title, status, joined_at, post_count, location, about, last_seen,
@@ -1580,7 +1583,8 @@ async fn register_account_impl(input: RegisterForm) -> Result<AuthResponse, Stri
         password_hash = sql_literal(&password_hash),
     )).await?;
 
-    let session_token = create_session(user.id).await?;
+    let (session_token, csrf_token) = create_session(user.id).await?;
+    user.csrf_token = csrf_token;
 
     Ok(AuthResponse {
         user,
@@ -1626,7 +1630,7 @@ async fn login_account_impl(input: LoginForm) -> Result<AuthResponse, String> {
         user.id
     )).await?;
 
-    let session_token = create_session(user.id).await?;
+    let (session_token, csrf_token) = create_session(user.id).await?;
 
     Ok(AuthResponse {
         user: SessionUser {
@@ -1635,6 +1639,7 @@ async fn login_account_impl(input: LoginForm) -> Result<AuthResponse, String> {
             email: user.email,
             title: user.title,
             group_id: user.group_id,
+            csrf_token,
         },
         session_token,
         message: "Signed in successfully.".to_string(),
@@ -1651,7 +1656,7 @@ async fn current_session_user_impl(headers: HeaderMap) -> Result<Option<SessionU
         "SELECT COALESCE((
              SELECT row_to_json(session_row)
              FROM (
-                  SELECT u.id, u.username, u.email, u.title, u.group_id
+                  SELECT u.id, u.username, u.email, u.title, u.group_id, s.csrf_token
                   FROM forum_sessions AS s
                   INNER JOIN users AS u ON u.id = s.user_id
                   WHERE s.token = {token}
@@ -1741,7 +1746,7 @@ async fn install_board_impl(input: InstallForm) -> Result<AuthResponse, String> 
     let salt = random_hex(16);
     let password_hash = hash_password(&input.admin_password, &salt);
 
-    let user = run_json_query::<SessionUser>(&format!(
+    let mut user = run_json_query::<SessionUser>(&format!(
         "WITH ins AS (
              INSERT INTO users (username, title, status, joined_at, email, password_hash, group_id, registered_at, last_visit)
              VALUES ({username}, 'Administrator', 'Online', to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD'), {email}, {password_hash}, 1, EXTRACT(EPOCH FROM now())::bigint, EXTRACT(EPOCH FROM now())::bigint)
@@ -1759,7 +1764,8 @@ async fn install_board_impl(input: InstallForm) -> Result<AuthResponse, String> 
         username = sql_literal(&username),
     )).await?;
 
-    let session_token = create_session(user.id).await?;
+    let (session_token, csrf_token) = create_session(user.id).await?;
+    user.csrf_token = csrf_token;
     Ok(AuthResponse {
         user,
         session_token,
@@ -1784,6 +1790,13 @@ async fn require_session(headers: &HeaderMap) -> Result<SessionUser, String> {
         token = sql_literal(&token),
     )).await?
     .ok_or_else(|| "Session expired. Please sign in again.".to_string())
+}
+
+#[cfg(feature = "server")]
+async fn require_session_csrf(headers: &HeaderMap) -> Result<SessionUser, String> {
+    let user = require_session(headers).await?;
+    validate_csrf(headers).await?;
+    Ok(user)
 }
 
 #[cfg(feature = "server")]
@@ -1816,7 +1829,7 @@ async fn require_permission(
     headers: &HeaderMap,
     perm: fn(&Group) -> bool,
 ) -> Result<SessionUser, String> {
-    let user = require_session(headers).await?;
+    let user = require_session_csrf(headers).await?;
     let group = get_group(user.group_id).await?;
     if !perm(&group) && !group.is_admin {
         return Err("You do not have permission to do this.".to_string());
@@ -1962,18 +1975,20 @@ async fn email_exists(email: &str) -> Result<bool, String> {
 }
 
 #[cfg(feature = "server")]
-async fn create_session(user_id: i32) -> Result<String, String> {
+async fn create_session(user_id: i32) -> Result<(String, String), String> {
     let token = random_hex(32);
+    let csrf = random_hex(16);
     let now = unix_now();
     let expires = now + SESSION_MAX_AGE_SECS;
 
     run_exec(&format!(
-        "INSERT INTO forum_sessions (token, user_id, created_at, expires_at, last_seen)
-         VALUES ({token}, {user_id}, {now}, {expires}, {now});",
+        "INSERT INTO forum_sessions (token, user_id, created_at, expires_at, last_seen, csrf_token)
+         VALUES ({token}, {user_id}, {now}, {expires}, {now}, {csrf});",
         token = sql_literal(&token),
+        csrf = sql_literal(&csrf),
     )).await?;
 
-    Ok(token)
+    Ok((token, csrf))
 }
 
 #[cfg(feature = "server")]
@@ -1989,6 +2004,44 @@ fn parse_session_cookie(headers: &HeaderMap) -> Option<String> {
             None
         }
     })
+}
+
+#[cfg(feature = "server")]
+fn parse_csrf_cookie(headers: &HeaderMap) -> Option<String> {
+    let raw_cookie = headers.get("cookie")?.to_str().ok()?;
+
+    raw_cookie.split(';').find_map(|part| {
+        let trimmed = part.trim();
+        let (name, value) = trimmed.split_once('=')?;
+        if name == CSRF_COOKIE {
+            Some(value.to_string())
+        } else {
+            None
+        }
+    })
+}
+
+#[cfg(feature = "server")]
+async fn validate_csrf(headers: &HeaderMap) -> Result<(), String> {
+    let Some(session_token) = parse_session_cookie(headers) else {
+        return Err("Session expired. Please sign in again.".to_string());
+    };
+    let Some(csrf_token) = parse_csrf_cookie(headers) else {
+        return Err("CSRF token missing. Please refresh the page.".to_string());
+    };
+
+    #[derive(Deserialize)]
+    struct CsrfRow { csrf_token: String }
+
+    let row = run_json_query::<Option<CsrfRow>>(&format!(
+        "SELECT COALESCE((SELECT row_to_json(r) FROM (SELECT csrf_token FROM forum_sessions WHERE token = {token} AND expires_at > EXTRACT(EPOCH FROM now())::bigint LIMIT 1) r), 'null'::json);",
+        token = sql_literal(&session_token),
+    )).await?;
+
+    match row {
+        Some(r) if r.csrf_token == csrf_token => Ok(()),
+        _ => Err("Invalid CSRF token. Please refresh the page.".to_string()),
+    }
 }
 
 #[cfg(feature = "server")]
@@ -2154,6 +2207,10 @@ async fn run_exec(sql: &str) -> Result<(), String> {
 
 pub fn cookie_name() -> &'static str {
     SESSION_COOKIE
+}
+
+pub fn csrf_cookie_name() -> &'static str {
+    CSRF_COOKIE
 }
 
 pub fn cookie_max_age() -> i64 {

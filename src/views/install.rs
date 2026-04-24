@@ -120,10 +120,9 @@ pub fn Install() -> Element {
                                             match install_board(form).await {
                                                 Ok(resp) => {
                                                     let script = format!(
-                                                        "document.cookie = '{}={}; path=/; max-age={}; samesite=lax';",
-                                                        cookie_name(),
-                                                        resp.session_token,
-                                                        cookie_max_age(),
+                                                        "document.cookie = '{}={}; path=/; max-age={}; samesite=strict'; document.cookie = '{}={}; path=/; max-age={}; samesite=strict';",
+                                                        cookie_name(), resp.session_token, cookie_max_age(),
+                                                        crate::data::csrf_cookie_name(), resp.user.csrf_token, cookie_max_age(),
                                                     );
                                                     let _ = document::eval(&script);
                                                     is_error.set(false);

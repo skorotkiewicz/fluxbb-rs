@@ -82,10 +82,9 @@ pub fn Login() -> Element {
                                 match login_account(login).await {
                                     Ok(response) => {
                                         let script = format!(
-                                            "document.cookie = '{}={}; path=/; max-age={}; samesite=lax';",
-                                            cookie_name(),
-                                            response.session_token,
-                                            cookie_max_age(),
+                                            "document.cookie = '{}={}; path=/; max-age={}; samesite=strict'; document.cookie = '{}={}; path=/; max-age={}; samesite=strict';",
+                                            cookie_name(), response.session_token, cookie_max_age(),
+                                            crate::data::csrf_cookie_name(), response.user.csrf_token, cookie_max_age(),
                                         );
                                         let _ = document::eval(&script);
                                         auth_user.set(Some(response.user));
@@ -233,10 +232,9 @@ pub fn Register() -> Element {
                                 match register_account(form).await {
                                     Ok(response) => {
                                         let script = format!(
-                                            "document.cookie = '{}={}; path=/; max-age={}; samesite=lax';",
-                                            cookie_name(),
-                                            response.session_token,
-                                            cookie_max_age(),
+                                            "document.cookie = '{}={}; path=/; max-age={}; samesite=strict'; document.cookie = '{}={}; path=/; max-age={}; samesite=strict';",
+                                            cookie_name(), response.session_token, cookie_max_age(),
+                                            crate::data::csrf_cookie_name(), response.user.csrf_token, cookie_max_age(),
                                         );
                                         let _ = document::eval(&script);
                                         auth_user.set(Some(response.user));

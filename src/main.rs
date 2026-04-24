@@ -58,7 +58,8 @@ fn main() {
 
     #[cfg(feature = "server")]
     {
-        std::env::set_var("RUST_LOG", "warn");
+        // std::env::set_var("RUST_LOG", "warn");
+        std::env::set_var("RUST_LOG", "sqlx=warn,info");
         dioxus::serve(|| async move {
             let router = dioxus::server::router(App);
             Ok(router)

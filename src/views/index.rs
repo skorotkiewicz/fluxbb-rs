@@ -43,6 +43,16 @@ pub fn Index() -> Element {
         .map(|u| (u.id, u.clone()))
         .collect();
 
+    let new_topic_ids: std::collections::HashSet<i32> = if data.last_visit > 0 {
+        recent_topics
+            .iter()
+            .filter(|t| (t.activity_rank as i64) > data.last_visit)
+            .map(|t| t.id)
+            .collect()
+    } else {
+        std::collections::HashSet::new()
+    };
+
     let cat_items: Vec<_> = categories
         .iter()
         .map(|cat| {
@@ -166,8 +176,11 @@ pub fn Index() -> Element {
                                     if topic.sticky {
                                         span { class: "badge badge-pinned", "Sticky" }
                                     }
+                                    if new_topic_ids.contains(&topic.id) {
+                                        span { class: "badge badge-new", "New" }
+                                    }
                                     Link {
-                                        class: "recent-topic-link",
+                                        class: if new_topic_ids.contains(&topic.id) { "recent-topic-link recent-topic-link-new" } else { "recent-topic-link" },
                                         to: Route::TopicPage {
                                             id: topic.id,
                                             page: 1,

@@ -406,6 +406,16 @@ textarea {
     color: #555;
 }
 
+.badge-new {
+    background: #c8e6c9;
+    color: #2e7d32;
+}
+
+.topic-link-new,
+.recent-topic-link-new {
+    font-weight: 700;
+}
+
 .breadcrumbs {
     display: flex;
     flex-wrap: wrap;

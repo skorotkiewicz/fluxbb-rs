@@ -179,6 +179,8 @@ pub struct IndexData {
     pub stats: BoardStats,
     pub recent_topics: Vec<Topic>,
     pub recent_users: Vec<UserProfile>,
+    #[serde(default)]
+    pub last_visit: i64,
 }
 
 const FORUM_TOPICS_PER_PAGE: i32 = 25;
@@ -192,6 +194,8 @@ pub struct ForumData {
     pub total_topics: i32,
     pub page: i32,
     pub per_page: i32,
+    #[serde(default)]
+    pub last_visit: i64,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -531,11 +535,20 @@ pub async fn load_shell_data() -> Result<ShellData, ServerFnError> {
     }
 }
 
-#[post("/api/index-data")]
+#[post("/api/index-data", headers: HeaderMap)]
 pub async fn load_index_data() -> Result<IndexData, ServerFnError> {
     #[cfg(feature = "server")]
     {
-        let data = run_json_query::<IndexData>(
+        let token = parse_session_cookie(&headers);
+        let user_id = if let Some(token) = token {
+            run_scalar_i64(&format!(
+                "SELECT COALESCE((SELECT user_id FROM forum_sessions WHERE token = {} AND expires_at > EXTRACT(EPOCH FROM now())::bigint LIMIT 1), 0);",
+                sql_literal(&token)
+            )).unwrap_or(0)
+        } else {
+            0
+        };
+        let data = run_json_query::<IndexData>(&format!(
             "SELECT json_build_object(
                 'meta', (SELECT row_to_json(m) FROM (SELECT title, tagline, announcement_title, announcement_body FROM board_meta LIMIT 1) m),
                 'categories', (SELECT COALESCE(json_agg(row_to_json(c)), '[]'::json) FROM (SELECT id, name, description, sort_order FROM categories ORDER BY sort_order, id) c),
@@ -564,13 +577,16 @@ pub async fn load_index_data() -> Result<IndexData, ServerFnError> {
                 'recent_users', (SELECT COALESCE(json_agg(row_to_json(u)), '[]'::json) FROM (
                     SELECT id, username, title, status, joined_at, post_count, location, about, last_seen, email, group_id
                     FROM users WHERE id IN (SELECT author_id FROM topics ORDER BY activity_rank DESC, id LIMIT 4)
-                ) u)
+                ) u),
+                'last_visit', COALESCE((SELECT last_visit FROM users WHERE id = {user_id}), 0)
             )::json;",
-        ).map_err(server_error)?;
+            user_id = user_id,
+        )).map_err(server_error)?;
         Ok(data)
     }
     #[cfg(not(feature = "server"))]
     {
+        let _ = headers;
         Err(ServerFnError::new("server only"))
     }
 }
@@ -590,10 +606,19 @@ pub async fn load_forums() -> Result<Vec<Forum>, ServerFnError> {
     }
 }
 
-#[post("/api/forum/:id/:page")]
+#[post("/api/forum/:id/:page", headers: HeaderMap)]
 pub async fn load_forum_data(id: i32, page: i32) -> Result<ForumData, ServerFnError> {
     #[cfg(feature = "server")]
     {
+        let token = parse_session_cookie(&headers);
+        let user_id = if let Some(token) = token {
+            run_scalar_i64(&format!(
+                "SELECT COALESCE((SELECT user_id FROM forum_sessions WHERE token = {} AND expires_at > EXTRACT(EPOCH FROM now())::bigint LIMIT 1), 0);",
+                sql_literal(&token)
+            )).unwrap_or(0)
+        } else {
+            0
+        };
         let page = page.max(1);
         let per_page = FORUM_TOPICS_PER_PAGE;
         let offset = (page - 1) * per_page;
@@ -612,12 +637,14 @@ pub async fn load_forum_data(id: i32, page: i32) -> Result<ForumData, ServerFnEr
                 ) u),
                 'total_topics', (SELECT COUNT(*) FROM topics WHERE forum_id = {id}),
                 'page', {page},
-                'per_page', {per_page}
+                'per_page', {per_page},
+                'last_visit', COALESCE((SELECT last_visit FROM users WHERE id = {user_id}), 0)
             )::json;",
             id = id,
             page = page,
             per_page = per_page,
-            offset = offset
+            offset = offset,
+            user_id = user_id,
         )).map_err(server_error)?;
         Ok(data)
     }
@@ -625,11 +652,12 @@ pub async fn load_forum_data(id: i32, page: i32) -> Result<ForumData, ServerFnEr
     {
         let _ = id;
         let _ = page;
+        let _ = headers;
         Err(ServerFnError::new("server only"))
     }
 }
 
-#[post("/api/topic/:id/:page")]
+#[post("/api/topic/:id/:page", headers: HeaderMap)]
 pub async fn load_topic_data(id: i32, page: i32) -> Result<TopicData, ServerFnError> {
     #[cfg(feature = "server")]
     {
@@ -658,12 +686,22 @@ pub async fn load_topic_data(id: i32, page: i32) -> Result<TopicData, ServerFnEr
             per_page = per_page,
             offset = offset
         )).map_err(server_error)?;
+
+        // Mark topic as read for logged-in user
+        if let Some(token) = parse_session_cookie(&headers) {
+            let _ = run_exec(&format!(
+                "UPDATE users SET last_visit = EXTRACT(EPOCH FROM now())::bigint WHERE id = (SELECT user_id FROM forum_sessions WHERE token = {} AND expires_at > EXTRACT(EPOCH FROM now())::bigint LIMIT 1);",
+                sql_literal(&token)
+            ));
+        }
+
         Ok(data)
     }
     #[cfg(not(feature = "server"))]
     {
         let _ = id;
         let _ = page;
+        let _ = headers;
         Err(ServerFnError::new("server only"))
     }
 }
@@ -1735,8 +1773,7 @@ fn login_account_impl(input: LoginForm) -> Result<AuthResponse, String> {
     run_exec(&format!(
         "UPDATE users
          SET status = 'Online',
-             last_seen = 'just now',
-             last_visit = EXTRACT(EPOCH FROM now())::bigint
+             last_seen = 'just now'
          WHERE id = {};",
         user.id
     ))?;

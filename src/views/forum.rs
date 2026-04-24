@@ -53,6 +53,16 @@ pub fn ForumPage(id: i32, page: i32) -> Element {
 
     let is_admin = current_user().as_ref().is_some_and(|u| u.group_id == 1);
 
+    let new_topic_ids: std::collections::HashSet<i32> = if data.last_visit > 0 {
+        topics
+            .iter()
+            .filter(|t| (t.activity_rank as i64) > data.last_visit)
+            .map(|t| t.id)
+            .collect()
+    } else {
+        std::collections::HashSet::new()
+    };
+
     rsx! {
         section { class: "page",
             nav { class: "breadcrumbs",
@@ -114,8 +124,11 @@ pub fn ForumPage(id: i32, page: i32) -> Element {
                                         if topic.sticky {
                                             span { class: "badge badge-pinned", "Sticky" }
                                         }
+                                        if new_topic_ids.contains(&topic.id) {
+                                            span { class: "badge badge-new", "New" }
+                                        }
                                         Link {
-                                            class: "topic-link",
+                                            class: if new_topic_ids.contains(&topic.id) { "topic-link topic-link-new" } else { "topic-link" },
                                             to: Route::TopicPage {
                                                 id: topic.id,
                                                 page: 1,

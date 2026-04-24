@@ -25,9 +25,9 @@ const CSRF_COOKIE: &str = "fluxbb_rs_csrf";
 const SESSION_MAX_AGE_SECS: i64 = 60 * 60 * 24 * 14;
 
 #[cfg(feature = "server")]
-use std::sync::OnceLock;
-#[cfg(feature = "server")]
 use sqlx::Row;
+#[cfg(feature = "server")]
+use std::sync::OnceLock;
 
 #[cfg(feature = "server")]
 static DB_POOL: OnceLock<sqlx::PgPool> = OnceLock::new();
@@ -719,7 +719,9 @@ pub async fn login_account(input: LoginForm) -> Result<AuthResponse, ServerFnErr
 pub async fn current_session_user() -> Result<Option<SessionUser>, ServerFnError> {
     #[cfg(feature = "server")]
     {
-        current_session_user_impl(headers).await.map_err(server_error)
+        current_session_user_impl(headers)
+            .await
+            .map_err(server_error)
     }
 
     #[cfg(not(feature = "server"))]
@@ -770,7 +772,9 @@ pub async fn install_board(input: InstallForm) -> Result<AuthResponse, ServerFnE
 pub async fn create_topic(input: NewTopicForm) -> Result<NewTopicResult, ServerFnError> {
     #[cfg(feature = "server")]
     {
-        create_topic_impl(input, headers).await.map_err(server_error)
+        create_topic_impl(input, headers)
+            .await
+            .map_err(server_error)
     }
     #[cfg(not(feature = "server"))]
     {
@@ -783,7 +787,9 @@ pub async fn create_topic(input: NewTopicForm) -> Result<NewTopicResult, ServerF
 pub async fn create_reply(input: ReplyForm) -> Result<(), ServerFnError> {
     #[cfg(feature = "server")]
     {
-        create_reply_impl(input, headers).await.map_err(server_error)
+        create_reply_impl(input, headers)
+            .await
+            .map_err(server_error)
     }
     #[cfg(not(feature = "server"))]
     {
@@ -838,7 +844,9 @@ pub async fn admin_delete_category(input: AdminDeleteItem) -> Result<(), ServerF
         if u.group_id != 1 {
             return Err(server_error("Admin only.".into()));
         }
-        run_exec(&format!("DELETE FROM categories WHERE id = {};", input.id)).await.map_err(server_error)
+        run_exec(&format!("DELETE FROM categories WHERE id = {};", input.id))
+            .await
+            .map_err(server_error)
     }
     #[cfg(not(feature = "server"))]
     {
@@ -855,7 +863,9 @@ pub async fn admin_delete_forum(input: AdminDeleteItem) -> Result<(), ServerFnEr
         if u.group_id != 1 {
             return Err(server_error("Admin only.".into()));
         }
-        run_exec(&format!("DELETE FROM forums WHERE id = {};", input.id)).await.map_err(server_error)
+        run_exec(&format!("DELETE FROM forums WHERE id = {};", input.id))
+            .await
+            .map_err(server_error)
     }
     #[cfg(not(feature = "server"))]
     {
@@ -877,7 +887,8 @@ pub async fn admin_update_user(input: AdminUserUpdate) -> Result<(), ServerFnErr
             input.group_id,
             sql_literal(input.title.trim()),
             input.user_id
-        )).await
+        ))
+        .await
         .map_err(server_error)
     }
     #[cfg(not(feature = "server"))]
@@ -901,9 +912,12 @@ pub async fn admin_delete_user(input: AdminDeleteItem) -> Result<(), ServerFnErr
         run_exec(&format!(
             "DELETE FROM forum_sessions WHERE user_id = {};",
             input.id
-        )).await
+        ))
+        .await
         .map_err(server_error)?;
-        run_exec(&format!("DELETE FROM users WHERE id = {};", input.id)).await.map_err(server_error)
+        run_exec(&format!("DELETE FROM users WHERE id = {};", input.id))
+            .await
+            .map_err(server_error)
     }
     #[cfg(not(feature = "server"))]
     {
@@ -923,7 +937,8 @@ pub async fn admin_update_topic(input: AdminTopicUpdate) -> Result<(), ServerFnE
         run_exec(&format!(
             "UPDATE topics SET closed = {} WHERE id = {};",
             input.closed, input.topic_id
-        )).await
+        ))
+        .await
         .map_err(server_error)
     }
     #[cfg(not(feature = "server"))]
@@ -941,7 +956,9 @@ pub async fn admin_delete_topic(input: AdminDeleteItem) -> Result<(), ServerFnEr
         if u.group_id != 1 {
             return Err(server_error("Admin only.".into()));
         }
-        run_exec(&format!("DELETE FROM topics WHERE id = {};", input.id)).await.map_err(server_error)
+        run_exec(&format!("DELETE FROM topics WHERE id = {};", input.id))
+            .await
+            .map_err(server_error)
     }
     #[cfg(not(feature = "server"))]
     {
@@ -1012,7 +1029,10 @@ pub async fn edit_post(input: EditPostForm) -> Result<(), ServerFnError> {
     #[cfg(feature = "server")]
     {
         let user = require_session_csrf(&headers).await.map_err(server_error)?;
-        if let Some(msg) = check_ban(&user.username, &user.email).await.map_err(server_error)? {
+        if let Some(msg) = check_ban(&user.username, &user.email)
+            .await
+            .map_err(server_error)?
+        {
             return Err(server_error(format!("You are banned: {msg}")));
         }
         let post = run_json_query::<Option<Post>>(&format!(
@@ -1040,7 +1060,8 @@ pub async fn edit_post(input: EditPostForm) -> Result<(), ServerFnError> {
             msg = sql_literal(message),
             now = now_str,
             pid = input.post_id,
-        )).await
+        ))
+        .await
         .map_err(server_error)?;
 
         // Update topic activity
@@ -1064,7 +1085,10 @@ pub async fn delete_post(post_id: i32) -> Result<i32, ServerFnError> {
     #[cfg(feature = "server")]
     {
         let user = require_session_csrf(&headers).await.map_err(server_error)?;
-        if let Some(msg) = check_ban(&user.username, &user.email).await.map_err(server_error)? {
+        if let Some(msg) = check_ban(&user.username, &user.email)
+            .await
+            .map_err(server_error)?
+        {
             return Err(server_error(format!("You are banned: {msg}")));
         }
         let group = get_group(user.group_id).await.map_err(server_error)?;
@@ -1105,26 +1129,31 @@ pub async fn delete_post(post_id: i32) -> Result<i32, ServerFnError> {
                 run_exec(&format!(
                     "UPDATE users SET post_count = GREATEST(post_count - {}, 0) WHERE id = {};",
                     pc.cnt, pc.author_id
-                )).await
+                ))
+                .await
                 .map_err(server_error)?;
             }
             // Delete topic and all posts
             run_exec(&format!(
                 "DELETE FROM posts WHERE topic_id = {};",
                 info.topic_id
-            )).await
+            ))
+            .await
             .map_err(server_error)?;
             run_exec(&format!("DELETE FROM topics WHERE id = {};", info.topic_id))
-                .await.map_err(server_error)?;
+                .await
+                .map_err(server_error)?;
             Ok(info.topic_id)
         } else {
             run_exec(&format!(
                 "UPDATE users SET post_count = GREATEST(post_count - 1, 0) WHERE id = {};",
                 info.author_id
             ))
-            .await.map_err(server_error)?;
+            .await
+            .map_err(server_error)?;
             run_exec(&format!("DELETE FROM posts WHERE id = {};", post_id))
-                .await.map_err(server_error)?;
+                .await
+                .map_err(server_error)?;
             Ok(0)
         }
     }
@@ -1251,7 +1280,9 @@ pub async fn remove_ban(ban_id: i32) -> Result<(), ServerFnError> {
         if user.group_id != 1 {
             return Err(server_error("Admin only.".into()));
         }
-        run_exec(&format!("DELETE FROM bans WHERE id = {};", ban_id)).await.map_err(server_error)?;
+        run_exec(&format!("DELETE FROM bans WHERE id = {};", ban_id))
+            .await
+            .map_err(server_error)?;
         Ok(())
     }
     #[cfg(not(feature = "server"))]
@@ -1290,7 +1321,8 @@ pub async fn mark_all_read() -> Result<(), ServerFnError> {
         run_exec(&format!(
             "UPDATE users SET last_visit = EXTRACT(EPOCH FROM now())::bigint WHERE id = {};",
             user.id
-        )).await
+        ))
+        .await
         .map_err(server_error)?;
         Ok(())
     }
@@ -1322,7 +1354,8 @@ pub async fn update_profile(input: UpdateProfileForm) -> Result<(), ServerFnErro
             sql_literal(input.location.trim()),
             sql_literal(input.about.trim()),
             input.user_id,
-        )).await
+        ))
+        .await
         .map_err(server_error)?;
 
         Ok(())
@@ -1355,7 +1388,8 @@ pub async fn change_password(input: ChangePasswordForm) -> Result<(), ServerFnEr
             "UPDATE users SET password = {} WHERE id = {};",
             sql_literal(&hash),
             input.user_id,
-        )).await
+        ))
+        .await
         .map_err(server_error)?;
         Ok(())
     }
@@ -1428,12 +1462,16 @@ pub async fn delete_topic(topic_id: i32) -> Result<(), ServerFnError> {
             run_exec(&format!(
                 "UPDATE users SET post_count = GREATEST(post_count - {}, 0) WHERE id = {};",
                 pc.cnt, pc.author_id
-            )).await
+            ))
+            .await
             .map_err(server_error)?;
         }
         run_exec(&format!("DELETE FROM posts WHERE topic_id = {};", topic_id))
-            .await.map_err(server_error)?;
-        run_exec(&format!("DELETE FROM topics WHERE id = {};", topic_id)).await.map_err(server_error)?;
+            .await
+            .map_err(server_error)?;
+        run_exec(&format!("DELETE FROM topics WHERE id = {};", topic_id))
+            .await
+            .map_err(server_error)?;
         Ok(())
     }
     #[cfg(not(feature = "server"))]
@@ -1454,7 +1492,8 @@ pub async fn move_topic(input: MoveTopicForm) -> Result<(), ServerFnError> {
         run_exec(&format!(
             "UPDATE topics SET forum_id = {} WHERE id = {};",
             input.forum_id, input.topic_id
-        )).await
+        ))
+        .await
         .map_err(server_error)?;
         Ok(())
     }
@@ -1482,14 +1521,16 @@ pub async fn toggle_sticky(topic_id: i32) -> Result<bool, ServerFnError> {
         let row = run_json_query::<StickyRow>(&format!(
             "SELECT row_to_json(r) FROM (SELECT sticky FROM topics WHERE id = {}) AS r;",
             topic_id
-        )).await
+        ))
+        .await
         .map_err(server_error)?;
 
         let new_sticky = !row.sticky;
         run_exec(&format!(
             "UPDATE topics SET sticky = {} WHERE id = {};",
             new_sticky, topic_id
-        )).await
+        ))
+        .await
         .map_err(server_error)?;
 
         Ok(new_sticky)
@@ -1518,14 +1559,16 @@ pub async fn toggle_topic_status(topic_id: i32) -> Result<String, ServerFnError>
         let row = run_json_query::<ClosedRow>(&format!(
             "SELECT row_to_json(r) FROM (SELECT closed FROM topics WHERE id = {}) AS r;",
             topic_id
-        )).await
+        ))
+        .await
         .map_err(server_error)?;
 
         let new_closed = !row.closed;
         run_exec(&format!(
             "UPDATE topics SET closed = {} WHERE id = {};",
             new_closed, topic_id
-        )).await
+        ))
+        .await
         .map_err(server_error)?;
 
         Ok(if new_closed { "closed" } else { "open" }.to_string())
@@ -1546,7 +1589,8 @@ pub async fn increment_topic_views(topic_id: i32) -> Result<(), ServerFnError> {
         run_exec(&format!(
             "UPDATE topics SET views = views + 1 WHERE id = {};",
             topic_id
-        )).await
+        ))
+        .await
         .map_err(server_error)
     }
     #[cfg(not(feature = "server"))]
@@ -1609,7 +1653,8 @@ async fn register_account_impl(input: RegisterForm) -> Result<AuthResponse, Stri
         about = sql_literal(about),
         email = sql_literal(&email),
         password_hash = sql_literal(&password_hash),
-    )).await?;
+    ))
+    .await?;
 
     let (session_token, csrf_token) = create_session(user.id).await?;
     user.csrf_token = csrf_token;
@@ -1639,7 +1684,8 @@ async fn login_account_impl(input: LoginForm) -> Result<AuthResponse, String> {
              ) AS user_row
          ), 'null'::json);",
         username = sql_literal(&username),
-    )).await?
+    ))
+    .await?
     .ok_or_else(|| "Wrong username or password.".to_string())?;
 
     if user.password_hash.is_empty() || !verify_password(&input.password, &user.password_hash) {
@@ -1656,7 +1702,8 @@ async fn login_account_impl(input: LoginForm) -> Result<AuthResponse, String> {
              last_seen = 'just now'
          WHERE id = {};",
         user.id
-    )).await?;
+    ))
+    .await?;
 
     let (session_token, csrf_token) = create_session(user.id).await?;
 
@@ -1693,7 +1740,8 @@ async fn current_session_user_impl(headers: HeaderMap) -> Result<Option<SessionU
              ) AS session_row
          ), 'null'::json);",
         token = sql_literal(&token),
-    )).await
+    ))
+    .await
 }
 
 #[cfg(feature = "server")]
@@ -1702,7 +1750,8 @@ async fn logout_account_impl(headers: HeaderMap) -> Result<(), String> {
         run_exec(&format!(
             "DELETE FROM forum_sessions WHERE token = {token};",
             token = sql_literal(&token)
-        )).await?;
+        ))
+        .await?;
     }
 
     Ok(())
@@ -1831,7 +1880,8 @@ async fn require_session(headers: &HeaderMap) -> Result<SessionUser, String> {
              ) r
          ), 'null'::json);",
         token = sql_literal(&token),
-    )).await?
+    ))
+    .await?
     .ok_or_else(|| "Session expired. Please sign in again.".to_string())
 }
 
@@ -1881,7 +1931,10 @@ async fn require_permission(
 }
 
 #[cfg(feature = "server")]
-async fn create_topic_impl(input: NewTopicForm, headers: HeaderMap) -> Result<NewTopicResult, String> {
+async fn create_topic_impl(
+    input: NewTopicForm,
+    headers: HeaderMap,
+) -> Result<NewTopicResult, String> {
     let user = require_permission(&headers, |g| g.post_topics).await?;
     if let Some(msg) = check_ban(&user.username, &user.email).await? {
         return Err(format!("You are banned: {msg}"));
@@ -1927,13 +1980,15 @@ async fn create_topic_impl(input: NewTopicForm, headers: HeaderMap) -> Result<Ne
         uid = user.id,
         now = now_str,
         msg = sql_literal(message),
-    )).await?;
+    ))
+    .await?;
 
     // Increment post count
     run_exec(&format!(
         "UPDATE users SET post_count = post_count + 1 WHERE id = {};",
         user.id
-    )).await?;
+    ))
+    .await?;
 
     Ok(NewTopicResult { topic_id: topic.id })
 }
@@ -1961,7 +2016,8 @@ async fn create_reply_impl(input: ReplyForm, headers: HeaderMap) -> Result<(), S
     let topic = run_json_query::<TopicCheck>(&format!(
         "SELECT row_to_json(r) FROM (SELECT closed FROM topics WHERE id = {}) AS r;",
         input.topic_id
-    )).await?;
+    ))
+    .await?;
     if topic.closed {
         return Err("This topic is closed. No new replies are allowed.".to_string());
     }
@@ -1970,7 +2026,8 @@ async fn create_reply_impl(input: ReplyForm, headers: HeaderMap) -> Result<(), S
     let pos = run_scalar_i64(&format!(
         "SELECT COALESCE(MAX(position), 0) + 1 FROM posts WHERE topic_id = {};",
         input.topic_id,
-    )).await?;
+    ))
+    .await?;
 
     // Insert reply
     run_exec(&format!(
@@ -1981,7 +2038,8 @@ async fn create_reply_impl(input: ReplyForm, headers: HeaderMap) -> Result<(), S
         now = now_str,
         msg = sql_literal(message),
         pos = pos,
-    )).await?;
+    ))
+    .await?;
 
     // Update topic timestamps
     run_exec(&format!(
@@ -1994,7 +2052,8 @@ async fn create_reply_impl(input: ReplyForm, headers: HeaderMap) -> Result<(), S
     run_exec(&format!(
         "UPDATE users SET post_count = post_count + 1 WHERE id = {};",
         user.id
-    )).await?;
+    ))
+    .await?;
 
     Ok(())
 }
@@ -2004,7 +2063,8 @@ async fn username_exists(username: &str) -> Result<bool, String> {
     let count = run_scalar_i64(&format!(
         "SELECT COUNT(*) FROM users WHERE LOWER(username) = LOWER({username});",
         username = sql_literal(username)
-    )).await?;
+    ))
+    .await?;
     Ok(count > 0)
 }
 
@@ -2013,7 +2073,8 @@ async fn email_exists(email: &str) -> Result<bool, String> {
     let count = run_scalar_i64(&format!(
         "SELECT COUNT(*) FROM users WHERE LOWER(email) = LOWER({email});",
         email = sql_literal(email)
-    )).await?;
+    ))
+    .await?;
     Ok(count > 0)
 }
 
@@ -2029,7 +2090,8 @@ async fn create_session(user_id: i32) -> Result<(String, String), String> {
          VALUES ({token}, {user_id}, {now}, {expires}, {now}, {csrf});",
         token = sql_literal(&token),
         csrf = sql_literal(&csrf),
-    )).await?;
+    ))
+    .await?;
 
     Ok((token, csrf))
 }
@@ -2074,7 +2136,9 @@ async fn validate_csrf(headers: &HeaderMap) -> Result<(), String> {
     };
 
     #[derive(Deserialize)]
-    struct CsrfRow { csrf_token: String }
+    struct CsrfRow {
+        csrf_token: String,
+    }
 
     let row = run_json_query::<Option<CsrfRow>>(&format!(
         "SELECT COALESCE((SELECT row_to_json(r) FROM (SELECT csrf_token FROM forum_sessions WHERE token = {token} AND expires_at > EXTRACT(EPOCH FROM now())::bigint LIMIT 1) r), 'null'::json);",
@@ -2218,8 +2282,7 @@ where
         .await
         .map_err(|e| format!("query failed: {e}"))?;
     let payload: serde_json::Value = row.get(0);
-    serde_json::from_value(payload)
-        .map_err(|e| format!("failed to parse postgres json: {e}"))
+    serde_json::from_value(payload).map_err(|e| format!("failed to parse postgres json: {e}"))
 }
 
 #[cfg(feature = "server")]
@@ -2232,7 +2295,8 @@ async fn run_scalar_i64(sql: &str) -> Result<i64, String> {
     // PostgreSQL may return INT4 or INT8; accept either.
     let val: i64 = match row.try_get::<i32, _>(0) {
         Ok(v) => v as i64,
-        Err(_) => row.try_get::<i64, _>(0)
+        Err(_) => row
+            .try_get::<i64, _>(0)
             .map_err(|e| format!("scalar decode failed: {e}"))?,
     };
     Ok(val)

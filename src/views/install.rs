@@ -160,7 +160,7 @@ pub fn Install() -> Element {
                                     class: "primary-button",
                                     disabled: submitting(),
                                     onclick: move |_| {
-                                         let form = InstallForm {
+                                        let form = InstallForm {
                                             board_title: board_title(),
                                             board_tagline: board_tagline(),
                                             admin_username: admin_username(),
@@ -178,8 +178,12 @@ pub fn Install() -> Element {
                                                 Ok(resp) => {
                                                     let script = format!(
                                                         "document.cookie = '{}={}; path=/; max-age={}; samesite=strict'; document.cookie = '{}={}; path=/; max-age={}; samesite=strict';",
-                                                        cookie_name(), resp.session_token, cookie_max_age(),
-                                                        crate::data::csrf_cookie_name(), resp.user.csrf_token, cookie_max_age(),
+                                                        cookie_name(),
+                                                        resp.session_token,
+                                                        cookie_max_age(),
+                                                        crate::data::csrf_cookie_name(),
+                                                        resp.user.csrf_token,
+                                                        cookie_max_age(),
                                                     );
                                                     let _ = document::eval(&script);
                                                     is_error.set(false);

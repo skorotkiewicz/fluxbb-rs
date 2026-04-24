@@ -3,8 +3,9 @@ use dioxus::prelude::*;
 use crate::{
     components::PostCard,
     data::{
-        clean_error, create_reply, delete_topic, increment_topic_views, load_forums, load_topic_data,
-        move_topic, toggle_sticky, toggle_topic_status, MoveTopicForm, ReplyForm, SessionUser,
+        clean_error, create_reply, delete_topic, increment_topic_views, load_forums,
+        load_topic_data, move_topic, toggle_sticky, toggle_topic_status, MoveTopicForm, ReplyForm,
+        SessionUser,
     },
     Route,
 };

@@ -88,8 +88,10 @@ pub fn Login() -> Element {
                                         };
                                         let script = format!(
                                             "document.cookie = '{}={}; path=/; samesite=strict{max_age_clause}'; document.cookie = '{}={}; path=/; samesite=strict{max_age_clause}';",
-                                            cookie_name(), response.session_token,
-                                            crate::data::csrf_cookie_name(), response.user.csrf_token,
+                                            cookie_name(),
+                                            response.session_token,
+                                            crate::data::csrf_cookie_name(),
+                                            response.user.csrf_token,
                                         );
                                         let _ = document::eval(&script);
                                         auth_user.set(Some(response.user));
@@ -238,8 +240,12 @@ pub fn Register() -> Element {
                                     Ok(response) => {
                                         let script = format!(
                                             "document.cookie = '{}={}; path=/; max-age={}; samesite=strict'; document.cookie = '{}={}; path=/; max-age={}; samesite=strict';",
-                                            cookie_name(), response.session_token, cookie_max_age(),
-                                            crate::data::csrf_cookie_name(), response.user.csrf_token, cookie_max_age(),
+                                            cookie_name(),
+                                            response.session_token,
+                                            cookie_max_age(),
+                                            crate::data::csrf_cookie_name(),
+                                            response.user.csrf_token,
+                                            cookie_max_age(),
                                         );
                                         let _ = document::eval(&script);
                                         auth_user.set(Some(response.user));

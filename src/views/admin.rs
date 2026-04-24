@@ -3,13 +3,12 @@ use dioxus::prelude::*;
 use crate::{
     components::SectionHeader,
     data::{
-        add_ban, admin_add_category, admin_add_forum, admin_delete_category, admin_delete_forum,
-        admin_clean_sessions, admin_delete_topic, admin_delete_user, admin_update_board,
+        add_ban, admin_add_category, admin_add_forum, admin_clean_sessions, admin_delete_category,
+        admin_delete_forum, admin_delete_topic, admin_delete_user, admin_update_board,
         admin_update_topic, admin_update_user, clean_error, load_admin_data, load_bans,
         load_groups, remove_ban, update_group, AdminBoardSettings, AdminCategoryForm, AdminData,
-        AdminDeleteItem,
-        AdminForumForm, AdminTopicUpdate, AdminUserUpdate, BanForm, GroupUpdateForm,
-        SessionUser,
+        AdminDeleteItem, AdminForumForm, AdminTopicUpdate, AdminUserUpdate, BanForm,
+        GroupUpdateForm, SessionUser,
     },
     Route,
 };

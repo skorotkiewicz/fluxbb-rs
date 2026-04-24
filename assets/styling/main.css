@@ -273,7 +273,10 @@ textarea {
 .search-results {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+}
+
+.recent-list {
+    border-top: 1px solid var(--border);
 }
 
 .forum-table-head,
@@ -300,7 +303,6 @@ textarea {
 .forum-row,
 .topic-row,
 .recent-row,
-.search-result-row,
 .member-result-row {
     display: grid;
     gap: 16px;
@@ -308,6 +310,14 @@ textarea {
     border: 1px solid var(--border);
     border-radius: 18px;
     background: rgba(255, 253, 248, 0.8);
+}
+
+.recent-row {
+    gap: 0;
+    border-radius: 0;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    background: transparent;
 }
 
 .topic-sticky {
@@ -354,17 +364,44 @@ textarea {
 }
 
 .recent-row,
-.search-result-row,
 .member-result-row {
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
 }
 
-.recent-main,
-.search-result-row {
+.recent-main {
     display: flex;
     align-items: center;
     gap: 10px;
+}
+
+.search-result-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0;
+    padding: 14px 16px;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    border-radius: 0;
+    background: transparent;
+}
+
+.search-result-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.search-input {
+    width: 100%;
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: var(--surface-strong);
+    color: var(--text);
+    font-size: 1rem;
 }
 
 .member-result-row {
@@ -576,6 +613,21 @@ textarea {
 
 .empty-state {
     text-align: center;
+}
+
+.site-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+    font-size: 0.85em;
+    color: var(--muted);
+}
+
+.site-meta p {
+    margin: 0;
 }
 
 .site-footer {

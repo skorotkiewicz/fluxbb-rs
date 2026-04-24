@@ -25,10 +25,17 @@ pub fn Forum(id: i32) -> Element {
 pub fn ForumPage(id: i32, page: i32) -> Element {
     let current_user = use_context::<Signal<Option<SessionUser>>>();
     let mut refresh = use_context::<Signal<()>>();
+    let mut current_page = use_signal(|| page);
+
+    // Only update signal when page actually changes
+    if current_page() != page {
+        current_page.set(page);
+    }
 
     let data_resource = use_resource(move || async move {
         refresh();
-        load_forum_data(id, page).await
+        let p = current_page();
+        load_forum_data(id, p).await
     });
 
     let data = if let Some(Ok(data)) = data_resource() {

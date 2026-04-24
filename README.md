@@ -47,15 +47,13 @@ cd fluxbb-rs
 dx build --platform server
 ```
 
-### 2. Configure database (manual)
+### 2. Configure database (optional)
 
 Create `.env`:
 
 ```bash
 DATABASE_URL=postgresql://user:password@localhost:5432/fluxbb
 ```
-
-Or set the environment variable directly.
 
 ### 3. Run
 

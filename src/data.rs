@@ -153,9 +153,9 @@ pub struct IndexData {
 }
 
 #[allow(unused)]
-const FORUM_TOPICS_PER_PAGE: i32 = 2;
+const FORUM_TOPICS_PER_PAGE: i32 = 25;
 #[allow(unused)]
-const TOPIC_POSTS_PER_PAGE: i32 = 2;
+const TOPIC_POSTS_PER_PAGE: i32 = 20;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ForumData {

@@ -1,7 +1,7 @@
 use dioxus::prelude::*;
 
 use crate::{
-    components::{SectionHeader, StatCard, TopicStatusBadge},
+    components::{SectionHeader, StatCard},
     data::{load_index_data, mark_all_read, SessionUser},
     Route,
 };
@@ -160,7 +160,12 @@ pub fn Index() -> Element {
                         if let Some(author) = recent_users.get(&topic.author_id) {
                             div { class: "recent-row",
                                 div { class: "recent-main",
-                                    TopicStatusBadge { status: topic.status.clone() }
+                                    if topic.closed {
+                                        span { class: "badge badge-closed", "Closed" }
+                                    }
+                                    if topic.sticky {
+                                        span { class: "badge badge-pinned", "Sticky" }
+                                    }
                                     Link {
                                         class: "recent-topic-link",
                                         to: Route::TopicPage {

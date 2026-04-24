@@ -1,7 +1,7 @@
 use dioxus::prelude::*;
 
 use crate::{
-    components::{EmptyState, SectionHeader, TopicStatusBadge},
+    components::{EmptyState, SectionHeader},
     data::{load_forum_data, mark_all_read, toggle_topic_status, ForumData, SessionUser},
     Route,
 };
@@ -108,7 +108,9 @@ pub fn ForumPage(id: i32, page: i32) -> Element {
                             if let Some(author) = users.get(&topic.author_id) {
                                 div { class: if topic.sticky { "topic-row topic-sticky" } else { "topic-row" },
                                     div { class: "topic-main",
-                                        TopicStatusBadge { status: topic.status.clone() }
+                                        if topic.closed {
+                                            span { class: "badge badge-closed", "Closed" }
+                                        }
                                         if topic.sticky {
                                             span { class: "badge badge-pinned", "Sticky" }
                                         }
@@ -137,7 +139,7 @@ pub fn ForumPage(id: i32, page: i32) -> Element {
                                                             refresh.set(());
                                                         });
                                                     },
-                                                    if matches!(topic.status, crate::data::TopicStatus::Closed) {
+                                                    if topic.closed {
                                                         "Open"
                                                     } else {
                                                         "Close"
@@ -146,7 +148,7 @@ pub fn ForumPage(id: i32, page: i32) -> Element {
                                             }
                                         }
                                     }
-                                    p { class: "topic-metric", "{topic.reply_count()}" }
+                                    p { class: "topic-metric", "{topic.reply_count}" }
                                     p { class: "topic-metric", "{topic.views}" }
                                     p { class: "topic-metric topic-update", "{topic.updated_at}" }
                                 }

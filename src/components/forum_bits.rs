@@ -1,6 +1,6 @@
 use dioxus::prelude::*;
 
-use crate::data::{delete_post, Post, SessionUser, TopicStatus};
+use crate::data::{delete_post, Post, SessionUser};
 use crate::Route;
 
 #[component]
@@ -22,13 +22,6 @@ pub fn StatCard(label: String, value: String, detail: String) -> Element {
             p { class: "stat-value", "{value}" }
             p { class: "stat-detail", "{detail}" }
         }
-    }
-}
-
-#[component]
-pub fn TopicStatusBadge(status: TopicStatus) -> Element {
-    rsx! {
-        span { class: status.class_name(), "{status.label()}" }
     }
 }
 

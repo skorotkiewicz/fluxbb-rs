@@ -1,7 +1,7 @@
 use dioxus::prelude::*;
 
 use crate::{
-    components::{EmptyState, PostCard, TopicStatusBadge},
+    components::{EmptyState, PostCard},
     data::{
         clean_error, create_reply, delete_topic, increment_topic_views, load_forums, load_topic_data,
         move_topic, toggle_sticky, toggle_topic_status, MoveTopicForm, ReplyForm, SessionUser,
@@ -66,7 +66,7 @@ pub fn TopicPage(id: i32, page: i32) -> Element {
     let mut move_forum_id = use_signal(|| 0_i32);
 
     let is_admin = current_user().as_ref().is_some_and(|u| u.group_id == 1);
-    let is_closed = matches!(topic.status, crate::data::TopicStatus::Closed);
+    let is_closed = topic.closed;
 
     let total_pages = ((data.total_posts + data.per_page - 1) / data.per_page).max(1);
     let current_page = data.page;
@@ -102,7 +102,9 @@ pub fn TopicPage(id: i32, page: i32) -> Element {
 
             article { class: "hero-card compact-hero",
                 div { class: "topic-hero-topline",
-                    TopicStatusBadge { status: topic.status.clone() }
+                    if topic.closed {
+                        span { class: "badge badge-closed", "Closed" }
+                    }
                     if topic.sticky {
                         span { class: "badge badge-pinned", "Sticky" }
                     }
@@ -112,7 +114,7 @@ pub fn TopicPage(id: i32, page: i32) -> Element {
                 }
                 h2 { class: "topic-title", "{topic.subject}" }
                 p { class: "topic-summary",
-                    "Views: {topic.views} · Replies: {topic.reply_count()} · Updated: {topic.updated_at}"
+                    "Views: {topic.views} · Replies: {topic.reply_count} · Updated: {topic.updated_at}"
                 }
 
                 if is_admin {

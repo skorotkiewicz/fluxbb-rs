@@ -45,13 +45,14 @@ CREATE TABLE IF NOT EXISTS topics (
     forum_id INTEGER NOT NULL REFERENCES forums(id) ON DELETE CASCADE,
     author_id INTEGER NOT NULL REFERENCES users(id),
     subject TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'fresh',
+    closed BOOLEAN NOT NULL DEFAULT false,
     views INTEGER NOT NULL DEFAULT 0,
     tags TEXT[] NOT NULL DEFAULT '{}',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     activity_rank INTEGER NOT NULL DEFAULT 0,
-    sticky BOOLEAN NOT NULL DEFAULT false
+    sticky BOOLEAN NOT NULL DEFAULT false,
+    moved_to INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS posts (

@@ -1,7 +1,7 @@
 use dioxus::prelude::*;
 
 use crate::{
-    components::{EmptyState, SectionHeader, TopicStatusBadge},
+    components::{EmptyState, SectionHeader},
     data::{search_server, SearchResults},
     Route,
 };
@@ -52,7 +52,12 @@ pub fn Search() -> Element {
                             div { class: "search-results",
                                 for topic in matches.topics {
                                     div { class: "search-result-row",
-                                        TopicStatusBadge { status: topic.status.clone() }
+                                        if topic.closed {
+                                            span { class: "badge badge-closed", "Closed" }
+                                        }
+                                        if topic.sticky {
+                                            span { class: "badge badge-pinned", "Sticky" }
+                                        }
                                         div { class: "search-result-copy",
                                             Link {
                                                 class: "topic-link",

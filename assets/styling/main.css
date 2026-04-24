@@ -401,21 +401,6 @@ textarea {
     color: #6a2f15;
 }
 
-.badge-hot {
-    background: #ffd9cb;
-    color: #832b18;
-}
-
-.badge-resolved {
-    background: #d6ebdd;
-    color: #24583d;
-}
-
-.badge-fresh {
-    background: #e3e6f3;
-    color: #374870;
-}
-
 .badge-closed {
     background: #e8e8e8;
     color: #555;

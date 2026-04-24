@@ -99,7 +99,8 @@ pub struct Topic {
     pub forum_id: i32,
     pub author_id: i32,
     pub subject: String,
-    pub status: TopicStatus,
+    #[serde(default)]
+    pub closed: bool,
     pub views: i32,
     pub tags: Vec<String>,
     pub created_at: String,
@@ -109,6 +110,8 @@ pub struct Topic {
     pub reply_count: i32,
     #[serde(default)]
     pub sticky: bool,
+    #[serde(default)]
+    pub moved_to: i32,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -121,16 +124,6 @@ pub struct Post {
     pub body: Vec<String>,
     pub signature: Option<String>,
     pub position: i32,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum TopicStatus {
-    Pinned,
-    Hot,
-    Resolved,
-    Fresh,
-    Closed,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -332,7 +325,7 @@ pub struct AdminUserUpdate {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct AdminTopicUpdate {
     pub topic_id: i32,
-    pub status: String,
+    pub closed: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -512,34 +505,6 @@ impl AppData {
     }
 }
 
-impl Topic {
-    pub fn reply_count(&self) -> i32 {
-        self.reply_count
-    }
-}
-
-impl TopicStatus {
-    pub fn label(&self) -> &'static str {
-        match self {
-            Self::Pinned => "Pinned",
-            Self::Hot => "Hot",
-            Self::Resolved => "Resolved",
-            Self::Fresh => "Fresh",
-            Self::Closed => "Closed",
-        }
-    }
-
-    pub fn class_name(&self) -> &'static str {
-        match self {
-            Self::Pinned => "badge badge-pinned",
-            Self::Hot => "badge badge-hot",
-            Self::Resolved => "badge badge-resolved",
-            Self::Fresh => "badge badge-fresh",
-            Self::Closed => "badge badge-closed",
-        }
-    }
-}
-
 // ── View-specific loaders ──
 
 #[post("/api/shell-data")]
@@ -592,7 +557,7 @@ pub async fn load_index_data() -> Result<IndexData, ServerFnError> {
                     'newest_member', COALESCE((SELECT username FROM users ORDER BY id DESC LIMIT 1), '')
                 ),
                 'recent_topics', (SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json) FROM (
-                    SELECT id, forum_id, author_id, subject, status, views, tags, created_at, updated_at, activity_rank, sticky
+                    SELECT id, forum_id, author_id, subject, closed, views, tags, created_at, updated_at, activity_rank, sticky, moved_to
                     FROM topics ORDER BY activity_rank DESC, id LIMIT 4
                 ) t),
                 'recent_users', (SELECT COALESCE(json_agg(row_to_json(u)), '[]'::json) FROM (
@@ -635,7 +600,7 @@ pub async fn load_forum_data(id: i32, page: i32) -> Result<ForumData, ServerFnEr
             "SELECT json_build_object(
                 'forum', (SELECT row_to_json(f) FROM forums f WHERE f.id = {id}),
                 'topics', (SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json) FROM (
-                    SELECT id, forum_id, author_id, subject, status, views, tags, created_at, updated_at, activity_rank, sticky,
+                    SELECT id, forum_id, author_id, subject, closed, views, tags, created_at, updated_at, activity_rank, sticky, moved_to,
                         COALESCE((SELECT COUNT(*) FROM posts WHERE topic_id = t.id), 0) - 1 AS reply_count
                     FROM topics t WHERE forum_id = {id} ORDER BY sticky DESC, activity_rank DESC, id
                     LIMIT {per_page} OFFSET {offset}
@@ -713,7 +678,7 @@ pub async fn load_profile_data(id: i32) -> Result<ProfileData, ServerFnError> {
                     FROM users WHERE id = {id}
                 ) u),
                 'topics', (SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json) FROM (
-                    SELECT id, forum_id, author_id, subject, status, views, tags, created_at, updated_at, activity_rank, sticky
+                    SELECT id, forum_id, author_id, subject, closed, views, tags, created_at, updated_at, activity_rank, sticky, moved_to
                     FROM topics WHERE author_id = {id} ORDER BY activity_rank DESC, id LIMIT 10
                 ) t),
                 'posts', (SELECT COALESCE(json_agg(row_to_json(p)), '[]'::json) FROM (
@@ -762,7 +727,7 @@ pub async fn search_server(query: String) -> Result<SearchResults, ServerFnError
         let results = run_json_query::<SearchResults>(&format!(
             "SELECT json_build_object(
                 'topics', (SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json) FROM (
-                    SELECT id, forum_id, author_id, subject, status, views, tags, created_at, updated_at, activity_rank, sticky
+                    SELECT id, forum_id, author_id, subject, closed, views, tags, created_at, updated_at, activity_rank, sticky, moved_to
                     FROM topics
                     WHERE LOWER(subject) LIKE {}
                        OR EXISTS (SELECT 1 FROM unnest(tags) tag WHERE LOWER(tag) LIKE {})
@@ -813,7 +778,7 @@ pub async fn load_admin_data() -> Result<AdminData, ServerFnError> {
                 'categories', (SELECT COALESCE(json_agg(row_to_json(c)), '[]'::json) FROM (SELECT id, name, description, sort_order FROM categories ORDER BY sort_order, id) c),
                 'forums', (SELECT COALESCE(json_agg(row_to_json(f)), '[]'::json) FROM (SELECT id, category_id, name, description, moderators, sort_order FROM forums ORDER BY category_id, sort_order, id) f),
                 'users', (SELECT COALESCE(json_agg(row_to_json(u)), '[]'::json) FROM (SELECT id, username, title, status, joined_at, post_count, location, about, last_seen, email, group_id FROM users ORDER BY id) u),
-                'topics', (SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json) FROM (SELECT id, forum_id, author_id, subject, status, views, tags, created_at, updated_at, activity_rank, sticky FROM topics ORDER BY sticky DESC, activity_rank DESC, id) t)
+                'topics', (SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json) FROM (SELECT id, forum_id, author_id, subject, closed, views, tags, created_at, updated_at, activity_rank, sticky, moved_to FROM topics ORDER BY sticky DESC, activity_rank DESC, id) t)
             )::json;",
         ).map_err(server_error)?;
         Ok(data)
@@ -1060,8 +1025,8 @@ pub async fn admin_update_topic(input: AdminTopicUpdate) -> Result<(), ServerFnE
             return Err(server_error("Admin only.".into()));
         }
         run_exec(&format!(
-            "UPDATE topics SET status = {} WHERE id = {};",
-            sql_literal(input.status.trim()),
+            "UPDATE topics SET closed = {} WHERE id = {};",
+            input.closed,
             input.topic_id
         ))
         .map_err(server_error)
@@ -1627,29 +1592,25 @@ pub async fn toggle_topic_status(topic_id: i32) -> Result<String, ServerFnError>
         }
 
         #[derive(Deserialize)]
-        struct StatusRow {
-            status: String,
+        struct ClosedRow {
+            closed: bool,
         }
 
-        let row = run_json_query::<StatusRow>(&format!(
-            "SELECT row_to_json(r) FROM (SELECT status FROM topics WHERE id = {}) AS r;",
+        let row = run_json_query::<ClosedRow>(&format!(
+            "SELECT row_to_json(r) FROM (SELECT closed FROM topics WHERE id = {}) AS r;",
             topic_id
         ))
         .map_err(server_error)?;
 
-        let new_status = if row.status == "closed" {
-            "fresh"
-        } else {
-            "closed"
-        };
+        let new_closed = !row.closed;
         run_exec(&format!(
-            "UPDATE topics SET status = {} WHERE id = {};",
-            sql_literal(new_status),
+            "UPDATE topics SET closed = {} WHERE id = {};",
+            new_closed,
             topic_id
         ))
         .map_err(server_error)?;
 
-        Ok(new_status.to_string())
+        Ok(if new_closed { "closed" } else { "open" }.to_string())
     }
     #[cfg(not(feature = "server"))]
     {
@@ -1996,8 +1957,8 @@ fn create_topic_impl(input: NewTopicForm, headers: HeaderMap) -> Result<NewTopic
     }
     let topic = run_json_query::<IdRow>(&format!(
         "WITH ins AS (
-             INSERT INTO topics (forum_id, author_id, subject, status, created_at, updated_at, activity_rank)
-             VALUES ({fid}, {uid}, {subject}, 'fresh', {now}, {now}, EXTRACT(EPOCH FROM now())::integer)
+             INSERT INTO topics (forum_id, author_id, subject, closed, created_at, updated_at, activity_rank, sticky, moved_to)
+             VALUES ({fid}, {uid}, {subject}, false, {now}, {now}, EXTRACT(EPOCH FROM now())::integer, false, 0)
              RETURNING id
          ) SELECT row_to_json(ins) FROM ins;",
         fid = input.forum_id,
@@ -2040,13 +2001,13 @@ fn create_reply_impl(input: ReplyForm, headers: HeaderMap) -> Result<(), String>
     // Check topic is not closed
     #[derive(Deserialize)]
     struct TopicCheck {
-        status: String,
+        closed: bool,
     }
     let topic = run_json_query::<TopicCheck>(&format!(
-        "SELECT row_to_json(r) FROM (SELECT status FROM topics WHERE id = {}) AS r;",
+        "SELECT row_to_json(r) FROM (SELECT closed FROM topics WHERE id = {}) AS r;",
         input.topic_id
     ))?;
-    if topic.status == "closed" {
+    if topic.closed {
         return Err("This topic is closed. No new replies are allowed.".to_string());
     }
 
@@ -2125,7 +2086,7 @@ fn load_board_from_postgres() -> Result<AppData, String> {
     let topics = run_json_query::<Vec<Topic>>(
         "SELECT COALESCE(json_agg(row_to_json(topic_row)), '[]'::json)
          FROM (
-             SELECT id, forum_id, author_id, subject, status, views, tags, created_at, updated_at, activity_rank, sticky
+             SELECT id, forum_id, author_id, subject, closed, views, tags, created_at, updated_at, activity_rank, sticky, moved_to
               FROM topics
               ORDER BY sticky DESC, activity_rank DESC, id
          ) AS topic_row;",

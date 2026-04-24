@@ -489,7 +489,6 @@ fn ModerationPanel(
     mut is_error: Signal<bool>,
     mut refresh: Signal<()>,
 ) -> Element {
-    let statuses = ["pinned", "hot", "resolved", "fresh"];
     let users_map: std::collections::HashMap<i32, crate::data::UserProfile> =
         data.users.iter().map(|u| (u.id, u.clone())).collect();
 
@@ -502,7 +501,8 @@ fn ModerationPanel(
             div { class: "topic-table",
                 div { class: "topic-table-head",
                     span { "Topic" }
-                    span { "Status" }
+                    span { "Sticky" }
+                    span { "Closed" }
                     span { "Views" }
                     span { "Actions" }
                 }
@@ -523,38 +523,35 @@ fn ModerationPanel(
                                 }
                             }
                         }
-                        p { class: "topic-metric", "{topic.status.label()}" }
+                        p { class: "topic-metric", if topic.sticky { "Yes" } else { "No" } }
+                        p { class: "topic-metric", if topic.closed { "Yes" } else { "No" } }
                         p { class: "topic-metric", "{topic.views}" }
                         div { class: "admin-actions",
-                            for st in statuses {
-                                button {
-                                    class: if topic.status.label().to_lowercase() == st { "small-button active" } else { "small-button" },
-                                    onclick: {
-                                        let tid = topic.id;
-                                        let st = st.to_string();
-                                        move |_| {
-                                            let st = st.clone();
-                                            spawn(async move {
-                                                match admin_update_topic(AdminTopicUpdate {
-                                                        topic_id: tid,
-                                                        status: st,
-                                                    })
-                                                    .await
-                                                {
-                                                    Ok(_) => {
-                                                        is_error.set(false);
-                                                        status.set("Topic status updated. Refresh.".into());
-                                                    }
-                                                    Err(e) => {
-                                                        is_error.set(true);
-                                                        status.set(clean_error(e));
-                                                    }
+                            button {
+                                class: "small-button",
+                                onclick: {
+                                    let tid = topic.id;
+                                    let closed = !topic.closed;
+                                    move |_| {
+                                        spawn(async move {
+                                            match admin_update_topic(AdminTopicUpdate {
+                                                topic_id: tid,
+                                                closed,
+                                            }).await
+                                            {
+                                                Ok(_) => {
+                                                    is_error.set(false);
+                                                    status.set("Topic status updated. Refresh.".into());
                                                 }
-                                            });
-                                        }
-                                    },
-                                    "{st}"
-                                }
+                                                Err(e) => {
+                                                    is_error.set(true);
+                                                    status.set(clean_error(e));
+                                                }
+                                            }
+                                        });
+                                    }
+                                },
+                                if topic.closed { "Open" } else { "Close" }
                             }
                             button {
                                 class: "danger-button small-button",

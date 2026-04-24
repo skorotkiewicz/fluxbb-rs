@@ -1,10 +1,7 @@
 # FluxBB RS
 
 A modern reimplementation of [FluxBB](https://fluxbb.org) — the classic lightweight forum software — built with **Rust**, **Dioxus 0.7**, and **PostgreSQL**.
-
 > Fast. Simple. No bloat.
-
----
 
 ## Features
 
@@ -16,20 +13,6 @@ A modern reimplementation of [FluxBB](https://fluxbb.org) — the classic lightw
 - **Anti-spam** — flood protection (30s rate limit), CSRF tokens, ban system
 - **Security** — bcrypt password hashing, session-based auth with CSRF double-submit
 - **Responsive** — clean Air theme, works on desktop and mobile
-
----
-
-## Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Frontend | Dioxus 0.7 (Rust → WASM) |
-| Backend | Dioxus Fullstack / Axum |
-| Database | PostgreSQL (SQLite planned) |
-| ORM | SQLx |
-| Styling | Custom CSS (Air theme) |
-
----
 
 ## Quick Start
 
@@ -71,8 +54,6 @@ dx check
 dx fmt
 ```
 
----
-
 ## Architecture
 
 ```
@@ -87,7 +68,15 @@ src/
 - **Server functions** — all state changes go through type-safe Rust endpoints
 - **Context API** — shared auth state across components
 
----
+## Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Frontend | Dioxus 0.7 (Rust → WASM) |
+| Backend | Dioxus Fullstack / Axum |
+| Database | PostgreSQL (SQLite planned) |
+| ORM | SQLx |
+| Styling | Custom CSS (Air theme) |
 
 ## License
 

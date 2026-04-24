@@ -229,6 +229,8 @@ pub struct AdminData {
 pub struct SessionUser {
     pub id: i32,
     pub username: String,
+    #[serde(default)]
+    pub email: String,
     pub title: String,
     pub group_id: i32,
 }
@@ -1136,6 +1138,9 @@ pub async fn edit_post(input: EditPostForm) -> Result<(), ServerFnError> {
     #[cfg(feature = "server")]
     {
         let user = require_session(&headers).map_err(server_error)?;
+        if let Some(msg) = check_ban(&user.username, &user.email).map_err(server_error)? {
+            return Err(server_error(format!("You are banned: {msg}")));
+        }
         let post = run_json_query::<Option<Post>>(&format!(
             "SELECT COALESCE((SELECT row_to_json(post_row) FROM (SELECT id, topic_id, author_id, posted_at, edited_at, body, signature, position FROM posts WHERE id = {}) AS post_row), 'null'::json);",
             input.post_id
@@ -1185,6 +1190,9 @@ pub async fn delete_post(post_id: i32) -> Result<i32, ServerFnError> {
     #[cfg(feature = "server")]
     {
         let user = require_session(&headers).map_err(server_error)?;
+        if let Some(msg) = check_ban(&user.username, &user.email).map_err(server_error)? {
+            return Err(server_error(format!("You are banned: {msg}")));
+        }
         let group = get_group(user.group_id).map_err(server_error)?;
 
         #[derive(Deserialize)]
@@ -1782,6 +1790,7 @@ fn login_account_impl(input: LoginForm) -> Result<AuthResponse, String> {
         user: SessionUser {
             id: user.id,
             username: user.username,
+            email: user.email,
             title: user.title,
             group_id: user.group_id,
         },
@@ -1800,10 +1809,10 @@ fn current_session_user_impl(headers: HeaderMap) -> Result<Option<SessionUser>, 
         "SELECT COALESCE((
              SELECT row_to_json(session_row)
              FROM (
-                 SELECT u.id, u.username, u.title, u.group_id
-                 FROM forum_sessions AS s
-                 INNER JOIN users AS u ON u.id = s.user_id
-                 WHERE s.token = {token}
+                  SELECT u.id, u.username, u.email, u.title, u.group_id
+                  FROM forum_sessions AS s
+                  INNER JOIN users AS u ON u.id = s.user_id
+                  WHERE s.token = {token}
                    AND s.expires_at > EXTRACT(EPOCH FROM now())::bigint
                  LIMIT 1
              ) AS session_row
@@ -1970,6 +1979,9 @@ fn require_permission(
 #[cfg(feature = "server")]
 fn create_topic_impl(input: NewTopicForm, headers: HeaderMap) -> Result<NewTopicResult, String> {
     let user = require_permission(&headers, |g| g.post_topics)?;
+    if let Some(msg) = check_ban(&user.username, &user.email)? {
+        return Err(format!("You are banned: {msg}"));
+    }
     let group = get_group(user.group_id)?;
     check_flood(user.id, group.is_admin)?;
     let subject = input.subject.trim();
@@ -2025,6 +2037,9 @@ fn create_topic_impl(input: NewTopicForm, headers: HeaderMap) -> Result<NewTopic
 #[cfg(feature = "server")]
 fn create_reply_impl(input: ReplyForm, headers: HeaderMap) -> Result<(), String> {
     let user = require_permission(&headers, |g| g.post_replies)?;
+    if let Some(msg) = check_ban(&user.username, &user.email)? {
+        return Err(format!("You are banned: {msg}"));
+    }
     let group = get_group(user.group_id)?;
     check_flood(user.id, group.is_admin)?;
     let message = input.message.trim();

@@ -1,11 +1,10 @@
 use dioxus::prelude::*;
 
 use crate::{
-    components::{EmptyState, PostCard},
+    components::PostCard,
     data::{
         clean_error, create_reply, delete_topic, increment_topic_views, load_forums, load_topic_data,
         move_topic, toggle_sticky, toggle_topic_status, MoveTopicForm, ReplyForm, SessionUser,
-        TopicData,
     },
     Route,
 };
@@ -146,28 +145,29 @@ pub fn TopicPage(id: i32, page: i32) -> Element {
                                 class: "small-button",
                                 disabled: move_forum_id() == 0,
                                 onclick: move |_| {
-                                let tid = id;
-                                let fid = move_forum_id();
-                                if fid == 0 {
-                                    return;
-                                }
-                                let navigator = navigator.clone();
-                                spawn(async move {
-                                    match move_topic(MoveTopicForm {
-                                        topic_id: tid,
-                                        forum_id: fid,
-                                    }).await
-                                    {
-                                        Ok(_) => {
-                                            navigator
-                                                .push(Route::ForumPage {
-                                                    id: fid,
-                                                    page: 1,
-                                                });
-                                        }
-                                        Err(_) => {}
+                                    let tid = id;
+                                    let fid = move_forum_id();
+                                    if fid == 0 {
+                                        return;
                                     }
-                                });
+                                    let navigator = navigator.clone();
+                                    spawn(async move {
+                                        match move_topic(MoveTopicForm {
+                                                topic_id: tid,
+                                                forum_id: fid,
+                                            })
+                                            .await
+                                        {
+                                            Ok(_) => {
+                                                navigator
+                                                    .push(Route::ForumPage {
+                                                        id: fid,
+                                                        page: 1,
+                                                    });
+                                            }
+                                            Err(_) => {}
+                                        }
+                                    });
                                 },
                                 "Move"
                             }

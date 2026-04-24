@@ -1,5 +1,3 @@
-use std::cmp::Reverse;
-
 #[cfg(feature = "server")]
 use std::{
     net::IpAddr,
@@ -22,16 +20,6 @@ use sha2::{Digest, Sha256};
 const DATABASE_URL: &str = "postgresql://dev:password@localhost:5432/fluxbb";
 const SESSION_COOKIE: &str = "fluxbb_rs_session";
 const SESSION_MAX_AGE_SECS: i64 = 60 * 60 * 24 * 14;
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct AppData {
-    pub meta: BoardMeta,
-    pub categories: Vec<Category>,
-    pub forums: Vec<Forum>,
-    pub users: Vec<UserProfile>,
-    pub topics: Vec<Topic>,
-    pub posts: Vec<Post>,
-}
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct BoardMeta {
@@ -134,25 +122,6 @@ pub struct BoardStats {
     pub newest_member: String,
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct ForumSnapshot {
-    pub forum: Forum,
-    pub topic_count: usize,
-    pub post_count: usize,
-    pub last_topic_id: i32,
-    pub last_topic_subject: String,
-    pub last_post_author: String,
-    pub last_posted_at: String,
-}
-
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-pub struct SearchResults {
-    pub topics: Vec<Topic>,
-    pub users: Vec<UserProfile>,
-}
-
-// ── View-specific data structs ──
-
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ShellData {
     pub meta: BoardMeta,
@@ -183,8 +152,10 @@ pub struct IndexData {
     pub last_visit: i64,
 }
 
-const FORUM_TOPICS_PER_PAGE: i32 = 25;
-const TOPIC_POSTS_PER_PAGE: i32 = 20;
+#[allow(unused)]
+const FORUM_TOPICS_PER_PAGE: i32 = 2;
+#[allow(unused)]
+const TOPIC_POSTS_PER_PAGE: i32 = 2;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ForumData {
@@ -223,6 +194,12 @@ pub struct AdminData {
     pub forums: Vec<Forum>,
     pub users: Vec<UserProfile>,
     pub topics: Vec<Topic>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
+pub struct SearchResults {
+    pub topics: Vec<Topic>,
+    pub users: Vec<UserProfile>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -355,160 +332,6 @@ struct StoredAuthUser {
     pub group_id: i32,
     pub email: String,
     pub password_hash: String,
-}
-
-impl AppData {
-    pub fn board_stats(&self) -> BoardStats {
-        let newest_member = self
-            .users
-            .iter()
-            .max_by_key(|user| user.id)
-            .map(|user| user.username.clone())
-            .unwrap_or_else(|| "guest".to_string());
-
-        BoardStats {
-            members: self.users.len(),
-            topics: self.topics.len(),
-            posts: self.posts.len(),
-            newest_member,
-        }
-    }
-
-    pub fn categories_sorted(&self) -> Vec<Category> {
-        let mut categories = self.categories.clone();
-        categories.sort_by_key(|category| category.sort_order);
-        categories
-    }
-
-    pub fn forums_in_category(&self, category_id: i32) -> Vec<Forum> {
-        let mut forums = self
-            .forums
-            .iter()
-            .filter(|forum| forum.category_id == category_id)
-            .cloned()
-            .collect::<Vec<_>>();
-        forums.sort_by_key(|forum| forum.sort_order);
-        forums
-    }
-
-    pub fn forum(&self, id: i32) -> Option<Forum> {
-        self.forums.iter().find(|forum| forum.id == id).cloned()
-    }
-
-    pub fn user(&self, id: i32) -> Option<UserProfile> {
-        self.users.iter().find(|user| user.id == id).cloned()
-    }
-
-    pub fn topic(&self, id: i32) -> Option<Topic> {
-        self.topics.iter().find(|topic| topic.id == id).cloned()
-    }
-
-    pub fn topics_for_forum(&self, forum_id: i32) -> Vec<Topic> {
-        let mut topics = self
-            .topics
-            .iter()
-            .filter(|topic| topic.forum_id == forum_id)
-            .cloned()
-            .collect::<Vec<_>>();
-        topics.sort_by_key(|topic| Reverse(topic.activity_rank));
-        topics
-    }
-
-    pub fn posts_for_topic(&self, topic_id: i32) -> Vec<Post> {
-        let mut posts = self
-            .posts
-            .iter()
-            .filter(|post| post.topic_id == topic_id)
-            .cloned()
-            .collect::<Vec<_>>();
-        posts.sort_by_key(|post| post.position);
-        posts
-    }
-
-    pub fn recent_topics(&self, limit: usize) -> Vec<Topic> {
-        let mut topics = self.topics.clone();
-        topics.sort_by_key(|topic| Reverse(topic.activity_rank));
-        topics.into_iter().take(limit).collect()
-    }
-
-    pub fn forum_snapshot(&self, forum_id: i32) -> Option<ForumSnapshot> {
-        let forum = self.forum(forum_id)?;
-        let topics = self.topics_for_forum(forum_id);
-        let topic_count = topics.len();
-        let post_count = topics
-            .iter()
-            .map(|topic| self.posts_for_topic(topic.id).len())
-            .sum::<usize>();
-
-        if let Some(latest_topic) = topics.first().cloned() {
-            let latest_post = self.posts_for_topic(latest_topic.id).last().cloned();
-            let last_post_author = latest_post
-                .as_ref()
-                .and_then(|p| self.user(p.author_id))
-                .map(|u| u.username)
-                .unwrap_or_default();
-            let last_posted_at = latest_post.map(|p| p.posted_at).unwrap_or_default();
-
-            Some(ForumSnapshot {
-                forum,
-                topic_count,
-                post_count,
-                last_topic_id: latest_topic.id,
-                last_topic_subject: latest_topic.subject,
-                last_post_author,
-                last_posted_at,
-            })
-        } else {
-            Some(ForumSnapshot {
-                forum,
-                topic_count: 0,
-                post_count: 0,
-                last_topic_id: 0,
-                last_topic_subject: "No topics yet".to_string(),
-                last_post_author: String::new(),
-                last_posted_at: String::new(),
-            })
-        }
-    }
-
-    pub fn search(&self, query: &str) -> SearchResults {
-        let needle = query.trim().to_lowercase();
-        if needle.is_empty() {
-            return SearchResults::default();
-        }
-
-        let topics = self
-            .topics
-            .iter()
-            .filter(|topic| {
-                topic.subject.to_lowercase().contains(&needle)
-                    || topic
-                        .tags
-                        .iter()
-                        .any(|tag| tag.to_lowercase().contains(&needle))
-                    || self
-                        .posts_for_topic(topic.id)
-                        .iter()
-                        .flat_map(|post| post.body.iter())
-                        .any(|paragraph| paragraph.to_lowercase().contains(&needle))
-            })
-            .cloned()
-            .collect::<Vec<_>>();
-
-        let users = self
-            .users
-            .iter()
-            .filter(|user| {
-                user.username.to_lowercase().contains(&needle)
-                    || user.title.to_lowercase().contains(&needle)
-                    || user.about.to_lowercase().contains(&needle)
-                    || user.location.to_lowercase().contains(&needle)
-            })
-            .cloned()
-            .collect::<Vec<_>>();
-
-        SearchResults { topics, users }
-    }
 }
 
 // ── View-specific loaders ──
@@ -1066,8 +889,7 @@ pub async fn admin_update_topic(input: AdminTopicUpdate) -> Result<(), ServerFnE
         }
         run_exec(&format!(
             "UPDATE topics SET closed = {} WHERE id = {};",
-            input.closed,
-            input.topic_id
+            input.closed, input.topic_id
         ))
         .map_err(server_error)
     }
@@ -1650,8 +1472,7 @@ pub async fn toggle_topic_status(topic_id: i32) -> Result<String, ServerFnError>
         let new_closed = !row.closed;
         run_exec(&format!(
             "UPDATE topics SET closed = {} WHERE id = {};",
-            new_closed,
-            topic_id
+            new_closed, topic_id
         ))
         .map_err(server_error)?;
 
@@ -2093,73 +1914,6 @@ fn create_reply_impl(input: ReplyForm, headers: HeaderMap) -> Result<(), String>
     ))?;
 
     Ok(())
-}
-
-#[cfg(feature = "server")]
-fn load_board_from_postgres() -> Result<AppData, String> {
-    let meta = run_json_query::<BoardMeta>(
-        "SELECT row_to_json(meta_row)
-         FROM (
-             SELECT title, tagline, announcement_title, announcement_body
-             FROM board_meta
-             ORDER BY id
-             LIMIT 1
-         ) AS meta_row;",
-    )?;
-
-    let categories = run_json_query::<Vec<Category>>(
-        "SELECT COALESCE(json_agg(row_to_json(category_row)), '[]'::json)
-         FROM (
-             SELECT id, name, description, sort_order
-             FROM categories
-             ORDER BY sort_order, id
-         ) AS category_row;",
-    )?;
-
-    let forums = run_json_query::<Vec<Forum>>(
-        "SELECT COALESCE(json_agg(row_to_json(forum_row)), '[]'::json)
-         FROM (
-             SELECT id, category_id, name, description, moderators, sort_order
-             FROM forums
-             ORDER BY category_id, sort_order, id
-         ) AS forum_row;",
-    )?;
-
-    let users = run_json_query::<Vec<UserProfile>>(
-        "SELECT COALESCE(json_agg(row_to_json(user_row)), '[]'::json)
-         FROM (
-             SELECT id, username, title, status, joined_at, post_count, location, about, last_seen, email, group_id
-             FROM users
-             ORDER BY id
-         ) AS user_row;",
-    )?;
-
-    let topics = run_json_query::<Vec<Topic>>(
-        "SELECT COALESCE(json_agg(row_to_json(topic_row)), '[]'::json)
-         FROM (
-             SELECT id, forum_id, author_id, subject, closed, views, tags, created_at, updated_at, activity_rank, sticky, moved_to
-              FROM topics
-              ORDER BY sticky DESC, activity_rank DESC, id
-         ) AS topic_row;",
-    )?;
-
-    let posts = run_json_query::<Vec<Post>>(
-        "SELECT COALESCE(json_agg(row_to_json(post_row)), '[]'::json)
-         FROM (
-             SELECT id, topic_id, author_id, posted_at, edited_at, body, signature, position
-             FROM posts
-             ORDER BY topic_id, position, id
-         ) AS post_row;",
-    )?;
-
-    Ok(AppData {
-        meta,
-        categories,
-        forums,
-        users,
-        topics,
-        posts,
-    })
 }
 
 #[cfg(feature = "server")]

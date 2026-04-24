@@ -7,7 +7,7 @@ use crate::{
         admin_delete_topic, admin_delete_user, admin_update_board, admin_update_topic,
         admin_update_user, clean_error, load_admin_data, load_bans, load_groups, remove_ban,
         update_group, AdminBoardSettings, AdminCategoryForm, AdminData, AdminDeleteItem,
-        AdminForumForm, AdminTopicUpdate, AdminUserUpdate, Ban, BanForm, Group, GroupUpdateForm,
+        AdminForumForm, AdminTopicUpdate, AdminUserUpdate, BanForm, GroupUpdateForm,
         SessionUser,
     },
     Route,
@@ -23,9 +23,7 @@ pub fn Admin() -> Element {
         load_admin_data().await
     });
 
-    let is_admin = current_user()
-        .as_ref()
-        .is_some_and(|u| u.group_id == 1);
+    let is_admin = current_user().as_ref().is_some_and(|u| u.group_id == 1);
 
     let mut tab = use_signal(|| "structure");
     let status = use_signal(String::new);
@@ -555,8 +553,20 @@ fn ModerationPanel(
                                 }
                             }
                         }
-                        p { class: "topic-metric", if topic.sticky { "Yes" } else { "No" } }
-                        p { class: "topic-metric", if topic.closed { "Yes" } else { "No" } }
+                        p { class: "topic-metric",
+                            if topic.sticky {
+                                "Yes"
+                            } else {
+                                "No"
+                            }
+                        }
+                        p { class: "topic-metric",
+                            if topic.closed {
+                                "Yes"
+                            } else {
+                                "No"
+                            }
+                        }
                         p { class: "topic-metric", "{topic.views}" }
                         div { class: "admin-actions",
                             button {
@@ -567,9 +577,10 @@ fn ModerationPanel(
                                     move |_| {
                                         spawn(async move {
                                             match admin_update_topic(AdminTopicUpdate {
-                                                topic_id: tid,
-                                                closed,
-                                            }).await
+                                                    topic_id: tid,
+                                                    closed,
+                                                })
+                                                .await
                                             {
                                                 Ok(_) => {
                                                     is_error.set(false);
@@ -583,7 +594,11 @@ fn ModerationPanel(
                                         });
                                     }
                                 },
-                                if topic.closed { "Open" } else { "Close" }
+                                if topic.closed {
+                                    "Open"
+                                } else {
+                                    "Close"
+                                }
                             }
                             button {
                                 class: "danger-button small-button",

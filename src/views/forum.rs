@@ -2,7 +2,7 @@ use dioxus::prelude::*;
 
 use crate::{
     components::{EmptyState, SectionHeader},
-    data::{load_forum_data, mark_all_read, toggle_topic_status, ForumData, SessionUser},
+    data::{load_forum_data, mark_all_read, toggle_topic_status, SessionUser},
     Route,
 };
 

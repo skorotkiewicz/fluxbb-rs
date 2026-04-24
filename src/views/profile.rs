@@ -1,15 +1,15 @@
 use dioxus::prelude::*;
 
 use crate::{
-    components::{EmptyState, SectionHeader},
-    data::{load_profile_data, ProfileData, SessionUser},
+    components::SectionHeader,
+    data::{load_profile_data, SessionUser},
     Route,
 };
 
 #[component]
 pub fn Profile(id: i32) -> Element {
     let current_user = use_context::<Signal<Option<SessionUser>>>();
-    let mut refresh = use_context::<Signal<()>>();
+    let refresh = use_context::<Signal<()>>();
 
     let data_resource = use_resource(move || async move {
         refresh();

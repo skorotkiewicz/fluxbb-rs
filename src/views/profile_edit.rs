@@ -30,6 +30,25 @@ pub fn ProfileEdit(id: i32) -> Element {
     let mut is_error = use_signal(|| false);
     let mut submitting = use_signal(|| false);
 
+    // Pre-fill form with existing profile data
+    use_effect(move || {
+        if let Some(Ok(data)) = data_resource() {
+            let u = &data.user;
+            if email().is_empty() && !u.email.is_empty() {
+                email.set(u.email.clone());
+            }
+            if title().is_empty() && !u.title.is_empty() {
+                title.set(u.title.clone());
+            }
+            if location().is_empty() && !u.location.is_empty() {
+                location.set(u.location.clone());
+            }
+            if about().is_empty() && !u.about.is_empty() {
+                about.set(u.about.clone());
+            }
+        }
+    });
+
     let data = if let Some(Ok(data)) = data_resource() {
         data
     } else {

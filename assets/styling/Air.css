@@ -448,6 +448,64 @@ a:focus {
     margin-top: 8px;
 }
 
+/* ── TOPIC REVIEW (above reply form) ── */
+.topic-review {
+    margin-bottom: 14px;
+    border: 1px dashed #c8d4e0;
+    background: #f4f8fb;
+}
+
+.topic-review .panel-heading {
+    padding: 7px 12px;
+    background: #e8eff5;
+    border-bottom: 1px dashed #c8d4e0;
+}
+
+.topic-review .panel-heading h4 {
+    font-size: 1.05em;
+    margin: 0;
+}
+
+.topic-review .panel-meta {
+    font-size: 0.9em;
+    color: #78869b;
+    margin: 2px 0 0;
+}
+
+.review-post {
+    padding: 8px 12px;
+    border-bottom: 1px dotted #d3dce5;
+}
+
+.review-post:last-child {
+    border-bottom: none;
+}
+
+.review-post-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.review-author {
+    font-weight: bold;
+    color: #2365b0;
+    font-size: 1em;
+}
+
+.review-date {
+    font-size: 0.88em;
+    color: #8898aa;
+}
+
+.review-body {
+    margin: 2px 0;
+    line-height: 1.45;
+    color: #444;
+    font-size: 0.97em;
+}
+
 /* ── 12. PAGINATION ── */
 .pagination {
     padding: 8px 0;

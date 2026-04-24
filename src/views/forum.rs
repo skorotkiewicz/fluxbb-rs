@@ -90,15 +90,15 @@ pub fn ForumPage(id: i32, page: i32) -> Element {
             if current_user().is_some() {
                 div { class: "forum-actions",
                     Link { class: "primary-button", to: Route::NewTopic { id }, "New topic" }
-                    button {
-                        class: "secondary-button",
-                        onclick: move |_| {
-                            spawn(async move {
-                                let _ = mark_all_read().await;
-                            });
-                        },
-                        "Mark all as read"
-                    }
+                    // button {
+                    //     class: "secondary-button",
+                    //     onclick: move |_| {
+                    //         spawn(async move {
+                    //             let _ = mark_all_read().await;
+                    //         });
+                    //     },
+                    //     "Mark all as read"
+                    // }
                 }
             }
 

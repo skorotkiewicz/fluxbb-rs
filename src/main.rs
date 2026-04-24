@@ -53,7 +53,19 @@ enum Route {
 }
 
 fn main() {
+    #[cfg(not(feature = "server"))]
     dioxus::launch(App);
+
+    #[cfg(feature = "server")]
+    {
+        let _ = dotenvy::dotenv();
+        // std::env::set_var("RUST_LOG", "warn");
+        std::env::set_var("RUST_LOG", "sqlx=warn,info");
+        dioxus::serve(|| async move {
+            let router = dioxus::server::router(App);
+            Ok(router)
+        });
+    }
 }
 
 #[component]

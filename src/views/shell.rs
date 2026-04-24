@@ -83,8 +83,9 @@ pub fn AppShell() -> Element {
                                     let _ = logout_account().await;
                                     let _ = document::eval(
                                         &format!(
-                                            "document.cookie = '{}=; path=/; max-age=0; samesite=lax';",
+                                            "document.cookie = '{}=; path=/; max-age=0; samesite=strict'; document.cookie = '{}=; path=/; max-age=0; samesite=strict';",
                                             cookie_name(),
+                                            crate::data::csrf_cookie_name(),
                                         ),
                                     );
                                     current_user.set(None);

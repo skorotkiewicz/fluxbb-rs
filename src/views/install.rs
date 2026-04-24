@@ -13,6 +13,11 @@ pub fn Install() -> Element {
     let mut admin_username = use_signal(String::new);
     let mut admin_email = use_signal(String::new);
     let mut admin_password = use_signal(String::new);
+    let mut db_host = use_signal(|| "localhost".to_string());
+    let mut db_port = use_signal(|| "5432".to_string());
+    let mut db_name = use_signal(|| "fluxbb".to_string());
+    let mut db_user = use_signal(|| "dev".to_string());
+    let mut db_password = use_signal(|| "password".to_string());
     let mut status = use_signal(String::new);
     let mut is_error = use_signal(|| false);
     let mut submitting = use_signal(|| false);
@@ -76,6 +81,53 @@ pub fn Install() -> Element {
                                         oninput: move |e| board_tagline.set(e.value()),
                                     }
                                 }
+
+                                h3 { "PostgreSQL database setup" }
+
+                                label {
+                                    "Database host"
+                                    input {
+                                        class: "text-input",
+                                        value: "{db_host}",
+                                        oninput: move |e| db_host.set(e.value()),
+                                    }
+                                }
+                                label {
+                                    "Database port"
+                                    input {
+                                        class: "text-input",
+                                        value: "{db_port}",
+                                        oninput: move |e| db_port.set(e.value()),
+                                    }
+                                }
+                                label {
+                                    "Database name"
+                                    input {
+                                        class: "text-input",
+                                        value: "{db_name}",
+                                        oninput: move |e| db_name.set(e.value()),
+                                    }
+                                }
+                                label {
+                                    "Database user"
+                                    input {
+                                        class: "text-input",
+                                        value: "{db_user}",
+                                        oninput: move |e| db_user.set(e.value()),
+                                    }
+                                }
+                                label {
+                                    "Database password"
+                                    input {
+                                        class: "text-input",
+                                        // r#type: "password",
+                                        value: "{db_password}",
+                                        oninput: move |e| db_password.set(e.value()),
+                                    }
+                                }
+
+                                h3 { "Admin setup" }
+
                                 label {
                                     "Admin username"
                                     input {
@@ -108,22 +160,26 @@ pub fn Install() -> Element {
                                     class: "primary-button",
                                     disabled: submitting(),
                                     onclick: move |_| {
-                                        let form = InstallForm {
+                                         let form = InstallForm {
                                             board_title: board_title(),
                                             board_tagline: board_tagline(),
                                             admin_username: admin_username(),
                                             admin_email: admin_email(),
                                             admin_password: admin_password(),
+                                            db_host: db_host(),
+                                            db_port: db_port(),
+                                            db_name: db_name(),
+                                            db_user: db_user(),
+                                            db_password: db_password(),
                                         };
                                         spawn(async move {
                                             submitting.set(true);
                                             match install_board(form).await {
                                                 Ok(resp) => {
                                                     let script = format!(
-                                                        "document.cookie = '{}={}; path=/; max-age={}; samesite=lax';",
-                                                        cookie_name(),
-                                                        resp.session_token,
-                                                        cookie_max_age(),
+                                                        "document.cookie = '{}={}; path=/; max-age={}; samesite=strict'; document.cookie = '{}={}; path=/; max-age={}; samesite=strict';",
+                                                        cookie_name(), resp.session_token, cookie_max_age(),
+                                                        crate::data::csrf_cookie_name(), resp.user.csrf_token, cookie_max_age(),
                                                     );
                                                     let _ = document::eval(&script);
                                                     is_error.set(false);

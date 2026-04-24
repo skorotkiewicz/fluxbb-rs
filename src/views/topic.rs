@@ -3,7 +3,7 @@ use dioxus::prelude::*;
 use crate::{
     components::{EmptyState, PostCard, TopicStatusBadge},
     data::{
-        create_reply, delete_topic, increment_topic_views, load_forums, load_topic_data,
+        clean_error, create_reply, delete_topic, increment_topic_views, load_forums, load_topic_data,
         move_topic, toggle_sticky, toggle_topic_status, MoveTopicForm, ReplyForm, SessionUser,
         TopicData,
     },
@@ -312,7 +312,7 @@ pub fn TopicPage(id: i32, page: i32) -> Element {
                                     }
                                     Err(e) => {
                                         reply_error.set(true);
-                                        reply_status.set(e.to_string());
+                                        reply_status.set(clean_error(e));
                                     }
                                 }
                                 replying.set(false);

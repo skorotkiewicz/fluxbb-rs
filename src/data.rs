@@ -2383,3 +2383,19 @@ pub fn cookie_name() -> &'static str {
 pub fn cookie_max_age() -> i64 {
     SESSION_MAX_AGE_SECS
 }
+
+/// Strip Dioxus server-function error wrapping so only the message is shown.
+pub fn clean_error(e: ServerFnError) -> String {
+    let s = e.to_string();
+    let prefix = "error running server function: ";
+    let trimmed = if let Some(rest) = s.strip_prefix(prefix) {
+        rest
+    } else {
+        &s
+    };
+    if let Some(idx) = trimmed.rfind(" (details: ") {
+        trimmed[..idx].to_string()
+    } else {
+        trimmed.to_string()
+    }
+}

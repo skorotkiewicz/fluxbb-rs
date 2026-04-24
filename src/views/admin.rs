@@ -5,9 +5,10 @@ use crate::{
     data::{
         add_ban, admin_add_category, admin_add_forum, admin_delete_category, admin_delete_forum,
         admin_delete_topic, admin_delete_user, admin_update_board, admin_update_topic,
-        admin_update_user, load_admin_data, load_bans, load_groups, remove_ban, update_group,
-        AdminBoardSettings, AdminCategoryForm, AdminData, AdminDeleteItem, AdminForumForm,
-        AdminTopicUpdate, AdminUserUpdate, Ban, BanForm, Group, GroupUpdateForm, SessionUser,
+        admin_update_user, clean_error, load_admin_data, load_bans, load_groups, remove_ban,
+        update_group, AdminBoardSettings, AdminCategoryForm, AdminData, AdminDeleteItem,
+        AdminForumForm, AdminTopicUpdate, AdminUserUpdate, Ban, BanForm, Group, GroupUpdateForm,
+        SessionUser,
     },
     Route,
 };
@@ -179,7 +180,7 @@ fn StructurePanel(
                                         }
                                         Err(e) => {
                                             is_error.set(true);
-                                            status.set(e.to_string());
+                                            status.set(clean_error(e));
                                         }
                                     }
                                 });
@@ -214,7 +215,7 @@ fn StructurePanel(
                                             }
                                             Err(e) => {
                                                 is_error.set(true);
-                                                status.set(e.to_string());
+                                                status.set(clean_error(e));
                                             }
                                         }
                                     });
@@ -265,7 +266,7 @@ fn StructurePanel(
                             }
                             Err(e) => {
                                 is_error.set(true);
-                                status.set(e.to_string());
+                                status.set(clean_error(e));
                             }
                         }
                     });
@@ -328,7 +329,7 @@ fn StructurePanel(
                             }
                             Err(e) => {
                                 is_error.set(true);
-                                status.set(e.to_string());
+                                status.set(clean_error(e));
                             }
                         }
                     });
@@ -408,7 +409,7 @@ fn UsersPanel(
                                                     }
                                                     Err(e) => {
                                                         is_error.set(true);
-                                                        status.set(e.to_string());
+                                                        status.set(clean_error(e));
                                                     }
                                                 }
                                             });
@@ -440,7 +441,7 @@ fn UsersPanel(
                                                     }
                                                     Err(e) => {
                                                         is_error.set(true);
-                                                        status.set(e.to_string());
+                                                        status.set(clean_error(e));
                                                     }
                                                 }
                                             });
@@ -463,7 +464,7 @@ fn UsersPanel(
                                                 }
                                                 Err(e) => {
                                                     is_error.set(true);
-                                                    status.set(e.to_string());
+                                                    status.set(clean_error(e));
                                                 }
                                             }
                                         });
@@ -546,7 +547,7 @@ fn ModerationPanel(
                                                     }
                                                     Err(e) => {
                                                         is_error.set(true);
-                                                        status.set(e.to_string());
+                                                        status.set(clean_error(e));
                                                     }
                                                 }
                                             });
@@ -568,7 +569,7 @@ fn ModerationPanel(
                                                 }
                                                 Err(e) => {
                                                     is_error.set(true);
-                                                    status.set(e.to_string());
+                                                    status.set(clean_error(e));
                                                 }
                                             }
                                         });
@@ -651,7 +652,7 @@ fn SettingsPanel(
                             }
                             Err(e) => {
                                 is_error.set(true);
-                                status.set(e.to_string());
+                                status.set(clean_error(e));
                             }
                         }
                     });
@@ -722,7 +723,7 @@ fn BansPanel(
                                                     Ok(_) => refresh.set(()),
                                                     Err(e) => {
                                                         is_error.set(true);
-                                                        status.set(e.to_string());
+                                                        status.set(clean_error(e));
                                                     }
                                                 }
                                             });
@@ -801,7 +802,7 @@ fn BansPanel(
                             }
                             Err(e) => {
                                 is_error.set(true);
-                                status.set(e.to_string());
+                                status.set(clean_error(e));
                             }
                         }
                     });

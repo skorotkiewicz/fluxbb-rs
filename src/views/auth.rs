@@ -3,8 +3,8 @@ use dioxus::{document, prelude::*};
 use crate::{
     components::SectionHeader,
     data::{
-        cookie_max_age, cookie_name, login_account, register_account, LoginForm, RegisterForm,
-        SessionUser,
+        clean_error, cookie_max_age, cookie_name, login_account, register_account, LoginForm,
+        RegisterForm, SessionUser,
     },
     Route,
 };
@@ -95,7 +95,7 @@ pub fn Login() -> Element {
                                     }
                                     Err(error) => {
                                         is_error.set(true);
-                                        status.set(error.to_string());
+                                        status.set(clean_error(error));
                                     }
                                 }
                                 submitting.set(false);
@@ -109,11 +109,6 @@ pub fn Login() -> Element {
                     }
                 }
 
-                article { class: "panel side-note",
-                    h3 { "Demo accounts" }
-                    p { "Seeded accounts use the password fluxbb-demo." }
-                    p { "Try signing in as nora (admin) or sol (member)." }
-                }
             }
         }
     }
@@ -251,7 +246,7 @@ pub fn Register() -> Element {
                                     }
                                     Err(error) => {
                                         is_error.set(true);
-                                        status.set(error.to_string());
+                                        status.set(clean_error(error));
                                     }
                                 }
                                 submitting.set(false);

@@ -1,7 +1,7 @@
 use dioxus::{document, prelude::*};
 
 use crate::{
-    data::{check_installed, cookie_max_age, cookie_name, install_board, InstallForm},
+    data::{check_installed, clean_error, cookie_max_age, cookie_name, install_board, InstallForm},
     Route, MAIN_CSS,
 };
 
@@ -132,7 +132,7 @@ pub fn Install() -> Element {
                                                 }
                                                 Err(e) => {
                                                     is_error.set(true);
-                                                    status.set(e.to_string());
+                                                    status.set(clean_error(e));
                                                 }
                                             }
                                             submitting.set(false);

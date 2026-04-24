@@ -3,8 +3,8 @@ use dioxus::prelude::*;
 use crate::{
     components::{EmptyState, SectionHeader},
     data::{
-        change_password, load_profile_data, update_profile, ChangePasswordForm, SessionUser,
-        UpdateProfileForm,
+        change_password, clean_error, load_profile_data, update_profile, ChangePasswordForm,
+        SessionUser, UpdateProfileForm,
     },
     Route,
 };
@@ -150,7 +150,7 @@ pub fn ProfileEdit(id: i32) -> Element {
                                     }
                                     Err(e) => {
                                         is_error.set(true);
-                                        status.set(e.to_string());
+                                        status.set(clean_error(e));
                                     }
                                 }
                                 submitting.set(false);
@@ -219,7 +219,7 @@ pub fn ProfileEdit(id: i32) -> Element {
                                     }
                                     Err(e) => {
                                         is_error.set(true);
-                                        status.set(e.to_string());
+                                        status.set(clean_error(e));
                                     }
                                 }
                                 submitting.set(false);

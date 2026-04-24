@@ -2,7 +2,7 @@ use dioxus::prelude::*;
 
 use crate::{
     components::{EmptyState, SectionHeader},
-    data::{create_topic, load_forum_data, NewTopicForm, SessionUser},
+    data::{clean_error, create_topic, load_forum_data, NewTopicForm, SessionUser},
     Route,
 };
 
@@ -140,7 +140,7 @@ pub fn NewTopic(id: i32) -> Element {
                                 }
                                 Err(e) => {
                                     is_error.set(true);
-                                    status.set(e.to_string());
+                                    status.set(clean_error(e));
                                 }
                             }
                             submitting.set(false);

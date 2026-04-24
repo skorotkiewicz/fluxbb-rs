@@ -2,7 +2,7 @@ use dioxus::prelude::*;
 
 use crate::{
     components::{EmptyState, SectionHeader},
-    data::{edit_post, load_post, load_topic_data, EditPostForm, SessionUser},
+    data::{clean_error, edit_post, load_post, load_topic_data, EditPostForm, SessionUser},
     Route,
 };
 
@@ -143,7 +143,7 @@ pub fn EditPost(id: i32) -> Element {
                                 }
                                 Err(e) => {
                                     is_error.set(true);
-                                    status.set(e.to_string());
+                                    status.set(clean_error(e));
                                 }
                             }
                             submitting.set(false);

@@ -44,21 +44,13 @@ A modern reimplementation of [FluxBB](https://fluxbb.org) — the classic lightw
 ```bash
 git clone https://github.com/skorotkiewicz/fluxbb-rs
 cd fluxbb-rs
-dx build --platform server
+dx build --release
 ```
 
-### 2. Configure database (optional)
-
-Create `.env`:
+### 2. Run
 
 ```bash
-DATABASE_URL=postgresql://user:password@localhost:5432/fluxbb
-```
-
-### 3. Run
-
-```bash
-./target/dx/fluxbb-rs/debug/web/server
+./target/dx/fluxbb-rs/release/web/server
 ```
 
 Visit `http://localhost:8080` and run the installer.
@@ -68,8 +60,8 @@ Visit `http://localhost:8080` and run the installer.
 ## Development
 
 ```bash
-# Hot-reload dev server (client only)
-dx serve --platform web
+# Hot-reload dev server
+dx serve
 
 # Check compilation
 dx check

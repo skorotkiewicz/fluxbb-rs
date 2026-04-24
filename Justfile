@@ -34,6 +34,9 @@ run-release: release
 db-reset:
     psql "$DATABASE_URL" -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
 
+seed:
+    psql "$DATABASE_URL" -f db/seed.sql
+
 install-cli:
     cargo install dioxus-cli
 

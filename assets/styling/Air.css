@@ -448,6 +448,7 @@ a:focus {
     margin-top: 8px;
 }
 
+
 /* ── TOPIC REVIEW (above reply form) ── */
 .topic-review {
     margin-bottom: 14px;
@@ -578,41 +579,48 @@ a:focus {
     background: #dfe6ee;
 }
 
+
 .small-button {
     display: inline-block;
-    padding: 4px 10px;
-    font-size: 0.78rem;
-    border-radius: 4px;
-    border: 1px solid #b9c5ce;
-    background: #fff;
-    color: #333;
+    /*padding: 0 6px;*/
+    padding-right: 6px;
+    font-size: inherit;
+    border: none;
+    background: transparent;
+    color: #44699c;
     cursor: pointer;
-    text-decoration: none;
+    text-decoration: underline;
 }
 
 .small-button:hover {
-    background: #44699c;
-    color: #fff;
-    border-color: #44699c;
-    text-decoration: none;
+    background: transparent;
+    color: #2a4d7a;
+    text-decoration: underline;
 }
 
 .small-button.active {
-    background: #44699c;
-    color: #fff;
-    border-color: #44699c;
+    background: transparent;
+    color: #2a4d7a;
+    text-decoration: underline;
+}
+
+.post-actions .small-button {
+    color: #44699c;
 }
 
 .danger-button {
-    background: #dc2626;
-    color: #fff;
-    border: 1px solid #dc2626;
+    color: #dc2626;
+    background: transparent;
+    border: none;
     cursor: pointer;
+    text-decoration: underline;
 }
 
 .danger-button:hover {
-    background: #b91c1c;
-    border-color: #b91c1c;
+    color: #b91c1c;
+    background: transparent;
+    border: none;
+    text-decoration: underline;
 }
 
 /* ── 14. FORMS ── */
@@ -977,13 +985,77 @@ label em {
 
 /* ── 24. SMALL SELECT (MOVE TOPIC) ── */
 .small-select {
-    padding: 4px 10px;
+    margin: 4px 10px 0 0;
+    padding: 4px;
     font-size: 0.78rem;
     border-radius: 4px;
     border: 1px solid #b9c5ce;
     background: #fff;
     color: #333;
     cursor: pointer;
+}
+
+/* ── REPORT FORM ── */
+.report-form {
+    /*display: flex;*/
+    /*flex-direction: column;*/
+    /*gap: 6px;*/
+    margin-top: 8px;
+}
+
+.report-form input {
+    font-size: 0.85em;
+    padding: 4px 8px;
+}
+
+/* ── REPORT ROW (admin moderation) ── */
+.report-row {
+    padding: 10px 12px;
+    border-bottom: 1px dotted #d3dce5;
+}
+
+.report-row:last-child {
+    border-bottom: none;
+}
+
+.report-header {
+    margin-bottom: 6px;
+}
+
+.report-reason {
+    font-size: 0.95em;
+    color: #b50000;
+    font-weight: bold;
+    margin: 4px 0;
+}
+
+.report-body {
+    background: #f4f8fb;
+    border: 1px dashed #c8d4e0;
+    padding: 8px 10px;
+    margin: 8px 0;
+    font-size: 0.9em;
+}
+
+.report-body p {
+    margin: 2px 0;
+    color: #555;
+}
+
+/* ── INLINE EDIT FORMS ── */
+.form-inline {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+}
+
+.form-inline input,
+.form-inline select {
+    font-size: 0.9em;
+    padding: 4px 8px;
+    flex: 1;
+    min-width: 120px;
 }
 
 /* ── 25. SIDE NOTE / HINT BOX ── */

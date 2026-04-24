@@ -1,6 +1,7 @@
 use dioxus::prelude::*;
 
-use crate::data::{delete_post, Post, SessionUser};
+use crate::components::ConfirmButton;
+use crate::data::{delete_post, report_post, Post, ReportPostForm, SessionUser};
 use crate::Route;
 
 #[component]
@@ -40,8 +41,14 @@ pub fn PostCard(
     let can_edit = current_user
         .as_ref()
         .is_some_and(|u| u.id == author_id || u.group_id == 1);
+    let can_report = current_user
+        .as_ref()
+        .is_some_and(|u| u.id != author_id && u.group_id != 1);
 
     let post_id = post.id;
+    let mut reporting = use_signal(|| false);
+    let mut report_reason = use_signal(String::new);
+    let mut report_status = use_signal(String::new);
 
     rsx! {
         article { class: "post-card",
@@ -64,9 +71,10 @@ pub fn PostCard(
                             to: Route::EditPost { id: post_id },
                             "Edit"
                         }
-                        button {
+                        ConfirmButton {
+                            label: "Delete",
                             class: "danger-button small-button",
-                            onclick: move |_| {
+                            on_confirm: move |_| {
                                 spawn(async move {
                                     match delete_post(post_id).await {
                                         Ok(0) => {
@@ -83,8 +91,61 @@ pub fn PostCard(
                                     }
                                 });
                             },
-                            "Delete"
                         }
+                    }
+                }
+
+                if can_report {
+                    if reporting() {
+                        div { class: "report-form",
+                            input {
+                                class: "text-input",
+                                value: "{report_reason}",
+                                oninput: move |e| report_reason.set(e.value()),
+                                placeholder: "Reason for reporting...",
+                            }
+                            button {
+                                class: "small-button",
+                                onclick: move |_| {
+                                    let reason = report_reason().trim().to_string();
+                                    if reason.is_empty() {
+                                        report_status.set("Reason is required.".to_string());
+                                        return;
+                                    }
+                                    spawn(async move {
+                                        match report_post(ReportPostForm { post_id, reason }).await {
+                                            Ok(_) => {
+                                                reporting.set(false);
+                                                report_reason.set(String::new());
+                                                report_status.set(String::new());
+                                            }
+                                            Err(_) => {
+                                                report_status.set("Failed to submit report.".to_string());
+                                            }
+                                        }
+                                    });
+                                },
+                                "Submit"
+                            }
+                            button {
+                                class: "small-button",
+                                onclick: move |_| {
+                                    reporting.set(false);
+                                    report_reason.set(String::new());
+                                    report_status.set(String::new());
+                                },
+                                "Cancel"
+                            }
+                        }
+                    } else {
+                        button {
+                            class: "small-button",
+                            onclick: move |_| reporting.set(true),
+                            "Report"
+                        }
+                    }
+                    if !report_status().is_empty() {
+                        p { class: "form-message form-error", "{report_status}" }
                     }
                 }
             }

@@ -1,14 +1,15 @@
 use dioxus::prelude::*;
 
 use crate::{
-    components::SectionHeader,
+    components::{ConfirmButton, SectionHeader},
     data::{
         add_ban, admin_add_category, admin_add_forum, admin_clean_sessions, admin_delete_category,
-        admin_delete_forum, admin_delete_topic, admin_delete_user, admin_update_board,
-        admin_update_topic, admin_update_user, clean_error, load_admin_data, load_bans,
-        load_groups, remove_ban, update_group, AdminBoardSettings, AdminCategoryForm, AdminData,
-        AdminDeleteItem, AdminForumForm, AdminTopicUpdate, AdminUserUpdate, BanForm,
-        GroupUpdateForm, SessionUser,
+        admin_delete_forum, admin_delete_user, admin_update_board,
+        admin_update_category, admin_update_forum, admin_update_user,
+        clean_error, dismiss_report, load_admin_data, load_bans, load_groups, remove_ban,
+        update_group, zap_report, AdminBoardSettings, AdminCategoryForm, AdminCategoryUpdate,
+        AdminData, AdminDeleteItem, AdminForumForm, AdminForumUpdate,
+        AdminUserUpdate, BanForm, GroupUpdateForm, SessionUser,
     },
     Route,
 };
@@ -162,61 +163,114 @@ fn StructurePanel(
                 .collect();
             (cat.clone(), cat_forums)
         })
-        .filter(|(_, cat_forums)| !cat_forums.is_empty())
         .collect();
+
+    let mut editing_cat = use_signal(|| 0_i32);
+    let mut edit_cat_name = use_signal(String::new);
+    let mut edit_cat_desc = use_signal(String::new);
+    let mut edit_cat_order = use_signal(|| 0_i32);
+
+    let mut editing_forum = use_signal(|| 0_i32);
+    let mut edit_forum_name = use_signal(String::new);
+    let mut edit_forum_desc = use_signal(String::new);
+    let mut edit_forum_cat = use_signal(|| 0_i32);
+    let mut edit_forum_order = use_signal(|| 0_i32);
 
     rsx! {
         // ── Existing categories & forums ──
         for (cat, cat_forums) in cat_items {
             article { class: "panel",
                 div { class: "panel-heading",
-                    h3 { "{cat.name}" }
-                    p { "{cat.description}" }
-                    button {
-                        class: "danger-button small-button",
-                        onclick: {
-                            let cid = cat.id;
-                            move |_| {
-                                spawn(async move {
-                                    match admin_delete_category(AdminDeleteItem { id: cid }).await {
-                                        Ok(_) => {
-                                            is_error.set(false);
-                                            status.set("Category deleted. Refresh to see changes.".into());
-                                        }
-                                        Err(e) => {
-                                            is_error.set(true);
-                                            status.set(clean_error(e));
-                                        }
+                    if editing_cat() == cat.id {
+                        div { class: "form-inline",
+                            input {
+                                class: "text-input",
+                                value: "{edit_cat_name}",
+                                oninput: move |e| edit_cat_name.set(e.value()),
+                                placeholder: "Category name",
+                            }
+                            input {
+                                class: "text-input",
+                                value: "{edit_cat_desc}",
+                                oninput: move |e| edit_cat_desc.set(e.value()),
+                                placeholder: "Description",
+                            }
+                            input {
+                                class: "text-input",
+                                r#type: "number",
+                                value: "{edit_cat_order}",
+                                oninput: move |e| {
+                                    if let Ok(v) = e.value().parse::<i32>() {
+                                        edit_cat_order.set(v);
                                     }
-                                });
-                            }
-                        },
-                        "Delete category"
-                    }
-                }
-                for forum in cat_forums {
-                    div { class: "forum-row",
-                        div { class: "forum-main",
-                            Link {
-                                class: "forum-link",
-                                to: Route::ForumPage {
-                                    id: forum.id,
-                                    page: 1,
                                 },
-                                "{forum.name}"
+                                placeholder: "Sort order",
                             }
-                            p { class: "forum-description", "{forum.description}" }
+                            button {
+                                class: "small-button",
+                                onclick: {
+                                    let cid = cat.id;
+                                    move |_| {
+                                        let form = AdminCategoryUpdate {
+                                            id: cid,
+                                            name: edit_cat_name(),
+                                            description: edit_cat_desc(),
+                                            sort_order: edit_cat_order(),
+                                        };
+                                        spawn(async move {
+                                            match admin_update_category(form).await {
+                                                Ok(_) => {
+                                                    is_error.set(false);
+                                                    status.set("Category updated. Refresh.".into());
+                                                    editing_cat.set(0);
+                                                }
+                                                Err(e) => {
+                                                    is_error.set(true);
+                                                    status.set(clean_error(e));
+                                                }
+                                            }
+                                        });
+                                    }
+                                },
+                                "Save"
+                            }
+                            button {
+                                class: "small-button",
+                                onclick: move |_| editing_cat.set(0),
+                                "Cancel"
+                            }
                         }
-                        button {
+                    } else {
+                        h3 { "{cat.name}" }
+                        p { "{cat.description}" }
+                    }
+                    div { class: "admin-actions",
+                        if editing_cat() != cat.id {
+                            button {
+                                class: "small-button",
+                                onclick: {
+                                    let cat = cat.clone();
+                                    move |_| {
+                                        edit_cat_name.set(cat.name.clone());
+                                        edit_cat_desc.set(cat.description.clone());
+                                        edit_cat_order.set(cat.sort_order);
+                                        editing_cat.set(cat.id);
+                                    }
+                                },
+                                "Edit"
+                            }
+                        }
+                        ConfirmButton {
+                            label: "Delete",
                             class: "danger-button small-button",
-                            onclick: {
-                                let fid = forum.id;
+                            on_confirm: {
+                                let cid = cat.id;
                                 move |_| {
                                     spawn(async move {
-                                        match admin_delete_forum(AdminDeleteItem { id: fid }).await {
+                                        match admin_delete_category(AdminDeleteItem { id: cid }).await {
                                             Ok(_) => {
                                                 is_error.set(false);
-                                                status.set("Forum deleted. Refresh to see changes.".into());
+                                                status.set("Category deleted. Refresh to see changes.".into());
                                             }
                                             Err(e) => {
                                                 is_error.set(true);
@@ -226,7 +280,137 @@ fn StructurePanel(
                                     });
                                 }
                             },
-                            "Delete"
+                        }
+                    }
+                }
+                for forum in cat_forums {
+                    div { class: "forum-row",
+                        if editing_forum() == forum.id {
+                            div { class: "form-inline",
+                                select {
+                                    class: "text-input",
+                                    value: "{edit_forum_cat}",
+                                    onchange: move |e| {
+                                        if let Ok(v) = e.value().parse::<i32>() {
+                                            edit_forum_cat.set(v);
+                                        }
+                                    },
+                                    for c in categories.clone() {
+                                        option {
+                                            value: "{c.id}",
+                                            selected: c.id == edit_forum_cat(),
+                                            "{c.name}"
+                                        }
+                                    }
+                                }
+                                input {
+                                    class: "text-input",
+                                    value: "{edit_forum_name}",
+                                    oninput: move |e| edit_forum_name.set(e.value()),
+                                    placeholder: "Forum name",
+                                }
+                                input {
+                                    class: "text-input",
+                                    value: "{edit_forum_desc}",
+                                    oninput: move |e| edit_forum_desc.set(e.value()),
+                                    placeholder: "Description",
+                                }
+                                input {
+                                    class: "text-input",
+                                    r#type: "number",
+                                    value: "{edit_forum_order}",
+                                    oninput: move |e| {
+                                        if let Ok(v) = e.value().parse::<i32>() {
+                                            edit_forum_order.set(v);
+                                        }
+                                    },
+                                    placeholder: "Sort order",
+                                }
+                                button {
+                                    class: "small-button",
+                                    onclick: {
+                                        let fid = forum.id;
+                                        move |_| {
+                                            let form = AdminForumUpdate {
+                                                id: fid,
+                                                category_id: edit_forum_cat(),
+                                                name: edit_forum_name(),
+                                                description: edit_forum_desc(),
+                                                sort_order: edit_forum_order(),
+                                            };
+                                            spawn(async move {
+                                                match admin_update_forum(form).await {
+                                                    Ok(_) => {
+                                                        is_error.set(false);
+                                                        status.set("Forum updated. Refresh.".into());
+                                                        editing_forum.set(0);
+                                                    }
+                                                    Err(e) => {
+                                                        is_error.set(true);
+                                                        status.set(clean_error(e));
+                                                    }
+                                                }
+                                            });
+                                        }
+                                    },
+                                    "Save"
+                                }
+                                button {
+                                    class: "small-button",
+                                    onclick: move |_| editing_forum.set(0),
+                                    "Cancel"
+                                }
+                            }
+                        } else {
+                            div { class: "forum-main",
+                                Link {
+                                    class: "forum-link",
+                                    to: Route::ForumPage {
+                                        id: forum.id,
+                                        page: 1,
+                                    },
+                                    "{forum.name}"
+                                }
+                                p { class: "forum-description", "{forum.description}" }
+                            }
+                            div { class: "admin-actions",
+                                button {
+                                    class: "small-button",
+                                    onclick: {
+                                        let forum = forum.clone();
+
+                                        move |_| {
+                                            edit_forum_name.set(forum.name.clone());
+                                            edit_forum_desc.set(forum.description.clone());
+                                            edit_forum_cat.set(forum.category_id);
+                                            edit_forum_order.set(forum.sort_order);
+                                            editing_forum.set(forum.id);
+                                        }
+                                    },
+                                    "Edit"
+                                }
+                                ConfirmButton {
+                                    label: "Delete",
+                                    class: "danger-button small-button",
+                                    on_confirm: {
+                                        let fid = forum.id;
+                                        move |_| {
+                                            spawn(async move {
+                                                match admin_delete_forum(AdminDeleteItem { id: fid }).await {
+                                                    Ok(_) => {
+                                                        is_error.set(false);
+                                                        status.set("Forum deleted. Refresh to see changes.".into());
+                                                    }
+                                                    Err(e) => {
+                                                        is_error.set(true);
+                                                        status.set(clean_error(e));
+                                                    }
+                                                }
+                                            });
+                                        }
+                                    },
+                                }
+                            }
                         }
                     }
                 }
@@ -488,9 +672,10 @@ fn UsersPanel(
                                 }
                             }
                             // Delete
-                            button {
+                            ConfirmButton {
+                                label: "Delete",
                                 class: "danger-button small-button",
-                                onclick: {
+                                on_confirm: {
                                     let uid = user.id;
                                     move |_| {
                                         spawn(async move {
@@ -507,7 +692,6 @@ fn UsersPanel(
                                         });
                                     }
                                 },
-                                "Delete"
                             }
                         }
                     }
@@ -526,72 +710,55 @@ fn ModerationPanel(
     mut is_error: Signal<bool>,
     mut refresh: Signal<()>,
 ) -> Element {
-    let users_map: std::collections::HashMap<i32, crate::data::UserProfile> =
-        data.users.iter().map(|u| (u.id, u.clone())).collect();
-
     rsx! {
         article { class: "panel",
             div { class: "panel-heading",
-                h3 { "All topics" }
-                p { "{data.topics.len()} topics" }
+                h3 { "Reported posts" }
+                p { "{data.reports.len()} open reports" }
             }
-            div { class: "topic-table",
-                div { class: "topic-table-head",
-                    span { "Topic" }
-                    span { "Sticky" }
-                    span { "Closed" }
-                    span { "Views" }
-                    span { "Actions" }
-                }
-                for topic in data.topics.iter() {
-                    div { class: "topic-row",
-                        div { class: "topic-main",
+            if data.reports.is_empty() {
+                p { class: "panel-meta", "No reports to review." }
+            } else {
+                for report in data.reports.iter() {
+                    div { class: "report-row",
+                        div { class: "report-header",
                             Link {
                                 class: "topic-link",
                                 to: Route::TopicPage {
-                                    id: topic.id,
+                                    id: report.topic_id,
                                     page: 1,
                                 },
-                                "{topic.subject}"
+                                "{report.topic_subject}"
                             }
                             p { class: "topic-meta",
-                                if let Some(author) = users_map.get(&topic.author_id) {
-                                    "by {author.username} · {topic.created_at}"
-                                }
+                                "Reported by {report.reporter_name} · Post by {report.author_name}"
                             }
                         }
-                        p { class: "topic-metric",
-                            if topic.sticky {
-                                "Yes"
-                            } else {
-                                "No"
+                        p { class: "report-reason", "Reason: {report.reason}" }
+                        div { class: "report-body",
+                            for line in report.post_body.iter().take(3) {
+                                p { "{line}" }
                             }
                         }
-                        p { class: "topic-metric",
-                            if topic.closed {
-                                "Yes"
-                            } else {
-                                "No"
-                            }
-                        }
-                        p { class: "topic-metric", "{topic.views}" }
                         div { class: "admin-actions",
+                            Link {
+                                class: "small-button",
+                                to: Route::TopicPage {
+                                    id: report.topic_id,
+                                    page: 1,
+                                },
+                                "View"
+                            }
                             button {
                                 class: "small-button",
                                 onclick: {
-                                    let tid = topic.id;
-                                    let closed = !topic.closed;
+                                    let rid = report.id;
                                     move |_| {
                                         spawn(async move {
-                                            match admin_update_topic(AdminTopicUpdate {
-                                                    topic_id: tid,
-                                                    closed,
-                                                })
-                                                .await
-                                            {
+                                            match dismiss_report(rid).await {
                                                 Ok(_) => {
                                                     is_error.set(false);
-                                                    status.set("Topic status updated. Refresh.".into());
+                                                    status.set("Report dismissed. Refresh.".into());
                                                 }
                                                 Err(e) => {
                                                     is_error.set(true);
@@ -601,22 +768,19 @@ fn ModerationPanel(
                                         });
                                     }
                                 },
-                                if topic.closed {
-                                    "Open"
-                                } else {
-                                    "Close"
-                                }
+                                "Dismiss"
                             }
-                            button {
+                            ConfirmButton {
+                                label: "Zap",
                                 class: "danger-button small-button",
-                                onclick: {
-                                    let tid = topic.id;
+                                on_confirm: {
+                                    let rid = report.id;
                                     move |_| {
                                         spawn(async move {
-                                            match admin_delete_topic(AdminDeleteItem { id: tid }).await {
+                                            match zap_report(rid).await {
                                                 Ok(_) => {
                                                     is_error.set(false);
-                                                    status.set("Topic deleted. Refresh.".into());
+                                                    status.set("Post deleted and report closed. Refresh.".into());
                                                 }
                                                 Err(e) => {
                                                     is_error.set(true);
@@ -626,7 +790,6 @@ fn ModerationPanel(
                                         });
                                     }
                                 },
-                                "Delete"
                             }
                         }
                     }

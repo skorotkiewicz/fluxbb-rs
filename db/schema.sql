@@ -97,7 +97,18 @@ CREATE TABLE IF NOT EXISTS bans (
     expires_at BIGINT DEFAULT NULL
 );
 
+CREATE TABLE IF NOT EXISTS reports (
+    id SERIAL PRIMARY KEY,
+    post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+    reporter_id INTEGER NOT NULL REFERENCES users(id),
+    reason TEXT NOT NULL DEFAULT '',
+    created_at BIGINT NOT NULL DEFAULT 0,
+    zapped BOOLEAN NOT NULL DEFAULT false
+);
+
 CREATE INDEX IF NOT EXISTS forum_sessions_user_id_idx ON forum_sessions (user_id);
 CREATE UNIQUE INDEX IF NOT EXISTS users_email_unique_idx ON users (LOWER(email));
 CREATE INDEX IF NOT EXISTS bans_username_idx ON bans (username);
 CREATE INDEX IF NOT EXISTS bans_email_idx ON bans (LOWER(email));
+CREATE INDEX IF NOT EXISTS reports_post_id_idx ON reports (post_id);
+CREATE INDEX IF NOT EXISTS reports_zapped_idx ON reports (zapped) WHERE zapped = false;

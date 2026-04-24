@@ -1,7 +1,7 @@
 use dioxus::prelude::*;
 
 use crate::{
-    components::PostCard,
+    components::{ConfirmButton, PostCard},
     data::{
         clean_error, create_reply, delete_topic, increment_topic_views, load_forums,
         load_topic_data, move_topic, toggle_sticky, toggle_topic_status, MoveTopicForm, ReplyForm,
@@ -204,9 +204,10 @@ pub fn TopicPage(id: i32, page: i32) -> Element {
                                 "Close topic"
                             }
                         }
-                        button {
+                        ConfirmButton {
+                            label: "Delete topic",
                             class: "danger-button small-button",
-                            onclick: move |_| {
+                            on_confirm: move |_| {
                                 let tid = id;
                                 let fid = forum_id;
                                 let navigator = navigator.clone();
@@ -223,7 +224,6 @@ pub fn TopicPage(id: i32, page: i32) -> Element {
                                     }
                                 });
                             },
-                            "Delete topic"
                         }
                     }
                 }
@@ -279,7 +279,7 @@ pub fn TopicPage(id: i32, page: i32) -> Element {
             }
 
             if current_user().is_some() && !is_closed {
-                if !review_posts.is_empty() {
+                if total_pages > 1 && !review_posts.is_empty() {
                     article { class: "panel topic-review",
                         div { class: "panel-heading",
                             h4 { "Topic review" }

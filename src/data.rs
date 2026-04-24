@@ -220,6 +220,8 @@ pub struct AdminData {
     pub forums: Vec<Forum>,
     pub users: Vec<UserProfile>,
     pub topics: Vec<Topic>,
+    #[serde(default)]
+    pub reports: Vec<Report>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
@@ -338,12 +340,6 @@ pub struct AdminUserUpdate {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct AdminTopicUpdate {
-    pub topic_id: i32,
-    pub closed: bool,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct AdminBoardSettings {
     pub title: String,
     pub tagline: String,
@@ -354,6 +350,45 @@ pub struct AdminBoardSettings {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct AdminDeleteItem {
     pub id: i32,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct AdminCategoryUpdate {
+    pub id: i32,
+    pub name: String,
+    pub description: String,
+    pub sort_order: i32,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct AdminForumUpdate {
+    pub id: i32,
+    pub category_id: i32,
+    pub name: String,
+    pub description: String,
+    pub sort_order: i32,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ReportPostForm {
+    pub post_id: i32,
+    pub reason: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Report {
+    pub id: i32,
+    pub post_id: i32,
+    pub reporter_id: i32,
+    pub reporter_name: String,
+    pub reason: String,
+    pub created_at: i64,
+    pub zapped: bool,
+    pub post_body: Vec<String>,
+    pub topic_id: i32,
+    pub topic_subject: String,
+    pub author_id: i32,
+    pub author_name: String,
 }
 
 #[cfg(feature = "server")]
@@ -523,7 +558,11 @@ pub async fn load_topic_data(id: i32, page: i32) -> Result<TopicData, ServerFnEr
         let offset = (page - 1) * per_page;
         let data = run_json_query::<TopicData>(&format!(
             "SELECT json_build_object(
-                'topic', (SELECT row_to_json(t) FROM topics t WHERE t.id = {id}),
+                'topic', (SELECT row_to_json(t) FROM (
+                    SELECT id, forum_id, author_id, subject, closed, views, tags, created_at, updated_at, activity_rank, sticky, moved_to,
+                        COALESCE((SELECT COUNT(*) FROM posts WHERE topic_id = topics.id), 0) - 1 AS reply_count
+                    FROM topics WHERE id = {id}
+                ) t),
                 'posts', (SELECT COALESCE(json_agg(row_to_json(p)), '[]'::json) FROM (
                     SELECT id, topic_id, author_id, posted_at, edited_at, body, signature, position
                     FROM posts WHERE topic_id = {id} ORDER BY position, id
@@ -674,7 +713,18 @@ pub async fn load_admin_data() -> Result<AdminData, ServerFnError> {
                 'categories', (SELECT COALESCE(json_agg(row_to_json(c)), '[]'::json) FROM (SELECT id, name, description, sort_order FROM categories ORDER BY sort_order, id) c),
                 'forums', (SELECT COALESCE(json_agg(row_to_json(f)), '[]'::json) FROM (SELECT id, category_id, name, description, moderators, sort_order FROM forums ORDER BY category_id, sort_order, id) f),
                 'users', (SELECT COALESCE(json_agg(row_to_json(u)), '[]'::json) FROM (SELECT id, username, title, status, joined_at, post_count, location, about, last_seen, email, group_id FROM users ORDER BY id) u),
-                'topics', (SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json) FROM (SELECT id, forum_id, author_id, subject, closed, views, tags, created_at, updated_at, activity_rank, sticky, moved_to FROM topics ORDER BY sticky DESC, activity_rank DESC, id) t)
+                'topics', (SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json) FROM (SELECT id, forum_id, author_id, subject, closed, views, tags, created_at, updated_at, activity_rank, sticky, moved_to FROM topics ORDER BY sticky DESC, activity_rank DESC, id) t),
+                'reports', (SELECT COALESCE(json_agg(row_to_json(r)), '[]'::json) FROM (
+                    SELECT rep.id, rep.post_id, rep.reporter_id, u.username AS reporter_name, rep.reason, rep.created_at, rep.zapped,
+                           p.body AS post_body, p.topic_id, t.subject AS topic_subject, p.author_id, au.username AS author_name
+                    FROM reports rep
+                    JOIN posts p ON p.id = rep.post_id
+                    JOIN topics t ON t.id = p.topic_id
+                    JOIN users u ON u.id = rep.reporter_id
+                    JOIN users au ON au.id = p.author_id
+                    WHERE rep.zapped = false
+                    ORDER BY rep.created_at DESC
+                ) r)
             )::json;",
         ).await.map_err(server_error)?;
         Ok(data)
@@ -874,6 +924,53 @@ pub async fn admin_delete_forum(input: AdminDeleteItem) -> Result<(), ServerFnEr
     }
 }
 
+#[post("/api/admin/update-category", headers: HeaderMap)]
+pub async fn admin_update_category(input: AdminCategoryUpdate) -> Result<(), ServerFnError> {
+    #[cfg(feature = "server")]
+    {
+        let u = require_session_csrf(&headers).await.map_err(server_error)?;
+        if u.group_id != 1 {
+            return Err(server_error("Admin only.".into()));
+        }
+        run_exec(&format!(
+            "UPDATE categories SET name = {}, description = {}, sort_order = {} WHERE id = {};",
+            sql_literal(input.name.trim()),
+            sql_literal(input.description.trim()),
+            input.sort_order,
+            input.id,
+        )).await.map_err(server_error)
+    }
+    #[cfg(not(feature = "server"))]
+    {
+        let _ = input;
+        Err(ServerFnError::new("server only"))
+    }
+}
+
+#[post("/api/admin/update-forum", headers: HeaderMap)]
+pub async fn admin_update_forum(input: AdminForumUpdate) -> Result<(), ServerFnError> {
+    #[cfg(feature = "server")]
+    {
+        let u = require_session_csrf(&headers).await.map_err(server_error)?;
+        if u.group_id != 1 {
+            return Err(server_error("Admin only.".into()));
+        }
+        run_exec(&format!(
+            "UPDATE forums SET category_id = {}, name = {}, description = {}, sort_order = {} WHERE id = {};",
+            input.category_id,
+            sql_literal(input.name.trim()),
+            sql_literal(input.description.trim()),
+            input.sort_order,
+            input.id,
+        )).await.map_err(server_error)
+    }
+    #[cfg(not(feature = "server"))]
+    {
+        let _ = input;
+        Err(ServerFnError::new("server only"))
+    }
+}
+
 #[post("/api/admin/update-user", headers: HeaderMap)]
 pub async fn admin_update_user(input: AdminUserUpdate) -> Result<(), ServerFnError> {
     #[cfg(feature = "server")]
@@ -918,28 +1015,6 @@ pub async fn admin_delete_user(input: AdminDeleteItem) -> Result<(), ServerFnErr
         run_exec(&format!("DELETE FROM users WHERE id = {};", input.id))
             .await
             .map_err(server_error)
-    }
-    #[cfg(not(feature = "server"))]
-    {
-        let _ = input;
-        Err(ServerFnError::new("server only"))
-    }
-}
-
-#[post("/api/admin/update-topic", headers: HeaderMap)]
-pub async fn admin_update_topic(input: AdminTopicUpdate) -> Result<(), ServerFnError> {
-    #[cfg(feature = "server")]
-    {
-        let u = require_session_csrf(&headers).await.map_err(server_error)?;
-        if u.group_id != 1 {
-            return Err(server_error("Admin only.".into()));
-        }
-        run_exec(&format!(
-            "UPDATE topics SET closed = {} WHERE id = {};",
-            input.closed, input.topic_id
-        ))
-        .await
-        .map_err(server_error)
     }
     #[cfg(not(feature = "server"))]
     {
@@ -1005,9 +1080,104 @@ pub async fn admin_clean_sessions() -> Result<i64, ServerFnError> {
     }
 }
 
+// ── Reporting ──
+
+#[post("/api/report-post", headers: HeaderMap)]
+pub async fn report_post(input: ReportPostForm) -> Result<(), ServerFnError> {
+    #[cfg(feature = "server")]
+    {
+        let user = require_session_csrf(&headers).await.map_err(server_error)?;
+        if input.reason.trim().is_empty() {
+            return Err(server_error("Please provide a reason for the report.".into()));
+        }
+        let now = unix_now();
+        run_exec(&format!(
+            "INSERT INTO reports (post_id, reporter_id, reason, created_at) VALUES ({}, {}, {}, {});",
+            input.post_id,
+            user.id,
+            sql_literal(input.reason.trim()),
+            now,
+        )).await.map_err(server_error)
+    }
+    #[cfg(not(feature = "server"))]
+    {
+        let _ = input;
+        Err(ServerFnError::new("server only"))
+    }
+}
+
+#[post("/api/dismiss-report", headers: HeaderMap)]
+pub async fn dismiss_report(report_id: i32) -> Result<(), ServerFnError> {
+    #[cfg(feature = "server")]
+    {
+        let u = require_session_csrf(&headers).await.map_err(server_error)?;
+        if u.group_id != 1 {
+            return Err(server_error("Admin only.".into()));
+        }
+        run_exec(&format!("UPDATE reports SET zapped = true WHERE id = {};", report_id))
+            .await
+            .map_err(server_error)
+    }
+    #[cfg(not(feature = "server"))]
+    {
+        let _ = report_id;
+        Err(ServerFnError::new("server only"))
+    }
+}
+
+#[post("/api/zap-report", headers: HeaderMap)]
+pub async fn zap_report(report_id: i32) -> Result<(), ServerFnError> {
+    #[cfg(feature = "server")]
+    {
+        let u = require_session_csrf(&headers).await.map_err(server_error)?;
+        if u.group_id != 1 {
+            return Err(server_error("Admin only.".into()));
+        }
+        // Mark report as zapped
+        run_exec(&format!("UPDATE reports SET zapped = true WHERE id = {};", report_id))
+            .await
+            .map_err(server_error)?;
+        // Delete the reported post (same logic as delete_post)
+        #[derive(Deserialize)]
+        struct PostInfo {
+            topic_id: i32,
+            author_id: i32,
+            is_first: bool,
+        }
+        let info = run_json_query::<PostInfo>(&format!(
+            "SELECT row_to_json(r) FROM (
+                SELECT p.topic_id, p.author_id,
+                       CASE WHEN p.id = (SELECT MIN(id) FROM posts WHERE topic_id = p.topic_id) THEN true ELSE false END AS is_first
+                FROM posts p
+                WHERE p.id = (SELECT post_id FROM reports WHERE id = {})
+            ) r;",
+            report_id
+        )).await.map_err(server_error)?;
+        if info.is_first {
+            run_exec(&format!("DELETE FROM posts WHERE topic_id = {};", info.topic_id))
+                .await.map_err(server_error)?;
+            run_exec(&format!("DELETE FROM topics WHERE id = {};", info.topic_id))
+                .await.map_err(server_error)?;
+        } else {
+            run_exec(&format!("DELETE FROM posts WHERE id = (SELECT post_id FROM reports WHERE id = {});", report_id))
+                .await.map_err(server_error)?;
+            run_exec(&format!(
+                "UPDATE users SET post_count = GREATEST(post_count - 1, 0) WHERE id = {};",
+                info.author_id
+            )).await.map_err(server_error)?;
+        }
+        Ok(())
+    }
+    #[cfg(not(feature = "server"))]
+    {
+        let _ = report_id;
+        Err(ServerFnError::new("server only"))
+    }
+}
+
 // ── Post editing ──
 
-#[post("/api/post/:id", headers: HeaderMap)]
+#[post("/api/post/:id")]
 pub async fn load_post(id: i32) -> Result<Post, ServerFnError> {
     #[cfg(feature = "server")]
     {

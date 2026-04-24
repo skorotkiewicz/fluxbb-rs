@@ -14,7 +14,7 @@ check:
     dx check
 
 fmt:
-    cargo fmt
+    dx fmt
 
 build:
     dx build

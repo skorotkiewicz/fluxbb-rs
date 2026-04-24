@@ -960,6 +960,25 @@ pub async fn admin_update_board(input: AdminBoardSettings) -> Result<(), ServerF
     }
 }
 
+#[post("/api/admin/clean-sessions", headers: HeaderMap)]
+pub async fn admin_clean_sessions() -> Result<i64, ServerFnError> {
+    #[cfg(feature = "server")]
+    {
+        let u = require_session_csrf(&headers).await.map_err(server_error)?;
+        if u.group_id != 1 {
+            return Err(server_error("Admin only.".into()));
+        }
+        let deleted = run_scalar_i64(
+            "WITH deleted AS (DELETE FROM forum_sessions WHERE expires_at < EXTRACT(EPOCH FROM now())::bigint RETURNING *) SELECT COUNT(*) FROM deleted;"
+        ).await.map_err(server_error)?;
+        Ok(deleted)
+    }
+    #[cfg(not(feature = "server"))]
+    {
+        Err(ServerFnError::new("server only"))
+    }
+}
+
 // ── Post editing ──
 
 #[post("/api/post/:id", headers: HeaderMap)]

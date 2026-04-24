@@ -65,7 +65,7 @@ pub fn Login() -> Element {
                             checked: remember(),
                             onchange: move |_| remember.toggle(),
                         }
-                        span { "Remember me on this browser" }
+                        span { "Remember me on this browser for 14 days" }
                     }
                     button {
                         class: "primary-button",
@@ -81,10 +81,15 @@ pub fn Login() -> Element {
                                 submitting.set(true);
                                 match login_account(login).await {
                                     Ok(response) => {
+                                        let max_age_clause = if remember() {
+                                            format!("; max-age={}", cookie_max_age())
+                                        } else {
+                                            String::new()
+                                        };
                                         let script = format!(
-                                            "document.cookie = '{}={}; path=/; max-age={}; samesite=strict'; document.cookie = '{}={}; path=/; max-age={}; samesite=strict';",
-                                            cookie_name(), response.session_token, cookie_max_age(),
-                                            crate::data::csrf_cookie_name(), response.user.csrf_token, cookie_max_age(),
+                                            "document.cookie = '{}={}; path=/; samesite=strict{max_age_clause}'; document.cookie = '{}={}; path=/; samesite=strict{max_age_clause}';",
+                                            cookie_name(), response.session_token,
+                                            crate::data::csrf_cookie_name(), response.user.csrf_token,
                                         );
                                         let _ = document::eval(&script);
                                         auth_user.set(Some(response.user));

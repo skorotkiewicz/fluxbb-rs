@@ -4,9 +4,10 @@ use crate::{
     components::SectionHeader,
     data::{
         add_ban, admin_add_category, admin_add_forum, admin_delete_category, admin_delete_forum,
-        admin_delete_topic, admin_delete_user, admin_update_board, admin_update_topic,
-        admin_update_user, clean_error, load_admin_data, load_bans, load_groups, remove_ban,
-        update_group, AdminBoardSettings, AdminCategoryForm, AdminData, AdminDeleteItem,
+        admin_clean_sessions, admin_delete_topic, admin_delete_user, admin_update_board,
+        admin_update_topic, admin_update_user, clean_error, load_admin_data, load_bans,
+        load_groups, remove_ban, update_group, AdminBoardSettings, AdminCategoryForm, AdminData,
+        AdminDeleteItem,
         AdminForumForm, AdminTopicUpdate, AdminUserUpdate, BanForm, GroupUpdateForm,
         SessionUser,
     },
@@ -76,6 +77,11 @@ pub fn Admin() -> Element {
                         onclick: move |_| tab.set("groups"),
                         "Groups"
                     }
+                    button {
+                        class: if tab() == "maintenance" { "admin-tab active" } else { "admin-tab" },
+                        onclick: move |_| tab.set("maintenance"),
+                        "Maintenance"
+                    }
                 }
 
                 if !status().is_empty() {
@@ -116,6 +122,8 @@ pub fn Admin() -> Element {
                     BansPanel { status, is_error, refresh }
                 } else if tab() == "groups" {
                     GroupsPanel { status, is_error, refresh }
+                } else if tab() == "maintenance" {
+                    MaintenancePanel { status, is_error, refresh }
                 }
             } else {
                 article { class: "empty-state",
@@ -1062,6 +1070,53 @@ fn GroupsPanel(
                                 }
                             },
                         }
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[component]
+fn MaintenancePanel(
+    mut status: Signal<String>,
+    mut is_error: Signal<bool>,
+    mut refresh: Signal<()>,
+) -> Element {
+    let mut cleaning = use_signal(|| false);
+    rsx! {
+        article { class: "panel",
+            div { class: "panel-heading",
+                h3 { "Maintenance" }
+                p { "Clean up expired data and optimise the board." }
+            }
+            div { class: "form-card",
+                h4 { "Session cleanup" }
+                p { "Remove expired forum sessions from the database." }
+                button {
+                    class: "primary-button",
+                    disabled: cleaning(),
+                    onclick: move |_| {
+                        spawn(async move {
+                            cleaning.set(true);
+                            match admin_clean_sessions().await {
+                                Ok(count) => {
+                                    is_error.set(false);
+                                    status.set(format!("Deleted {count} expired session(s)."));
+                                    refresh.set(());
+                                }
+                                Err(e) => {
+                                    is_error.set(true);
+                                    status.set(clean_error(e));
+                                }
+                            }
+                            cleaning.set(false);
+                        });
+                    },
+                    if cleaning() {
+                        "Cleaning…"
+                    } else {
+                        "Clean expired sessions"
                     }
                 }
             }

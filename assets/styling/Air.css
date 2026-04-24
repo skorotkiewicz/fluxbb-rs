@@ -1,0 +1,932 @@
+/*****************************************************************
+ Air Theme — Adapted for FluxBB RS (class-name mapping)
+*****************************************************************/
+
+/* ── 1. BASE / RESET ── */
+html, body, .site-shell *, .site-shell *::before, .site-shell *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    font-style: normal;
+    font-weight: normal;
+}
+
+html, body {
+    background: #f6f9fc;
+    color: #333;
+    font: 14px/1.55 Arial, Helvetica, sans-serif;
+}
+
+a {
+    text-decoration: none;
+    color: #2365B0;
+}
+
+a:hover, a:active, a:focus {
+    text-decoration: underline;
+    color: #b50000;
+}
+
+/* ── 2. SHELL / LAYOUT ── */
+.site-shell {
+    max-width: 1070px;
+    margin: 0 auto;
+    padding: 30px 40px;
+    background: #f6f9fc;
+    color: #333;
+}
+
+/* ── 3. MASTHEAD ── */
+.masthead {
+    padding: 0 0 10px 0;
+    border-bottom: 1px dotted #b9c5ce;
+    margin-bottom: 12px;
+}
+
+.masthead h1 {
+    font: 2.154em/1em "Trebuchet MS", Arial, Helvetica, sans-serif;
+    padding: 7px 0;
+    color: #333;
+}
+
+.masthead-tagline {
+    border-top: 1px dotted #b9c5ce;
+    padding: 10px 0;
+    color: #566579;
+    font-size: 1em;
+}
+
+.eyebrow {
+    margin: 0;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #357082;
+    font-size: 0.85rem;
+    font-weight: bold;
+}
+
+/* ── 4. TOP NAV ── */
+.top-nav {
+    background: #44699c;
+    padding: 0;
+    margin-bottom: 12px;
+    border-radius: 4px;
+    display: flex;
+    flex-wrap: wrap;
+}
+
+.top-nav a {
+    display: block;
+    padding: 12px 16px 6px 8px;
+    min-width: 60px;
+    white-space: nowrap;
+    background: #44699c;
+    border-right: 1px solid #fff;
+    color: #d4dae2;
+    text-decoration: none;
+}
+
+.top-nav a:hover,
+.top-nav a:active,
+.top-nav a:focus {
+    background: #b50000;
+    color: #fff;
+    text-decoration: none;
+}
+
+/* Auth chip in nav */
+.auth-chip {
+    margin-left: auto;
+    padding: 12px 16px;
+    color: #d4dae2;
+    font-weight: bold;
+}
+
+.nav-button {
+    background: transparent;
+    border: none;
+    color: #d4dae2;
+    cursor: pointer;
+    padding: 12px 16px;
+    font-size: 1em;
+}
+
+.nav-button:hover {
+    color: #fff;
+    background: #b50000;
+}
+
+/* ── 5. BREADCRUMBS ── */
+.breadcrumbs {
+    font-family: "Trebuchet MS", Helvetica, Arial, sans-serif;
+    font-size: 1.154em;
+    padding: 7px 0;
+    margin-bottom: 12px;
+    border-bottom: 1px dotted #b9c5ce;
+}
+
+.breadcrumbs a {
+    color: #2365B0;
+}
+
+/* ── 6. PAGE / MAIN CONTENT ── */
+.page {
+    margin-top: 12px;
+}
+
+/* ── 7. HERO / SECTION HEADERS ── */
+.hero-card {
+    background: #fff;
+    border: 1px solid #cad7e1;
+    border-radius: 4px;
+    margin-bottom: 12px;
+    padding: 12px 18px;
+}
+
+.compact-hero {
+    padding: 8px 14px;
+    margin-bottom: 8px;
+}
+
+.section-header {
+    /* padding-bottom: 8px; */
+    border-bottom: 1px solid #dfe6ee;
+    margin-bottom: 10px;
+}
+
+.section-kicker {
+    color: #357082;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: bold;
+}
+
+.section-title {
+    font: 1.462em/1em "Trebuchet MS", Arial, Helvetica, sans-serif;
+    padding: 4px 0;
+    color: #333;
+}
+
+.section-subtitle {
+    color: #566579;
+    font-size: 0.923em;
+}
+
+/* ── 8. PANELS ── */
+.panel {
+    background: #fff;
+    border: 1px solid #cad7e1;
+    border-radius: 4px;
+    margin: 12px 0;
+    overflow: hidden;
+}
+
+.panel-heading {
+    background: #ebf1f5;
+    border-bottom: 1px solid #cad7e1;
+    padding: 7px 12px;
+    font-weight: bold;
+    color: #357082;
+    font-size: 1em;
+}
+
+.panel-heading h3 {
+    font: 1em/1.462em Arial, Helvetica, sans-serif;
+    font-weight: bold;
+    padding: 0;
+    margin: 0;
+    color: #357082;
+}
+
+/* ── 9. FORUM & TOPIC TABLES ── */
+.topic-table,
+.forum-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.topic-table-head,
+.forum-table-head {
+    display: grid;
+    grid-template-columns: minmax(0, 2.7fr) 0.6fr 0.6fr minmax(140px, 1fr);
+    gap: 8px;
+    padding: 7px 8px;
+    background: #ebf1f5;
+    border-bottom: 1px solid #cad7e1;
+    color: #357082;
+    font-weight: bold;
+    font-size: 0.923em;
+}
+
+.topic-table-head span,
+.forum-table-head span {
+    padding: 0;
+}
+
+.topic-row,
+.forum-row {
+    display: grid;
+    grid-template-columns: minmax(0, 2.7fr) 0.6fr 0.6fr minmax(140px, 1fr);
+    gap: 8px;
+    padding: 7px 8px;
+    border-bottom: 1px solid #dfe6ee;
+    background: #fcfdfe;
+    align-items: start;
+}
+
+.topic-row:last-child,
+.forum-row:last-child {
+    border-bottom: none;
+}
+
+.topic-row:hover,
+.forum-row:hover {
+    background: #f6f9fc;
+}
+
+/* Topic sticky highlight */
+.topic-sticky {
+    background: #f0f7fa;
+}
+
+/* Topic main cell */
+.topic-main,
+.forum-main {
+    overflow: hidden;
+}
+
+/* Topic link */
+.topic-link,
+.forum-link,
+.recent-topic-link {
+    color: #2365B0;
+    font-weight: bold;
+    font-size: 1.077em;
+    text-decoration: none;
+}
+
+.topic-link:hover,
+.forum-link:hover,
+.recent-topic-link:hover {
+    color: #b50000;
+    text-decoration: underline;
+}
+
+/* Unread bold */
+.topic-link-new,
+.recent-topic-link-new {
+    font-weight: bold;
+}
+
+/* Topic meta */
+.topic-meta,
+.forum-meta {
+    color: #566579;
+    font-size: 0.923em;
+    padding: 2px 0;
+}
+
+.topic-tags {
+    color: #566579;
+    font-size: 0.85em;
+    padding: 2px 0;
+}
+
+/* Metric cells */
+.topic-metric,
+.forum-metric {
+    text-align: center;
+    color: #566579;
+    font-size: 0.923em;
+}
+
+.topic-update {
+    font-size: 0.85em;
+    color: #566579;
+}
+
+/* ── 10. BADGES / STATUS INDICATORS ── */
+.badge {
+    display: inline-block;
+    font-size: 0.72em;
+    font-weight: bold;
+    padding: 1px 6px;
+    border-radius: 3px;
+    margin-right: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.badge-pinned {
+    background: #e1f0f7;
+    color: #3399CC;
+    border: 1px solid #b3d9ec;
+}
+
+.badge-closed {
+    background: #e8e8e8;
+    color: #555;
+    border: 1px solid #ccc;
+}
+
+.badge-new {
+    background: #e1f5e1;
+    color: #2e7d32;
+    border: 1px solid #a5d6a7;
+}
+
+/* ── 11. POST CARDS ── */
+.post-card {
+    display: grid;
+    grid-template-columns: 194px 1fr;
+    background: #f6f9fc;
+    border: 1px solid #b9c5ce;
+    border-right-color: #d9e1e7;
+    margin-bottom: -1px;
+    overflow: hidden;
+    position: relative;
+}
+
+.post-aside {
+    padding: 7px 12px;
+    background: #ebf1f5;
+    border-right: 1px solid #dfe6ee;
+}
+
+.post-author {
+    font-size: 1.231em;
+    font-weight: bold;
+    color: #2365B0;
+    display: block;
+    margin-bottom: 4px;
+}
+
+.post-role {
+    color: #566579;
+    font-size: 0.923em;
+    padding: 4px 0 6px;
+}
+
+.post-timestamp {
+    color: #566579;
+    font-size: 0.85em;
+    padding: 2px 0;
+}
+
+.post-edited {
+    color: #566579;
+    font-size: 0.85em;
+    font-style: italic;
+}
+
+.post-body {
+    padding: 7px 12px;
+    background: #fcfdfe;
+    min-height: 120px;
+}
+
+.post-body p {
+    padding: 7px 0;
+    line-height: 1.5;
+    white-space: pre-wrap;
+}
+
+.post-signature {
+    border-top: 1px solid #dfe6ee;
+    margin-top: 12px;
+    padding-top: 8px;
+    color: #566579;
+    font-size: 0.923em;
+    font-style: italic;
+}
+
+.post-actions {
+    padding: 6px 0;
+    margin-top: 8px;
+}
+
+/* ── 12. PAGINATION ── */
+.pagination {
+    padding: 8px 0;
+    margin: 12px 0;
+    border-top: 1px dotted #b9c5ce;
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.page-button {
+    display: inline-block;
+    padding: 3px 10px;
+    border: 1px solid #b9c5ce;
+    border-left-width: 1px;
+    background: #fff;
+    color: #2365B0;
+    text-decoration: none;
+    font-size: 0.923em;
+    cursor: pointer;
+    border-radius: 3px;
+}
+
+.page-button:hover {
+    background: #ebf1f5;
+}
+
+.page-button.active {
+    background: #44699c;
+    color: #fff;
+    border-color: #44699c;
+    font-weight: bold;
+}
+
+/* ── 13. BUTTONS ── */
+.primary-button {
+    display: inline-block;
+    padding: 8px 16px;
+    background: #44699c;
+    color: #fff;
+    border: 1px solid #44699c;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    text-decoration: none;
+    font-size: 1em;
+    margin: 4px 0;
+}
+
+.primary-button:hover {
+    background: #b50000;
+    border-color: #b50000;
+    text-decoration: none;
+    color: #fff;
+}
+
+.secondary-button {
+    display: inline-block;
+    padding: 8px 16px;
+    background: #ebf1f5;
+    color: #357082;
+    border: 1px solid #cad7e1;
+    border-radius: 4px;
+    cursor: pointer;
+    text-decoration: none;
+    font-size: 1em;
+}
+
+.secondary-button:hover {
+    background: #dfe6ee;
+}
+
+.small-button {
+    display: inline-block;
+    padding: 4px 10px;
+    font-size: 0.78rem;
+    border-radius: 4px;
+    border: 1px solid #b9c5ce;
+    background: #fff;
+    color: #333;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.small-button:hover {
+    background: #44699c;
+    color: #fff;
+    border-color: #44699c;
+    text-decoration: none;
+}
+
+.small-button.active {
+    background: #44699c;
+    color: #fff;
+    border-color: #44699c;
+}
+
+.danger-button {
+    background: #dc2626;
+    color: #fff;
+    border: 1px solid #dc2626;
+    cursor: pointer;
+}
+
+.danger-button:hover {
+    background: #b91c1c;
+    border-color: #b91c1c;
+}
+
+/* ── 14. FORMS ── */
+.form-card {
+    background: #ebf1f5;
+    border: 1px solid #b9c5ce;
+    border-right-color: #d9e1e7;
+    padding: 18px;
+    margin-bottom: 12px;
+}
+
+.form-card h3 {
+    font: 1em/1.462em Arial, Helvetica, sans-serif;
+    font-weight: bold;
+    padding: 10px 0 4px;
+    color: #357082;
+    border-bottom: 1px solid #dfe6ee;
+    margin-bottom: 12px;
+}
+
+.form-card label {
+    display: block;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 12px;
+}
+
+.form-card label input,
+.form-card label textarea {
+    margin-top: 6px;
+    display: block;
+}
+
+.text-input,
+.text-area {
+    font-family: Verdana, Arial, Helvetica, sans-serif;
+    font-size: 1em;
+    padding: 8px 12px;
+    border: 1px solid #b9c5ce;
+    border-radius: 4px;
+    background: #fff;
+    color: #333;
+    width: 100%;
+    max-width: 600px;
+}
+
+.text-area {
+    resize: vertical;
+    min-height: 80px;
+}
+
+.text-input:focus,
+.text-area:focus {
+    outline: none;
+    border-color: #44699c;
+    box-shadow: 0 0 0 2px rgba(68, 105, 156, 0.15);
+}
+
+.checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+}
+
+label {
+    display: block;
+    padding: 0 0 7px;
+    color: #357082;
+}
+
+label em {
+    font-weight: normal;
+    font-style: normal;
+    color: #566579;
+}
+
+/* ── 15. FORM MESSAGES ── */
+.form-message {
+    padding: 8px 12px;
+    border-radius: 4px;
+    margin: 8px 0;
+    font-size: 0.923em;
+}
+
+.form-error {
+    background: #ffffe1;
+    border: 1px solid #dfe6ee;
+    color: #b50000;
+}
+
+.form-success {
+    background: #e1f5e1;
+    border: 1px solid #a5d6a7;
+    color: #2e7d32;
+}
+
+/* ── 16. ADMIN ── */
+.admin-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid #cad7e1;
+    padding-bottom: 4px;
+}
+
+.admin-tab {
+    padding: 9px 12px 3px;
+    min-height: 1px;
+    text-decoration: none;
+    border: none;
+    background: transparent;
+    color: #2365B0;
+    cursor: pointer;
+    font-size: 1em;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -5px;
+}
+
+.admin-tab:hover {
+    background: #ffffe6;
+    text-decoration: none;
+}
+
+.admin-tab.active {
+    color: #333;
+    background: #f6f9fc;
+    border-bottom-color: #44699c;
+    font-weight: bold;
+}
+
+.admin-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.admin-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 18px;
+}
+
+/* ── 17. USER DIRECTORY ── */
+.user-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 18px;
+}
+
+.user-card {
+    background: #fff;
+    border: 1px solid #cad7e1;
+    border-radius: 4px;
+    padding: 14px;
+}
+
+.user-card h3 {
+    font-size: 1.154em;
+    padding: 0;
+    margin-bottom: 6px;
+}
+
+/* ── 18. EMPTY STATES ── */
+.empty-state {
+    text-align: center;
+    padding: 48px 18px;
+    color: #566579;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-height: 50vh;
+}
+
+.empty-state h3 {
+    font: 1.462em/1em "Trebuchet MS", Arial, Helvetica, sans-serif;
+    padding: 7px 0;
+    color: #357082;
+}
+
+/* ── 19. STAT CARDS ── */
+.stat-grid {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.stat-card {
+    flex: 1 1 auto;
+    min-width: 100px;
+    background: #fff;
+    border: 1px solid #cad7e1;
+    border-radius: 4px;
+    padding: 8px 10px;
+    text-align: center;
+}
+
+.stat-label {
+    color: #357082;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: bold;
+}
+
+.stat-value {
+    font-size: 1.3em;
+    font-weight: bold;
+    color: #333;
+}
+
+.stat-detail {
+    color: #566579;
+    font-size: 0.85em;
+}
+
+/* ── 20. SEARCH ── */
+.search-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 18px;
+}
+
+.search-input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #c8d4e0;
+    border-radius: 4px;
+    background: #fff;
+    color: #333;
+    font-size: 0.95rem;
+}
+
+.search-results {
+    display: flex;
+    flex-direction: column;
+    border-top: 1px solid #dfe6ee;
+}
+
+.search-result-row {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: 0;
+    padding: 10px 12px;
+    background: transparent;
+    border-bottom: 1px solid #dfe6ee;
+}
+
+.search-result-row:hover {
+    background: #f6f9fc;
+}
+
+.search-result-row .badge {
+    justify-self: start;
+}
+
+.search-result-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+
+/* ── 21. RECENT LIST ── */
+.recent-list {
+    display: flex;
+    flex-direction: column;
+    border-top: 1px solid #dfe6ee;
+}
+
+.recent-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    padding: 10px 12px;
+    background: transparent;
+    border-bottom: 1px solid #dfe6ee;
+    align-items: center;
+}
+
+.recent-row:hover {
+    background: #f6f9fc;
+}
+
+.recent-main {
+    overflow: hidden;
+}
+
+.recent-meta {
+    color: #566579;
+    font-size: 0.85em;
+    white-space: nowrap;
+}
+
+/* ── 22. FOOTER ── */
+.site-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #b9c5ce;
+    font-size: 0.923em;
+    color: #566579;
+}
+
+.site-meta p {
+    margin: 0;
+}
+
+.site-footer {
+    border-top: 2px solid #b9c5ce;
+    margin-top: 24px;
+    padding-top: 12px;
+    text-align: center;
+    color: #566579;
+    font-size: 0.923em;
+}
+
+/* ── 23. MODERATOR ACTIONS IN TOPIC LIST ── */
+.topic-admin-actions {
+    display: inline-flex;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.tiny-button {
+    padding: 2px 8px;
+    font-size: 0.7rem;
+    border-radius: 4px;
+    border: 1px solid #b9c5ce;
+    background: #fff;
+    color: #333;
+    cursor: pointer;
+}
+
+.tiny-button:hover {
+    background: #44699c;
+    color: #fff;
+    border-color: #44699c;
+}
+
+/* ── 24. SMALL SELECT (MOVE TOPIC) ── */
+.small-select {
+    padding: 4px 10px;
+    font-size: 0.78rem;
+    border-radius: 4px;
+    border: 1px solid #b9c5ce;
+    background: #fff;
+    color: #333;
+    cursor: pointer;
+}
+
+/* ── 25. SIDE NOTE / HINT BOX ── */
+.side-note {
+    background: #f6f9fc;
+    border: 1px solid #dfe6ee;
+    border-radius: 4px;
+    padding: 12px 18px;
+    margin-top: 12px;
+    font-size: 0.923em;
+    color: #566579;
+}
+
+.side-note h3 {
+    color: #357082;
+    font-size: 1em;
+    padding: 0 0 6px;
+}
+
+/* ── 26. RESPONSIVE ── */
+@media (max-width: 920px) {
+    .site-shell {
+        padding: 18px 12px;
+    }
+
+    .masthead {
+        grid-template-columns: 1fr;
+    }
+
+    .masthead-art {
+        display: none;
+    }
+
+    .topic-table-head,
+    .topic-row,
+    .forum-table-head,
+    .forum-row {
+        gap: 4px;
+    }
+
+    .topic-metric,
+    .forum-metric {
+        text-align: left;
+    }
+
+    .post-card {
+        grid-template-columns: 1fr;
+    }
+
+    .post-aside {
+        border-right: none;
+        border-bottom: 1px solid #dfe6ee;
+    }
+
+    .admin-grid,
+    .user-grid,
+    .search-grid {
+        grid-template-columns: 1fr;
+    }
+}

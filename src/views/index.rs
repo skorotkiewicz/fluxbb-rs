@@ -68,7 +68,7 @@ pub fn Index() -> Element {
 
     rsx! {
         section { class: "page",
-            article { class: "hero-card",
+            article {
                 SectionHeader {
                     kicker: "Board index".to_string(),
                     title: data.meta.announcement_title.clone(),

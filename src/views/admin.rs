@@ -418,8 +418,40 @@ fn UsersPanel(
                                     "Make admin"
                                 }
                             }
+                            // Promote to moderator
+                            if user.group_id() == 4 {
+                                button {
+                                    class: "small-button",
+                                    onclick: {
+                                        let uid = user.id;
+                                        let uname = user.username.clone();
+                                        move |_| {
+                                            let uname = uname.clone();
+                                            spawn(async move {
+                                                match admin_update_user(AdminUserUpdate {
+                                                        user_id: uid,
+                                                        group_id: 2,
+                                                        title: "Moderator".into(),
+                                                    })
+                                                    .await
+                                                {
+                                                    Ok(_) => {
+                                                        is_error.set(false);
+                                                        status.set(format!("{uname} promoted to moderator. Refresh."));
+                                                    }
+                                                    Err(e) => {
+                                                        is_error.set(true);
+                                                        status.set(clean_error(e));
+                                                    }
+                                                }
+                                            });
+                                        }
+                                    },
+                                    "Make moderator"
+                                }
+                            }
                             // Demote to member
-                            if user.group_id() == 1 {
+                            if user.group_id() != 4 {
                                 button {
                                     class: "small-button",
                                     onclick: {
@@ -447,7 +479,7 @@ fn UsersPanel(
                                             });
                                         }
                                     },
-                                    "Demote"
+                                    "Demote to member"
                                 }
                             }
                             // Delete

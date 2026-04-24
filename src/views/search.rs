@@ -97,7 +97,13 @@ pub fn Search() -> Element {
                             div { class: "search-results",
                                 for user in matches.users {
                                     div { class: "member-result-row",
-                                        h4 { "{user.username}" }
+                                        h4 {
+                                            Link {
+                                                class: "topic-link",
+                                                to: Route::Profile { id: user.id },
+                                                "{user.username}"
+                                            }
+                                        }
                                         p { class: "user-title", "{user.title}" }
                                         p { class: "user-copy", "{user.about}" }
                                     }

@@ -295,7 +295,6 @@ pub struct UpdateProfileForm {
     pub email: String,
     pub location: String,
     pub about: String,
-    pub title: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -1436,11 +1435,10 @@ pub async fn update_profile(input: UpdateProfileForm) -> Result<(), ServerFnErro
         }
 
         run_exec(&format!(
-            "UPDATE users SET email = {}, location = {}, about = {}, title = {} WHERE id = {};",
+            "UPDATE users SET email = {}, location = {}, about = {} WHERE id = {};",
             sql_literal(&email),
             sql_literal(input.location.trim()),
             sql_literal(input.about.trim()),
-            sql_literal(input.title.trim()),
             input.user_id,
         ))
         .map_err(server_error)?;

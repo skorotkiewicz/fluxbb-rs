@@ -23,7 +23,6 @@ pub fn ProfileEdit(id: i32) -> Element {
     let mut email = use_signal(String::new);
     let mut location = use_signal(String::new);
     let mut about = use_signal(String::new);
-    let mut title = use_signal(String::new);
     let mut password = use_signal(String::new);
     let mut password_confirm = use_signal(String::new);
     let mut status = use_signal(String::new);
@@ -36,9 +35,6 @@ pub fn ProfileEdit(id: i32) -> Element {
             let u = &data.user;
             if email().is_empty() && !u.email.is_empty() {
                 email.set(u.email.clone());
-            }
-            if title().is_empty() && !u.title.is_empty() {
-                title.set(u.title.clone());
             }
             if location().is_empty() && !u.location.is_empty() {
                 location.set(u.location.clone());
@@ -109,15 +105,6 @@ pub fn ProfileEdit(id: i32) -> Element {
                         }
                     }
                     label {
-                        "Title"
-                        input {
-                            class: "text-input",
-                            value: "{title}",
-                            oninput: move |e| title.set(e.value()),
-                            placeholder: "Member, Moderator, etc.",
-                        }
-                    }
-                    label {
                         "Location"
                         input {
                             class: "text-input",
@@ -156,7 +143,6 @@ pub fn ProfileEdit(id: i32) -> Element {
                                 email: e,
                                 location: location(),
                                 about: about(),
-                                title: title(),
                             };
                             spawn(async move {
                                 submitting.set(true);

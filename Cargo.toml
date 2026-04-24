@@ -8,17 +8,19 @@ edition = "2021"
 
 [dependencies]
 dioxus = { version = "0.7.1", features = ["router", "fullstack"] }
-getrandom = { version = "0.3.4", features = ["wasm_js"] }
 http = "1"
 rand = "0.9"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 sha2 = "0.10"
 
+# Only needed for WASM client builds
+getrandom = { version = "0.3.4", features = ["wasm_js"], optional = true }
+
 [features]
 default = ["web"]
 # The feature that are only required for the web = ["dioxus/web"] build target should be optional and only enabled in the web = ["dioxus/web"] feature
-web = ["dioxus/web"]
+web = ["dioxus/web", "dep:getrandom"]
 # The feature that are only required for the desktop = ["dioxus/desktop"] build target should be optional and only enabled in the desktop = ["dioxus/desktop"] feature
 desktop = ["dioxus/desktop"]
 # The feature that are only required for the mobile = ["dioxus/mobile"] build target should be optional and only enabled in the mobile = ["dioxus/mobile"] feature

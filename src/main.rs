@@ -53,7 +53,14 @@ enum Route {
 }
 
 fn main() {
+    #[cfg(not(feature = "server"))]
     dioxus::launch(App);
+
+    #[cfg(feature = "server")]
+    dioxus::serve(|| async move {
+        let router = dioxus::server::router(App);
+        Ok(router)
+    });
 }
 
 #[component]

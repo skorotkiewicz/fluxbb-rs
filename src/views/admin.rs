@@ -220,8 +220,9 @@ fn StructurePanel(
                                             match admin_update_category(form).await {
                                                 Ok(_) => {
                                                     is_error.set(false);
-                                                    status.set("Category updated. Refresh.".into());
+                                                    status.set("Category updated.".into());
                                                     editing_cat.set(0);
+                                                    refresh.set(());
                                                 }
                                                 Err(e) => {
                                                     is_error.set(true);
@@ -269,7 +270,8 @@ fn StructurePanel(
                                         match admin_delete_category(AdminDeleteItem { id: cid }).await {
                                             Ok(_) => {
                                                 is_error.set(false);
-                                                status.set("Category deleted. Refresh to see changes.".into());
+                                                status.set("Category deleted.".into());
+                                                refresh.set(());
                                             }
                                             Err(e) => {
                                                 is_error.set(true);
@@ -341,8 +343,9 @@ fn StructurePanel(
                                                 match admin_update_forum(form).await {
                                                     Ok(_) => {
                                                         is_error.set(false);
-                                                        status.set("Forum updated. Refresh.".into());
+                                                        status.set("Forum updated.".into());
                                                         editing_forum.set(0);
+                                                        refresh.set(());
                                                     }
                                                     Err(e) => {
                                                         is_error.set(true);
@@ -398,7 +401,8 @@ fn StructurePanel(
                                                 match admin_delete_forum(AdminDeleteItem { id: fid }).await {
                                                     Ok(_) => {
                                                         is_error.set(false);
-                                                        status.set("Forum deleted. Refresh to see changes.".into());
+                                                        status.set("Forum deleted.".into());
+                                                        refresh.set(());
                                                     }
                                                     Err(e) => {
                                                         is_error.set(true);
@@ -448,9 +452,10 @@ fn StructurePanel(
                         match admin_add_category(form).await {
                             Ok(_) => {
                                 is_error.set(false);
-                                status.set("Category created. Refresh to see it.".into());
+                                status.set("Category created.".into());
                                 cat_name.set(String::new());
                                 cat_desc.set(String::new());
+                                refresh.set(());
                             }
                             Err(e) => {
                                 is_error.set(true);
@@ -511,9 +516,10 @@ fn StructurePanel(
                         match admin_add_forum(form).await {
                             Ok(_) => {
                                 is_error.set(false);
-                                status.set("Forum created. Refresh to see it.".into());
+                                status.set("Forum created.".into());
                                 forum_name.set(String::new());
                                 forum_desc.set(String::new());
+                                refresh.set(());
                             }
                             Err(e) => {
                                 is_error.set(true);
@@ -598,7 +604,8 @@ fn UsersPanel(
                                                 {
                                                     Ok(_) => {
                                                         is_error.set(false);
-                                                        status.set(format!("{uname} moved to {title}. Refresh."));
+                                                        status.set(format!("{uname} moved to {title}."));
+                                                        refresh.set(());
                                                     }
                                                     Err(e) => {
                                                         is_error.set(true);
@@ -628,7 +635,8 @@ fn UsersPanel(
                                             match admin_delete_user(AdminDeleteItem { id: uid }).await {
                                                 Ok(_) => {
                                                     is_error.set(false);
-                                                    status.set("User deleted. Refresh.".into());
+                                                    status.set("User deleted.".into());
+                                                    refresh.set(());
                                                 }
                                                 Err(e) => {
                                                     is_error.set(true);
@@ -704,7 +712,8 @@ fn ModerationPanel(
                                             match dismiss_report(rid).await {
                                                 Ok(_) => {
                                                     is_error.set(false);
-                                                    status.set("Report dismissed. Refresh.".into());
+                                                    status.set("Report dismissed.".into());
+                                                    refresh.set(());
                                                 }
                                                 Err(e) => {
                                                     is_error.set(true);
@@ -726,7 +735,8 @@ fn ModerationPanel(
                                             match zap_report(rid).await {
                                                 Ok(_) => {
                                                     is_error.set(false);
-                                                    status.set("Post deleted and report closed. Refresh.".into());
+                                                    status.set("Post deleted and report closed.".into());
+                                                    refresh.set(());
                                                 }
                                                 Err(e) => {
                                                     is_error.set(true);
@@ -912,7 +922,8 @@ fn SettingsPanel(
                         match admin_update_board(form).await {
                             Ok(_) => {
                                 is_error.set(false);
-                                status.set("Board settings saved. Refresh to see changes.".into());
+                                status.set("Board settings saved.".into());
+                                refresh.set(());
                             }
                             Err(e) => {
                                 is_error.set(true);

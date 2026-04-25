@@ -187,12 +187,7 @@ pub fn StatusMessage(message: String, is_error: bool) -> Element {
     }
 
     rsx! {
-        p {
-            class: if is_error {
-                "form-message form-error"
-            } else {
-                "form-message form-success"
-            },
+        p { class: if is_error { "form-message form-error" } else { "form-message form-success" },
             "{message}"
         }
     }
@@ -213,29 +208,17 @@ pub fn Pagination(
     rsx! {
         nav { class: "pagination",
             if let Some(route) = prev_route {
-                Link {
-                    class: "page-button",
-                    to: route,
-                    "← Prev"
-                }
+                Link { class: "page-button", to: route, "← Prev" }
             }
             for (page_number, route) in page_routes {
                 if page_number == current_page {
                     span { class: "page-button active", "{page_number}" }
                 } else {
-                    Link {
-                        class: "page-button",
-                        to: route,
-                        "{page_number}"
-                    }
+                    Link { class: "page-button", to: route, "{page_number}" }
                 }
             }
             if let Some(route) = next_route {
-                Link {
-                    class: "page-button",
-                    to: route,
-                    "Next →"
-                }
+                Link { class: "page-button", to: route, "Next →" }
             }
         }
     }

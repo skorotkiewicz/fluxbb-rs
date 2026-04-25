@@ -195,13 +195,17 @@ pub fn TopicPage(id: i32, page: i32) -> Element {
                                     }
                                     spawn(async move {
                                         if move_topic(MoveTopicForm {
-                                            topic_id: tid,
-                                            forum_id: fid,
-                                        })
-                                        .await
-                                        .is_ok()
+                                                topic_id: tid,
+                                                forum_id: fid,
+                                            })
+                                            .await
+                                            .is_ok()
                                         {
-                                            navigator.push(Route::ForumPage { id: fid, page: 1 });
+                                            navigator
+                                                .push(Route::ForumPage {
+                                                    id: fid,
+                                                    page: 1,
+                                                });
                                         }
                                     });
                                 },
@@ -251,7 +255,11 @@ pub fn TopicPage(id: i32, page: i32) -> Element {
                                     let fid = forum_id;
                                     spawn(async move {
                                         if delete_topic(tid).await.is_ok() {
-                                            navigator.push(Route::ForumPage { id: fid, page: 1 });
+                                            navigator
+                                                .push(Route::ForumPage {
+                                                    id: fid,
+                                                    page: 1,
+                                                });
                                         }
                                     });
                                 },
@@ -312,10 +320,7 @@ pub fn TopicPage(id: i32, page: i32) -> Element {
                 article { class: "form-card",
                     h3 { "Post a reply" }
 
-                    StatusMessage {
-                        message: reply_status(),
-                        is_error: reply_error(),
-                    }
+                    StatusMessage { message: reply_status(), is_error: reply_error() }
 
                     label {
                         "Message"

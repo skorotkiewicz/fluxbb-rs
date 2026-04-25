@@ -42,10 +42,7 @@ pub fn Login() -> Element {
                 article { class: "form-card",
                     h3 { "Sign in" }
 
-                    StatusMessage {
-                        message: status(),
-                        is_error: is_error(),
-                    }
+                    StatusMessage { message: status(), is_error: is_error() }
 
                     label {
                         "Username"
@@ -160,10 +157,7 @@ pub fn Register() -> Element {
                 article { class: "form-card",
                     h3 { "Create account" }
 
-                    StatusMessage {
-                        message: status(),
-                        is_error: is_error(),
-                    }
+                    StatusMessage { message: status(), is_error: is_error() }
 
                     label {
                         "Username"
@@ -312,10 +306,7 @@ pub fn ForgotPassword() -> Element {
                 article { class: "form-card",
                     h3 { "Reset your password" }
 
-                    StatusMessage {
-                        message: status(),
-                        is_error: is_error(),
-                    }
+                    StatusMessage { message: status(), is_error: is_error() }
 
                     label {
                         "Email"
@@ -396,10 +387,7 @@ pub fn ResetPassword() -> Element {
                 article { class: "form-card",
                     h3 { "Choose a new password" }
 
-                    StatusMessage {
-                        message: status(),
-                        is_error: is_error(),
-                    }
+                    StatusMessage { message: status(), is_error: is_error() }
 
                     label {
                         "Reset token"

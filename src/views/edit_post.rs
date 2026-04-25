@@ -127,10 +127,7 @@ pub fn EditPost(id: i32) -> Element {
             }
 
             article { class: "form-card",
-                StatusMessage {
-                    message: status(),
-                    is_error: is_error(),
-                }
+                StatusMessage { message: status(), is_error: is_error() }
 
                 label {
                     "Message"

@@ -188,4 +188,3 @@ pub(crate) async fn run_exec(sql: &str) -> Result<(), String> {
         .map_err(|e| format!("exec failed: {e}"))?;
     Ok(())
 }
-

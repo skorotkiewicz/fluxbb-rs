@@ -60,10 +60,7 @@ pub fn Install() -> Element {
                             article { class: "form-card",
                                 h3 { "Board setup" }
 
-                                StatusMessage {
-                                    message: status(),
-                                    is_error: is_error(),
-                                }
+                                StatusMessage { message: status(), is_error: is_error() }
 
                                 label {
                                     "Board title"

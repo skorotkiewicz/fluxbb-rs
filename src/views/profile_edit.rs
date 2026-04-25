@@ -106,10 +106,7 @@ pub fn ProfileEdit(id: i32) -> Element {
                 }
             } else {
                 article { class: "form-card",
-                    StatusMessage {
-                        message: status(),
-                        is_error: is_error(),
-                    }
+                    StatusMessage { message: status(), is_error: is_error() }
 
                     label {
                         "Email"

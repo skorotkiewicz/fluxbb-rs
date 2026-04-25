@@ -4,12 +4,12 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use dioxus::prelude::ServerFnError;
 #[cfg(feature = "server")]
 use argon2::{
     password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
     Argon2,
 };
+use dioxus::prelude::ServerFnError;
 #[cfg(feature = "server")]
 use http::HeaderMap;
 #[cfg(feature = "server")]

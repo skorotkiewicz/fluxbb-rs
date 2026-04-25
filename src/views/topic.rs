@@ -1,7 +1,7 @@
 use dioxus::prelude::*;
 
 use crate::{
-    components::{ConfirmButton, PostCard},
+    components::{ConfirmButton, EmptyState, Pagination, PostCard, StatusMessage},
     data::{
         clean_error, create_reply, delete_topic, increment_topic_views, load_forums,
         load_topic_data, move_topic, toggle_sticky, toggle_topic_status, MoveTopicForm, ReplyForm,
@@ -48,13 +48,23 @@ pub fn TopicPage(id: i32, page: i32) -> Element {
         load_topic_data(id, p).await
     });
 
-    let data = if let Some(Ok(data)) = data_resource() {
-        data
-    } else {
+    let Some(resource) = data_resource() else {
         return rsx! {
             section { class: "page",
-                article { class: "empty-state",
-                    h3 { "Loading topic…" }
+                EmptyState {
+                    title: "Loading topic…".to_string(),
+                    body: "Fetching the discussion.".to_string(),
+                }
+            }
+        };
+    };
+
+    let Ok(data) = resource else {
+        return rsx! {
+            section { class: "page",
+                EmptyState {
+                    title: "Topic unavailable".to_string(),
+                    body: "This discussion could not be loaded right now.".to_string(),
                 }
             }
         };
@@ -90,6 +100,25 @@ pub fn TopicPage(id: i32, page: i32) -> Element {
 
     let total_pages = ((data.total_posts + data.per_page - 1) / data.per_page).max(1);
     let current_page = data.page;
+    let prev_route = (current_page > 1).then(|| Route::TopicPage {
+        id,
+        page: current_page - 1,
+    });
+    let next_route = (current_page < total_pages).then(|| Route::TopicPage {
+        id,
+        page: current_page + 1,
+    });
+    let page_routes = (1..=total_pages)
+        .map(|page_number| {
+            (
+                page_number,
+                Route::TopicPage {
+                    id,
+                    page: page_number,
+                },
+            )
+        })
+        .collect();
 
     let forums_resource = use_resource(move || async move {
         if can_move_topic {
@@ -164,22 +193,15 @@ pub fn TopicPage(id: i32, page: i32) -> Element {
                                     if fid == 0 {
                                         return;
                                     }
-                                    let navigator = navigator.clone();
                                     spawn(async move {
-                                        match move_topic(MoveTopicForm {
-                                                topic_id: tid,
-                                                forum_id: fid,
-                                            })
-                                            .await
+                                        if move_topic(MoveTopicForm {
+                                            topic_id: tid,
+                                            forum_id: fid,
+                                        })
+                                        .await
+                                        .is_ok()
                                         {
-                                            Ok(_) => {
-                                                navigator
-                                                    .push(Route::ForumPage {
-                                                        id: fid,
-                                                        page: 1,
-                                                    });
-                                            }
-                                            Err(_) => {}
+                                            navigator.push(Route::ForumPage { id: fid, page: 1 });
                                         }
                                     });
                                 },
@@ -227,17 +249,9 @@ pub fn TopicPage(id: i32, page: i32) -> Element {
                                 on_confirm: move |_| {
                                     let tid = id;
                                     let fid = forum_id;
-                                    let navigator = navigator.clone();
                                     spawn(async move {
-                                        match delete_topic(tid).await {
-                                            Ok(_) => {
-                                                navigator
-                                                    .push(Route::ForumPage {
-                                                        id: fid,
-                                                        page: 1,
-                                                    });
-                                            }
-                                            Err(_) => {}
+                                        if delete_topic(tid).await.is_ok() {
+                                            navigator.push(Route::ForumPage { id: fid, page: 1 });
                                         }
                                     });
                                 },
@@ -255,45 +269,17 @@ pub fn TopicPage(id: i32, page: i32) -> Element {
                         author_id: author.id,
                         post: post.clone(),
                         current_user: current_user().clone(),
-                        topic_id: id,
+                        forum_id,
                     }
                 }
             }
 
-            if total_pages > 1 {
-                nav { class: "pagination",
-                    if current_page > 1 {
-                        Link {
-                            class: "page-button",
-                            to: Route::TopicPage {
-                                id,
-                                page: current_page - 1,
-                            },
-                            "← Prev"
-                        }
-                    }
-                    for p in 1..=total_pages {
-                        if p == current_page {
-                            span { class: "page-button active", "{p}" }
-                        } else {
-                            Link {
-                                class: "page-button",
-                                to: Route::TopicPage { id, page: p },
-                                "{p}"
-                            }
-                        }
-                    }
-                    if current_page < total_pages {
-                        Link {
-                            class: "page-button",
-                            to: Route::TopicPage {
-                                id,
-                                page: current_page + 1,
-                            },
-                            "Next →"
-                        }
-                    }
-                }
+            Pagination {
+                current_page,
+                total_pages,
+                prev_route,
+                next_route,
+                page_routes,
             }
 
             if can_post_replies && !is_closed {
@@ -326,10 +312,9 @@ pub fn TopicPage(id: i32, page: i32) -> Element {
                 article { class: "form-card",
                     h3 { "Post a reply" }
 
-                    if !reply_status().is_empty() {
-                        p { class: if reply_error() { "form-message form-error" } else { "form-message form-success" },
-                            "{reply_status}"
-                        }
+                    StatusMessage {
+                        message: reply_status(),
+                        is_error: reply_error(),
                     }
 
                     label {

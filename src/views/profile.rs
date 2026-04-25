@@ -1,7 +1,7 @@
 use dioxus::prelude::*;
 
 use crate::{
-    components::SectionHeader,
+    components::{EmptyState, SectionHeader},
     data::{load_profile_data, SessionUser},
     Route,
 };
@@ -16,13 +16,23 @@ pub fn Profile(id: i32) -> Element {
         load_profile_data(id).await
     });
 
-    let data = if let Some(Ok(data)) = data_resource() {
-        data
-    } else {
+    let Some(resource) = data_resource() else {
         return rsx! {
             section { class: "page",
-                article { class: "empty-state",
-                    h3 { "Loading profile…" }
+                EmptyState {
+                    title: "Loading profile…".to_string(),
+                    body: "Fetching member details.".to_string(),
+                }
+            }
+        };
+    };
+
+    let Ok(data) = resource else {
+        return rsx! {
+            section { class: "page",
+                EmptyState {
+                    title: "Profile unavailable".to_string(),
+                    body: "This member profile could not be loaded right now.".to_string(),
                 }
             }
         };

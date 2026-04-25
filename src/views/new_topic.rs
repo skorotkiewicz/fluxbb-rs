@@ -1,7 +1,7 @@
 use dioxus::prelude::*;
 
 use crate::{
-    components::{EmptyState, SectionHeader},
+    components::{EmptyState, SectionHeader, StatusMessage},
     data::{clean_error, create_topic, load_forum_data, NewTopicForm, SessionUser},
     Route,
 };
@@ -17,20 +17,23 @@ pub fn NewTopic(id: i32) -> Element {
         load_forum_data(id, 1).await
     });
 
-    let data = if let Some(Ok(data)) = data_resource() {
-        data
-    } else {
+    let Some(resource) = data_resource() else {
         return rsx! {
             section { class: "page",
-                if data_resource().is_none() {
-                    article { class: "empty-state",
-                        h3 { "Loading forum…" }
-                    }
-                } else {
-                    EmptyState {
-                        title: "Forum not found".to_string(),
-                        body: "The requested forum does not exist.".to_string(),
-                    }
+                EmptyState {
+                    title: "Loading forum…".to_string(),
+                    body: "Preparing the new topic form.".to_string(),
+                }
+            }
+        };
+    };
+
+    let Ok(data) = resource else {
+        return rsx! {
+            section { class: "page",
+                EmptyState {
+                    title: "Forum unavailable".to_string(),
+                    body: "The requested forum could not be loaded.".to_string(),
                 }
             }
         };
@@ -74,10 +77,9 @@ pub fn NewTopic(id: i32) -> Element {
             }
 
             article { class: "form-card",
-                if !status().is_empty() {
-                    p { class: if is_error() { "form-message form-error" } else { "form-message form-success" },
-                        "{status}"
-                    }
+                StatusMessage {
+                    message: status(),
+                    is_error: is_error(),
                 }
 
                 label {

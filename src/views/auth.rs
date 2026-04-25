@@ -1,7 +1,7 @@
 use dioxus::{document, prelude::*};
 
 use crate::{
-    components::SectionHeader,
+    components::{SectionHeader, StatusMessage},
     data::{
         clean_error, cookie_max_age, cookie_name, load_shell_data, login_account, register_account,
         request_password_reset, reset_password, LoginForm, RegisterForm, RequestPasswordResetForm,
@@ -42,10 +42,9 @@ pub fn Login() -> Element {
                 article { class: "form-card",
                     h3 { "Sign in" }
 
-                    if !status().is_empty() {
-                        p { class: if is_error() { "form-message form-error" } else { "form-message form-success" },
-                            "{status}"
-                        }
+                    StatusMessage {
+                        message: status(),
+                        is_error: is_error(),
                     }
 
                     label {
@@ -161,10 +160,9 @@ pub fn Register() -> Element {
                 article { class: "form-card",
                     h3 { "Create account" }
 
-                    if !status().is_empty() {
-                        p { class: if is_error() { "form-message form-error" } else { "form-message form-success" },
-                            "{status}"
-                        }
+                    StatusMessage {
+                        message: status(),
+                        is_error: is_error(),
                     }
 
                     label {
@@ -314,10 +312,9 @@ pub fn ForgotPassword() -> Element {
                 article { class: "form-card",
                     h3 { "Reset your password" }
 
-                    if !status().is_empty() {
-                        p { class: if is_error() { "form-message form-error" } else { "form-message form-success" },
-                            "{status}"
-                        }
+                    StatusMessage {
+                        message: status(),
+                        is_error: is_error(),
                     }
 
                     label {
@@ -399,10 +396,9 @@ pub fn ResetPassword() -> Element {
                 article { class: "form-card",
                     h3 { "Choose a new password" }
 
-                    if !status().is_empty() {
-                        p { class: if is_error() { "form-message form-error" } else { "form-message form-success" },
-                            "{status}"
-                        }
+                    StatusMessage {
+                        message: status(),
+                        is_error: is_error(),
                     }
 
                     label {

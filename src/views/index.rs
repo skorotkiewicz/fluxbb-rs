@@ -1,7 +1,7 @@
 use dioxus::prelude::*;
 
 use crate::{
-    components::{SectionHeader, StatCard},
+    components::{EmptyState, SectionHeader, StatCard},
     data::{load_index_data, mark_all_read, SessionUser},
     Route,
 };
@@ -16,13 +16,23 @@ pub fn Index() -> Element {
         load_index_data().await
     });
 
-    let data = if let Some(Ok(data)) = data_resource() {
-        data
-    } else {
+    let Some(resource) = data_resource() else {
         return rsx! {
             section { class: "page",
-                article { class: "empty-state",
-                    h3 { "Loading board…" }
+                EmptyState {
+                    title: "Loading board…".to_string(),
+                    body: "Gathering the latest forum activity.".to_string(),
+                }
+            }
+        };
+    };
+
+    let Ok(data) = resource else {
+        return rsx! {
+            section { class: "page",
+                EmptyState {
+                    title: "Board unavailable".to_string(),
+                    body: "The board index could not be loaded right now.".to_string(),
                 }
             }
         };

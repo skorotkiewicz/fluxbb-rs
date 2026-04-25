@@ -1,7 +1,7 @@
 use dioxus::prelude::*;
 
 use crate::{
-    components::{EmptyState, SectionHeader},
+    components::{EmptyState, Pagination, SectionHeader},
     data::{load_forum_data, toggle_topic_status, SessionUser}, // todo, for each forum mark_all_read
     Route,
 };
@@ -38,13 +38,23 @@ pub fn ForumPage(id: i32, page: i32) -> Element {
         load_forum_data(id, p).await
     });
 
-    let data = if let Some(Ok(data)) = data_resource() {
-        data
-    } else {
+    let Some(resource) = data_resource() else {
         return rsx! {
             section { class: "page",
-                article { class: "empty-state",
-                    h3 { "Loading forum…" }
+                EmptyState {
+                    title: "Loading forum…".to_string(),
+                    body: "Fetching the latest topics.".to_string(),
+                }
+            }
+        };
+    };
+
+    let Ok(data) = resource else {
+        return rsx! {
+            section { class: "page",
+                EmptyState {
+                    title: "Forum unavailable".to_string(),
+                    body: "This forum could not be loaded right now.".to_string(),
                 }
             }
         };
@@ -57,6 +67,25 @@ pub fn ForumPage(id: i32, page: i32) -> Element {
 
     let total_pages = ((data.total_topics + data.per_page - 1) / data.per_page).max(1);
     let current_page = data.page;
+    let prev_route = (current_page > 1).then(|| Route::ForumPage {
+        id,
+        page: current_page - 1,
+    });
+    let next_route = (current_page < total_pages).then(|| Route::ForumPage {
+        id,
+        page: current_page + 1,
+    });
+    let page_routes = (1..=total_pages)
+        .map(|page_number| {
+            (
+                page_number,
+                Route::ForumPage {
+                    id,
+                    page: page_number,
+                },
+            )
+        })
+        .collect();
 
     let can_post_topics = current_user().as_ref().is_some_and(|u| u.post_topics);
     let can_close_topic = current_user()
@@ -180,40 +209,12 @@ pub fn ForumPage(id: i32, page: i32) -> Element {
                     }
                 }
 
-                if total_pages > 1 {
-                    nav { class: "pagination",
-                        if current_page > 1 {
-                            Link {
-                                class: "page-button",
-                                to: Route::ForumPage {
-                                    id,
-                                    page: current_page - 1,
-                                },
-                                "← Prev"
-                            }
-                        }
-                        for p in 1..=total_pages {
-                            if p == current_page {
-                                span { class: "page-button active", "{p}" }
-                            } else {
-                                Link {
-                                    class: "page-button",
-                                    to: Route::ForumPage { id, page: p },
-                                    "{p}"
-                                }
-                            }
-                        }
-                        if current_page < total_pages {
-                            Link {
-                                class: "page-button",
-                                to: Route::ForumPage {
-                                    id,
-                                    page: current_page + 1,
-                                },
-                                "Next →"
-                            }
-                        }
-                    }
+                Pagination {
+                    current_page,
+                    total_pages,
+                    prev_route,
+                    next_route,
+                    page_routes,
                 }
             }
         }

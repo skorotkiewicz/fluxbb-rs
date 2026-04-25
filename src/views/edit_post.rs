@@ -1,7 +1,7 @@
 use dioxus::prelude::*;
 
 use crate::{
-    components::{EmptyState, SectionHeader},
+    components::{EmptyState, SectionHeader, StatusMessage},
     data::{clean_error, edit_post, load_post, load_topic_data, EditPostForm, SessionUser},
     Route,
 };
@@ -12,51 +12,74 @@ pub fn EditPost(id: i32) -> Element {
     let navigator = use_navigator();
     let mut refresh = use_context::<Signal<()>>();
 
-    let post_resource = use_resource(move || async move { load_post(id).await.ok() });
+    let post_resource = use_resource(move || async move { load_post(id).await });
 
     let mut message = use_signal(String::new);
     let mut status = use_signal(String::new);
     let mut is_error = use_signal(|| false);
     let mut submitting = use_signal(|| false);
+    let mut initialized = use_signal(|| false);
 
     // Populate form when post loads
     use_effect(move || {
-        if let Some(Some(post)) = post_resource() {
+        if initialized() {
+            return;
+        }
+
+        if let Some(Ok(post)) = post_resource() {
             let body = post.body.join("\n\n");
             message.set(body);
+            initialized.set(true);
         }
     });
 
-    let post = match post_resource().flatten() {
-        Some(p) => p,
-        None => {
-            return rsx! {
-                section { class: "page",
-                    if post_resource().is_none() {
-                        article { class: "empty-state",
-                            h3 { "Loading…" }
-                        }
-                    } else {
-                        EmptyState {
-                            title: "Post not found".to_string(),
-                            body: "The post you are trying to edit does not exist.".to_string(),
-                        }
-                    }
+    let Some(post_result) = post_resource() else {
+        return rsx! {
+            section { class: "page",
+                EmptyState {
+                    title: "Loading post…".to_string(),
+                    body: "Preparing the editor.".to_string(),
                 }
             }
+        };
+    };
+
+    let post = match post_result {
+        Ok(post) => post,
+        Err(_) => {
+            return rsx! {
+                section { class: "page",
+                    EmptyState {
+                        title: "Post unavailable".to_string(),
+                        body: "The post you are trying to edit could not be loaded.".to_string(),
+                    }
+                }
+            };
         }
     };
 
     let topic_resource =
-        use_resource(move || async move { load_topic_data(post.topic_id, 1).await.ok() });
+        use_resource(move || async move { load_topic_data(post.topic_id, 1).await });
 
-    let topic_data = match topic_resource().flatten() {
-        Some(td) => td,
-        None => {
+    let Some(topic_result) = topic_resource() else {
+        return rsx! {
+            section { class: "page",
+                EmptyState {
+                    title: "Loading topic…".to_string(),
+                    body: "Looking up the discussion context.".to_string(),
+                }
+            }
+        };
+    };
+
+    let topic_data = match topic_result {
+        Ok(topic_data) => topic_data,
+        Err(_) => {
             return rsx! {
                 section { class: "page",
-                    article { class: "empty-state",
-                        h3 { "Loading topic…" }
+                    EmptyState {
+                        title: "Topic unavailable".to_string(),
+                        body: "The discussion for this post could not be loaded.".to_string(),
                     }
                 }
             }
@@ -104,10 +127,9 @@ pub fn EditPost(id: i32) -> Element {
             }
 
             article { class: "form-card",
-                if !status().is_empty() {
-                    p { class: if is_error() { "form-message form-error" } else { "form-message form-success" },
-                        "{status}"
-                    }
+                StatusMessage {
+                    message: status(),
+                    is_error: is_error(),
                 }
 
                 label {

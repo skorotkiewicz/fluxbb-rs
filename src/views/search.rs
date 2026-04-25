@@ -75,10 +75,15 @@ pub fn Search() -> Element {
                                 }
                             }
                         }
+                    } else if let Some(Err(_)) = results_resource() {
+                        EmptyState {
+                            title: "Search unavailable".to_string(),
+                            body: "Topic search could not be completed right now.".to_string(),
+                        }
                     } else {
                         EmptyState {
                             title: "Searching…".to_string(),
-                            body: "".to_string(),
+                            body: "Looking for matching topics.".to_string(),
                         }
                     }
                 }
@@ -110,10 +115,15 @@ pub fn Search() -> Element {
                                 }
                             }
                         }
+                    } else if let Some(Err(_)) = results_resource() {
+                        EmptyState {
+                            title: "Search unavailable".to_string(),
+                            body: "Member search could not be completed right now.".to_string(),
+                        }
                     } else {
                         EmptyState {
                             title: "Searching…".to_string(),
-                            body: "".to_string(),
+                            body: "Looking for matching members.".to_string(),
                         }
                     }
                 }

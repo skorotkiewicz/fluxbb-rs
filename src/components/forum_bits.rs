@@ -33,7 +33,7 @@ pub fn PostCard(
     author_id: i32,
     post: Post,
     current_user: Option<SessionUser>,
-    topic_id: i32,
+    forum_id: i32,
 ) -> Element {
     let mut refresh = use_context::<Signal<()>>();
     let navigator = use_navigator();
@@ -86,10 +86,10 @@ pub fn PostCard(
                                             Ok(0) => {
                                                 refresh.set(());
                                             }
-                                            Ok(topic_id) => {
+                                            Ok(_) => {
                                                 navigator
                                                     .push(Route::ForumPage {
-                                                        id: topic_id,
+                                                        id: forum_id,
                                                         page: 1,
                                                     });
                                             }
@@ -176,6 +176,67 @@ pub fn EmptyState(title: String, body: String) -> Element {
         article { class: "empty-state",
             h3 { "{title}" }
             p { "{body}" }
+        }
+    }
+}
+
+#[component]
+pub fn StatusMessage(message: String, is_error: bool) -> Element {
+    if message.is_empty() {
+        return rsx! {};
+    }
+
+    rsx! {
+        p {
+            class: if is_error {
+                "form-message form-error"
+            } else {
+                "form-message form-success"
+            },
+            "{message}"
+        }
+    }
+}
+
+#[component]
+pub fn Pagination(
+    current_page: i32,
+    total_pages: i32,
+    prev_route: Option<Route>,
+    next_route: Option<Route>,
+    page_routes: Vec<(i32, Route)>,
+) -> Element {
+    if total_pages <= 1 {
+        return rsx! {};
+    }
+
+    rsx! {
+        nav { class: "pagination",
+            if let Some(route) = prev_route {
+                Link {
+                    class: "page-button",
+                    to: route,
+                    "← Prev"
+                }
+            }
+            for (page_number, route) in page_routes {
+                if page_number == current_page {
+                    span { class: "page-button active", "{page_number}" }
+                } else {
+                    Link {
+                        class: "page-button",
+                        to: route,
+                        "{page_number}"
+                    }
+                }
+            }
+            if let Some(route) = next_route {
+                Link {
+                    class: "page-button",
+                    to: route,
+                    "Next →"
+                }
+            }
         }
     }
 }

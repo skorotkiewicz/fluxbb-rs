@@ -1,6 +1,10 @@
 use dioxus::prelude::*;
 
-use crate::{components::SectionHeader, data::load_users_data, Route};
+use crate::{
+    components::{EmptyState, SectionHeader},
+    data::load_users_data,
+    Route,
+};
 
 #[component]
 pub fn Users() -> Element {
@@ -45,9 +49,15 @@ pub fn Users() -> Element {
                         }
                     }
                 }
+            } else if let Some(Err(_)) = data_resource() {
+                EmptyState {
+                    title: "Members unavailable".to_string(),
+                    body: "The member directory could not be loaded right now.".to_string(),
+                }
             } else {
-                article { class: "empty-state",
-                    h3 { "Loading members…" }
+                EmptyState {
+                    title: "Loading members…".to_string(),
+                    body: "Fetching registered users.".to_string(),
                 }
             }
         }

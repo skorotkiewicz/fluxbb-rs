@@ -1,7 +1,7 @@
 use dioxus::prelude::*;
 
 use crate::{
-    components::{EmptyState, SectionHeader},
+    components::{EmptyState, SectionHeader, StatusMessage},
     data::{
         change_password, clean_error, load_profile_data, update_profile, ChangePasswordForm,
         SessionUser, UpdateProfileForm,
@@ -52,13 +52,23 @@ pub fn ProfileEdit(id: i32) -> Element {
         }
     });
 
-    let data = if let Some(Ok(data)) = data_resource() {
-        data
-    } else {
+    let Some(resource) = data_resource() else {
         return rsx! {
             section { class: "page",
-                article { class: "empty-state",
-                    h3 { "Loading profile…" }
+                EmptyState {
+                    title: "Loading profile…".to_string(),
+                    body: "Fetching account settings.".to_string(),
+                }
+            }
+        };
+    };
+
+    let Ok(data) = resource else {
+        return rsx! {
+            section { class: "page",
+                EmptyState {
+                    title: "Profile unavailable".to_string(),
+                    body: "The profile editor could not be loaded right now.".to_string(),
                 }
             }
         };
@@ -96,10 +106,9 @@ pub fn ProfileEdit(id: i32) -> Element {
                 }
             } else {
                 article { class: "form-card",
-                    if !status().is_empty() {
-                        p { class: if is_error() { "form-message form-error" } else { "form-message form-success" },
-                            "{status}"
-                        }
+                    StatusMessage {
+                        message: status(),
+                        is_error: is_error(),
                     }
 
                     label {

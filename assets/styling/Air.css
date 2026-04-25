@@ -951,6 +951,32 @@ label em {
     margin: 0;
 }
 
+.online-users {
+    margin-top: 16px;
+    padding: 10px 14px;
+    background: #f4f8fb;
+    border: 1px dashed #c8d4e0;
+    border-radius: 6px;
+    font-size: 0.85em;
+    color: #566579;
+}
+
+.online-users .online-label {
+    margin: 0 0 6px;
+    font-weight: 600;
+    color: #44699c;
+}
+
+.online-users a {
+    color: #44699c;
+    text-decoration: none;
+    margin-right: 8px;
+}
+
+.online-users a:hover {
+    text-decoration: underline;
+}
+
 .site-footer {
     border-top: 2px solid #b9c5ce;
     margin-top: 24px;

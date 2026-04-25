@@ -95,10 +95,30 @@ pub struct UserProfile {
     pub email: String,
     #[serde(default = "default_group_id")]
     pub group_id: i32,
+    #[serde(default)]
+    pub timezone: String,
+    #[serde(default = "default_disp_topics")]
+    pub disp_topics: i32,
+    #[serde(default = "default_disp_posts")]
+    pub disp_posts: i32,
+    #[serde(default = "default_show_online")]
+    pub show_online: bool,
 }
 
 fn default_group_id() -> i32 {
     4
+}
+
+fn default_disp_topics() -> i32 {
+    25
+}
+
+fn default_disp_posts() -> i32 {
+    20
+}
+
+fn default_show_online() -> bool {
+    true
 }
 
 impl UserProfile {
@@ -156,9 +176,17 @@ pub struct BoardStats {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct OnlineUser {
+    pub id: i32,
+    pub username: String,
+    pub title: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ShellData {
     pub meta: BoardMeta,
     pub stats: BoardStats,
+    pub online_users: Vec<OnlineUser>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -184,11 +212,6 @@ pub struct IndexData {
     #[serde(default)]
     pub last_visit: i64,
 }
-
-#[allow(unused)]
-const FORUM_TOPICS_PER_PAGE: i32 = 25;
-#[allow(unused)]
-const TOPIC_POSTS_PER_PAGE: i32 = 20;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ForumData {
@@ -247,6 +270,14 @@ pub struct SessionUser {
     pub group_id: i32,
     #[serde(default)]
     pub csrf_token: String,
+    #[serde(default)]
+    pub timezone: String,
+    #[serde(default = "default_disp_topics")]
+    pub disp_topics: i32,
+    #[serde(default = "default_disp_posts")]
+    pub disp_posts: i32,
+    #[serde(default = "default_show_online")]
+    pub show_online: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -316,6 +347,10 @@ pub struct UpdateProfileForm {
     pub email: String,
     pub location: String,
     pub about: String,
+    pub timezone: String,
+    pub disp_topics: i32,
+    pub disp_posts: i32,
+    pub show_online: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -425,6 +460,10 @@ struct StoredAuthUser {
     pub group_id: i32,
     pub email: String,
     pub password_hash: String,
+    pub timezone: String,
+    pub disp_topics: i32,
+    pub disp_posts: i32,
+    pub show_online: bool,
 }
 
 // ── View-specific loaders ──
@@ -433,7 +472,8 @@ struct StoredAuthUser {
 pub async fn load_shell_data() -> Result<ShellData, ServerFnError> {
     #[cfg(feature = "server")]
     {
-        let data = run_json_query::<ShellData>(
+        let cutoff = unix_now() - 900;
+        let data = run_json_query::<ShellData>(&format!(
             "SELECT json_build_object(
                 'meta', (SELECT row_to_json(m) FROM (SELECT title, tagline, announcement_title, announcement_body, smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from_email, smtp_from_name, smtp_enable FROM board_meta LIMIT 1) m),
                 'stats', json_build_object(
@@ -441,9 +481,18 @@ pub async fn load_shell_data() -> Result<ShellData, ServerFnError> {
                     'topics', (SELECT COUNT(*)::int FROM topics),
                     'posts', (SELECT COUNT(*)::int FROM posts),
                     'newest_member', COALESCE((SELECT username FROM users ORDER BY id DESC LIMIT 1), '')
-                )
+                ),
+                'online_users', (SELECT COALESCE(json_agg(row_to_json(u)), '[]'::json) FROM (
+                    SELECT DISTINCT u.id, u.username, u.title
+                    FROM forum_sessions s
+                    JOIN users u ON u.id = s.user_id
+                    WHERE s.last_seen > {cutoff}
+                      AND u.show_online = true
+                    ORDER BY u.username
+                ) u)
             )::json;",
-        ).await.map_err(server_error)?;
+            cutoff = cutoff,
+        )).await.map_err(server_error)?;
         Ok(data)
     }
     #[cfg(not(feature = "server"))]
@@ -537,7 +586,17 @@ pub async fn load_forum_data(id: i32, page: i32) -> Result<ForumData, ServerFnEr
             0
         };
         let page = page.max(1);
-        let per_page = FORUM_TOPICS_PER_PAGE;
+        let per_page = if user_id > 0 {
+            run_scalar_i64(&format!(
+                "SELECT COALESCE((SELECT disp_topics FROM users WHERE id = {}), 25);",
+                user_id
+            ))
+            .await
+            .unwrap_or(25) as i32
+        } else {
+            25
+        }
+        .clamp(5, 100);
         let offset = (page - 1) * per_page;
         let data = run_json_query::<ForumData>(&format!(
             "SELECT json_build_object(
@@ -578,8 +637,27 @@ pub async fn load_forum_data(id: i32, page: i32) -> Result<ForumData, ServerFnEr
 pub async fn load_topic_data(id: i32, page: i32) -> Result<TopicData, ServerFnError> {
     #[cfg(feature = "server")]
     {
+        let token = parse_session_cookie(&headers);
+        let user_id = if let Some(token) = &token {
+            run_scalar_i64(&format!(
+                "SELECT COALESCE((SELECT user_id FROM forum_sessions WHERE token = {} AND expires_at > EXTRACT(EPOCH FROM now())::bigint LIMIT 1), 0);",
+                sql_literal(token)
+            )).await.unwrap_or(0)
+        } else {
+            0
+        };
         let page = page.max(1);
-        let per_page = TOPIC_POSTS_PER_PAGE;
+        let per_page = if user_id > 0 {
+            run_scalar_i64(&format!(
+                "SELECT COALESCE((SELECT disp_posts FROM users WHERE id = {}), 20);",
+                user_id
+            ))
+            .await
+            .unwrap_or(20) as i32
+        } else {
+            20
+        }
+        .clamp(5, 100);
         let offset = (page - 1) * per_page;
         let data = run_json_query::<TopicData>(&format!(
             "SELECT json_build_object(
@@ -634,7 +712,7 @@ pub async fn load_profile_data(id: i32) -> Result<ProfileData, ServerFnError> {
         let data = run_json_query::<ProfileData>(&format!(
             "SELECT json_build_object(
                 'user', (SELECT row_to_json(u) FROM (
-                    SELECT id, username, title, status, joined_at, post_count, location, about, last_seen, email, group_id
+                    SELECT id, username, title, status, joined_at, post_count, location, about, last_seen, email, group_id, timezone, disp_topics, disp_posts, show_online
                     FROM users WHERE id = {id}
                 ) u),
                 'topics', (SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json) FROM (
@@ -737,7 +815,7 @@ pub async fn load_admin_data() -> Result<AdminData, ServerFnError> {
                 'meta', (SELECT row_to_json(m) FROM (SELECT title, tagline, announcement_title, announcement_body, smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from_email, smtp_from_name, smtp_enable FROM board_meta LIMIT 1) m),
                 'categories', (SELECT COALESCE(json_agg(row_to_json(c)), '[]'::json) FROM (SELECT id, name, description, sort_order FROM categories ORDER BY sort_order, id) c),
                 'forums', (SELECT COALESCE(json_agg(row_to_json(f)), '[]'::json) FROM (SELECT id, category_id, name, description, moderators, sort_order FROM forums ORDER BY category_id, sort_order, id) f),
-                'users', (SELECT COALESCE(json_agg(row_to_json(u)), '[]'::json) FROM (SELECT id, username, title, status, joined_at, post_count, location, about, last_seen, email, group_id FROM users ORDER BY id) u),
+                'users', (SELECT COALESCE(json_agg(row_to_json(u)), '[]'::json) FROM (SELECT id, username, title, status, joined_at, post_count, location, about, last_seen, email, group_id, timezone, disp_topics, disp_posts, show_online FROM users ORDER BY id) u),
                 'topics', (SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json) FROM (SELECT id, forum_id, author_id, subject, closed, views, tags, created_at, updated_at, activity_rank, sticky, moved_to FROM topics ORDER BY sticky DESC, activity_rank DESC, id) t),
                 'reports', (SELECT COALESCE(json_agg(row_to_json(r)), '[]'::json) FROM (
                     SELECT rep.id, rep.post_id, rep.reporter_id, u.username AS reporter_name, rep.reason, rep.created_at, rep.zapped,
@@ -963,7 +1041,9 @@ pub async fn admin_update_category(input: AdminCategoryUpdate) -> Result<(), Ser
             sql_literal(input.description.trim()),
             input.sort_order,
             input.id,
-        )).await.map_err(server_error)
+        ))
+        .await
+        .map_err(server_error)
     }
     #[cfg(not(feature = "server"))]
     {
@@ -1124,7 +1204,9 @@ pub async fn report_post(input: ReportPostForm) -> Result<(), ServerFnError> {
     {
         let user = require_session_csrf(&headers).await.map_err(server_error)?;
         if input.reason.trim().is_empty() {
-            return Err(server_error("Please provide a reason for the report.".into()));
+            return Err(server_error(
+                "Please provide a reason for the report.".into(),
+            ));
         }
         let now = unix_now();
         run_exec(&format!(
@@ -1150,9 +1232,12 @@ pub async fn dismiss_report(report_id: i32) -> Result<(), ServerFnError> {
         if u.group_id != 1 {
             return Err(server_error("Admin only.".into()));
         }
-        run_exec(&format!("UPDATE reports SET zapped = true WHERE id = {};", report_id))
-            .await
-            .map_err(server_error)
+        run_exec(&format!(
+            "UPDATE reports SET zapped = true WHERE id = {};",
+            report_id
+        ))
+        .await
+        .map_err(server_error)
     }
     #[cfg(not(feature = "server"))]
     {
@@ -1170,9 +1255,12 @@ pub async fn zap_report(report_id: i32) -> Result<(), ServerFnError> {
             return Err(server_error("Admin only.".into()));
         }
         // Mark report as zapped
-        run_exec(&format!("UPDATE reports SET zapped = true WHERE id = {};", report_id))
-            .await
-            .map_err(server_error)?;
+        run_exec(&format!(
+            "UPDATE reports SET zapped = true WHERE id = {};",
+            report_id
+        ))
+        .await
+        .map_err(server_error)?;
         // Delete the reported post (same logic as delete_post)
         #[derive(Deserialize)]
         struct PostInfo {
@@ -1190,17 +1278,28 @@ pub async fn zap_report(report_id: i32) -> Result<(), ServerFnError> {
             report_id
         )).await.map_err(server_error)?;
         if info.is_first {
-            run_exec(&format!("DELETE FROM posts WHERE topic_id = {};", info.topic_id))
-                .await.map_err(server_error)?;
+            run_exec(&format!(
+                "DELETE FROM posts WHERE topic_id = {};",
+                info.topic_id
+            ))
+            .await
+            .map_err(server_error)?;
             run_exec(&format!("DELETE FROM topics WHERE id = {};", info.topic_id))
-                .await.map_err(server_error)?;
+                .await
+                .map_err(server_error)?;
         } else {
-            run_exec(&format!("DELETE FROM posts WHERE id = (SELECT post_id FROM reports WHERE id = {});", report_id))
-                .await.map_err(server_error)?;
+            run_exec(&format!(
+                "DELETE FROM posts WHERE id = (SELECT post_id FROM reports WHERE id = {});",
+                report_id
+            ))
+            .await
+            .map_err(server_error)?;
             run_exec(&format!(
                 "UPDATE users SET post_count = GREATEST(post_count - 1, 0) WHERE id = {};",
                 info.author_id
-            )).await.map_err(server_error)?;
+            ))
+            .await
+            .map_err(server_error)?;
         }
         Ok(())
     }
@@ -1554,11 +1653,18 @@ pub async fn update_profile(input: UpdateProfileForm) -> Result<(), ServerFnErro
             return Err(server_error("Enter a valid email address.".into()));
         }
 
+        let disp_topics = input.disp_topics.clamp(5, 100);
+        let disp_posts = input.disp_posts.clamp(5, 100);
+
         run_exec(&format!(
-            "UPDATE users SET email = {}, location = {}, about = {} WHERE id = {};",
+            "UPDATE users SET email = {}, location = {}, about = {}, timezone = {}, disp_topics = {}, disp_posts = {}, show_online = {} WHERE id = {};",
             sql_literal(&email),
             sql_literal(input.location.trim()),
             sql_literal(input.about.trim()),
+            sql_literal(input.timezone.trim()),
+            disp_topics,
+            disp_posts,
+            if input.show_online { "true" } else { "false" },
             input.user_id,
         ))
         .await
@@ -1591,7 +1697,7 @@ pub async fn change_password(input: ChangePasswordForm) -> Result<(), ServerFnEr
         let salt = random_hex(16);
         let hash = hash_password(&input.password, &salt);
         run_exec(&format!(
-            "UPDATE users SET password = {} WHERE id = {};",
+            "UPDATE users SET password_hash = {} WHERE id = {};",
             sql_literal(&hash),
             input.user_id,
         ))
@@ -1626,20 +1732,47 @@ pub async fn test_smtp_settings(input: TestSmtpForm) -> Result<String, ServerFnE
 
         let config = config.ok_or_else(|| server_error("No SMTP configuration found.".into()))?;
 
-        let enabled = config.get("smtp_enable").and_then(|v| v.as_bool()).unwrap_or(false);
+        let enabled = config
+            .get("smtp_enable")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
         if !enabled {
             return Err(server_error("Email sending is not enabled.".into()));
         }
 
-        let host = config.get("smtp_host").and_then(|v| v.as_str()).unwrap_or("");
-        let port = config.get("smtp_port").and_then(|v| v.as_i64()).unwrap_or(587) as u16;
-        let user_smtp = config.get("smtp_user").and_then(|v| v.as_str()).unwrap_or("").to_string();
-        let pass = config.get("smtp_pass").and_then(|v| v.as_str()).unwrap_or("").to_string();
-        let from_email = config.get("smtp_from_email").and_then(|v| v.as_str()).unwrap_or("").to_string();
-        let from_name = config.get("smtp_from_name").and_then(|v| v.as_str()).unwrap_or("FluxBB").to_string();
+        let host = config
+            .get("smtp_host")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let port = config
+            .get("smtp_port")
+            .and_then(|v| v.as_i64())
+            .unwrap_or(587) as u16;
+        let user_smtp = config
+            .get("smtp_user")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        let pass = config
+            .get("smtp_pass")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        let from_email = config
+            .get("smtp_from_email")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        let from_name = config
+            .get("smtp_from_name")
+            .and_then(|v| v.as_str())
+            .unwrap_or("FluxBB")
+            .to_string();
 
         if host.is_empty() || from_email.is_empty() {
-            return Err(server_error("SMTP host and from email are required.".into()));
+            return Err(server_error(
+                "SMTP host and from email are required.".into(),
+            ));
         }
 
         use lettre::{
@@ -1705,7 +1838,10 @@ pub async fn request_password_reset(
             None => return Err(server_error("Password reset is not enabled.".into())),
         };
 
-        let enabled = config.get("smtp_enable").and_then(|v| v.as_bool()).unwrap_or(false);
+        let enabled = config
+            .get("smtp_enable")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
         if !enabled {
             return Err(server_error("Password reset is not enabled.".into()));
         }
@@ -1719,18 +1855,27 @@ pub async fn request_password_reset(
         .map_err(server_error)?;
 
         if let Some(user) = user {
-            let host = config.get("smtp_host").and_then(|v| v.as_str()).unwrap_or("");
-            let from_email = config.get("smtp_from_email").and_then(|v| v.as_str()).unwrap_or("");
+            let host = config
+                .get("smtp_host")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
+            let from_email = config
+                .get("smtp_from_email")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
 
             if host.is_empty() || from_email.is_empty() {
-                return Err(server_error("Password reset is not properly configured.".into()));
+                return Err(server_error(
+                    "Password reset is not properly configured.".into(),
+                ));
             }
 
             // Clean up old tokens for this user
             let _ = run_exec(&format!(
                 "DELETE FROM password_resets WHERE user_id = {};",
                 user.id
-            )).await;
+            ))
+            .await;
 
             // Generate new token (valid for 24 hours)
             let token = random_hex(32);
@@ -1748,25 +1893,53 @@ pub async fn request_password_reset(
                 expires,
             )).await.map_err(server_error)?;
 
-            let port = config.get("smtp_port").and_then(|v| v.as_i64()).unwrap_or(587) as u16;
-            let user_smtp = config.get("smtp_user").and_then(|v| v.as_str()).unwrap_or("").to_string();
-            let pass = config.get("smtp_pass").and_then(|v| v.as_str()).unwrap_or("").to_string();
-            let from_name = config.get("smtp_from_name").and_then(|v| v.as_str()).unwrap_or("FluxBB").to_string();
+            let port = config
+                .get("smtp_port")
+                .and_then(|v| v.as_i64())
+                .unwrap_or(587) as u16;
+            let user_smtp = config
+                .get("smtp_user")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let pass = config
+                .get("smtp_pass")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let from_name = config
+                .get("smtp_from_name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("FluxBB")
+                .to_string();
 
             let email_result = send_reset_email(
-                host, port, &user_smtp, &pass,
-                from_email, &from_name, &email, &user.username, &token,
-            ).await;
+                host,
+                port,
+                &user_smtp,
+                &pass,
+                from_email,
+                &from_name,
+                &email,
+                &user.username,
+                &token,
+            )
+            .await;
 
             if email_result.is_ok() {
                 return Ok("A password reset link has been sent to your email address.".to_string());
             } else {
-                return Err(server_error("Failed to send reset email. Please try again later.".into()));
+                return Err(server_error(
+                    "Failed to send reset email. Please try again later.".into(),
+                ));
             }
         }
 
         // User not found - return same generic success message (don't reveal account existence)
-        Ok("If an account with that email exists, a password reset link has been sent.".to_string())
+        Ok(
+            "If an account with that email exists, a password reset link has been sent."
+                .to_string(),
+        )
     }
     #[cfg(not(feature = "server"))]
     {
@@ -1824,7 +1997,10 @@ pub async fn reset_password(input: ResetPasswordForm) -> Result<String, ServerFn
         .await
         .map_err(server_error)?;
 
-        Ok("Password updated successfully. You can now sign in with your new password.".to_string())
+        Ok(
+            "Password updated successfully. You can now sign in with your new password."
+                .to_string(),
+        )
     }
     #[cfg(not(feature = "server"))]
     {
@@ -2062,7 +2238,8 @@ async fn register_account_impl(input: RegisterForm) -> Result<AuthResponse, Stri
         "WITH inserted AS (
              INSERT INTO users (
                  username, title, status, joined_at, post_count, location, about, last_seen,
-                 email, password_hash, group_id, registered_at, last_visit, registration_ip
+                 email, password_hash, group_id, registered_at, last_visit, registration_ip,
+                 timezone, disp_topics, disp_posts, show_online
              )
              VALUES (
                  {username}, 'Member', 'Online',
@@ -2076,9 +2253,10 @@ async fn register_account_impl(input: RegisterForm) -> Result<AuthResponse, Stri
                  4,
                  EXTRACT(EPOCH FROM now())::bigint,
                  EXTRACT(EPOCH FROM now())::bigint,
-                 '127.0.0.1'
+                 '127.0.0.1',
+                 'UTC', 25, 20, true
              )
-             RETURNING id, username, title, group_id
+             RETURNING id, username, title, group_id, timezone, disp_topics, disp_posts, show_online
          )
          SELECT row_to_json(inserted) FROM inserted;",
         username = sql_literal(&username),
@@ -2110,7 +2288,7 @@ async fn login_account_impl(input: LoginForm) -> Result<AuthResponse, String> {
         "SELECT COALESCE((
              SELECT row_to_json(user_row)
              FROM (
-                 SELECT id, username, title, group_id, email, password_hash
+                 SELECT id, username, title, group_id, email, password_hash, timezone, disp_topics, disp_posts, show_online
                  FROM users
                  WHERE LOWER(username) = LOWER({username})
                  LIMIT 1
@@ -2148,6 +2326,10 @@ async fn login_account_impl(input: LoginForm) -> Result<AuthResponse, String> {
             title: user.title,
             group_id: user.group_id,
             csrf_token,
+            timezone: user.timezone,
+            disp_topics: user.disp_topics,
+            disp_posts: user.disp_posts,
+            show_online: user.show_online,
         },
         session_token,
         message: "Signed in successfully.".to_string(),
@@ -2160,11 +2342,19 @@ async fn current_session_user_impl(headers: HeaderMap) -> Result<Option<SessionU
         return Ok(None);
     };
 
+    let now = unix_now();
+    let _ = run_exec(&format!(
+        "UPDATE forum_sessions SET last_seen = {now} WHERE token = {token} AND expires_at > {now};",
+        token = sql_literal(&token),
+        now = now,
+    ))
+    .await;
+
     run_json_query::<Option<SessionUser>>(&format!(
         "SELECT COALESCE((
              SELECT row_to_json(session_row)
              FROM (
-                  SELECT u.id, u.username, u.email, u.title, u.group_id, s.csrf_token
+                  SELECT u.id, u.username, u.email, u.title, u.group_id, s.csrf_token, u.timezone, u.disp_topics, u.disp_posts, u.show_online
                   FROM forum_sessions AS s
                   INNER JOIN users AS u ON u.id = s.user_id
                   WHERE s.token = {token}
@@ -2659,8 +2849,8 @@ async fn send_reset_email(
     token: &str,
 ) -> Result<(), String> {
     use lettre::{
-        message::header::ContentType, transport::smtp::authentication::Credentials, AsyncSmtpTransport,
-        AsyncTransport, Message, Tokio1Executor,
+        message::header::ContentType, transport::smtp::authentication::Credentials,
+        AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor,
     };
 
     let from = format!("{} <{}>", from_name, from_email);
@@ -2818,4 +3008,79 @@ pub fn clean_error(e: ServerFnError) -> String {
     } else {
         trimmed.to_string()
     }
+}
+
+#[post("/api/rss")]
+pub async fn generate_rss_feed() -> Result<String, ServerFnError> {
+    #[cfg(feature = "server")]
+    {
+        let meta = run_json_query::<Option<serde_json::Value>>(
+            "SELECT COALESCE((SELECT row_to_json(m) FROM (SELECT title, tagline FROM board_meta LIMIT 1) m), 'null'::json);"
+        ).await.map_err(server_error)?;
+
+        let board_title = meta
+            .as_ref()
+            .and_then(|m| m.get("title"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("FluxBB Forum")
+            .to_string();
+        let board_tagline = meta
+            .as_ref()
+            .and_then(|m| m.get("tagline"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+
+        let topics = run_json_query::<Vec<Topic>>(
+            "SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json) FROM (
+                SELECT id, forum_id, author_id, subject, closed, views, tags, created_at, updated_at, activity_rank, sticky, moved_to
+                FROM topics ORDER BY updated_at DESC LIMIT 25
+            ) t;"
+        ).await.map_err(server_error)?;
+
+        let mut xml = format!(
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+<channel>
+<title>{}</title>
+<link>/</link>
+<description>{}</description>
+<language>en</language>
+"#,
+            xml_escape(&board_title),
+            xml_escape(&board_tagline),
+        );
+
+        for topic in topics {
+            xml.push_str(&format!(
+                r#"<item>
+<title>{}</title>
+<link>/topic/{}</link>
+<pubDate>{}</pubDate>
+<guid>/topic/{}</guid>
+</item>
+"#,
+                xml_escape(&topic.subject),
+                topic.id,
+                topic.updated_at,
+                topic.id,
+            ));
+        }
+
+        xml.push_str("</channel>\n</rss>");
+
+        Ok(xml)
+    }
+    #[cfg(not(feature = "server"))]
+    {
+        Err(ServerFnError::new("server only"))
+    }
+}
+
+#[cfg(feature = "server")]
+fn xml_escape(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
 }

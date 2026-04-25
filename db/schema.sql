@@ -44,7 +44,11 @@ CREATE TABLE IF NOT EXISTS users (
     group_id INTEGER NOT NULL DEFAULT 4,
     registered_at BIGINT NOT NULL DEFAULT 0,
     last_visit BIGINT NOT NULL DEFAULT 0,
-    registration_ip TEXT NOT NULL DEFAULT '127.0.0.1'
+    registration_ip TEXT NOT NULL DEFAULT '127.0.0.1',
+    timezone TEXT NOT NULL DEFAULT 'UTC',
+    disp_topics INTEGER NOT NULL DEFAULT 25,
+    disp_posts INTEGER NOT NULL DEFAULT 20,
+    show_online BOOLEAN NOT NULL DEFAULT true
 );
 
 CREATE TABLE IF NOT EXISTS topics (

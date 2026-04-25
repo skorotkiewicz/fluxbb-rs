@@ -23,25 +23,32 @@ pub fn ProfileEdit(id: i32) -> Element {
     let mut email = use_signal(String::new);
     let mut location = use_signal(String::new);
     let mut about = use_signal(String::new);
+    let mut timezone = use_signal(String::new);
+    let mut disp_topics = use_signal(|| 25_i32);
+    let mut disp_posts = use_signal(|| 20_i32);
+    let mut show_online = use_signal(|| true);
     let mut password = use_signal(String::new);
     let mut password_confirm = use_signal(String::new);
     let mut status = use_signal(String::new);
     let mut is_error = use_signal(|| false);
     let mut submitting = use_signal(|| false);
+    let mut initialized = use_signal(|| false);
 
     // Pre-fill form with existing profile data
     use_effect(move || {
+        if initialized() {
+            return;
+        }
         if let Some(Ok(data)) = data_resource() {
             let u = &data.user;
-            if email().is_empty() && !u.email.is_empty() {
-                email.set(u.email.clone());
-            }
-            if location().is_empty() && !u.location.is_empty() {
-                location.set(u.location.clone());
-            }
-            if about().is_empty() && !u.about.is_empty() {
-                about.set(u.about.clone());
-            }
+            email.set(u.email.clone());
+            location.set(u.location.clone());
+            about.set(u.about.clone());
+            timezone.set(u.timezone.clone());
+            disp_topics.set(u.disp_topics);
+            disp_posts.set(u.disp_posts);
+            show_online.set(u.show_online);
+            initialized.set(true);
         }
     });
 
@@ -123,6 +130,58 @@ pub fn ProfileEdit(id: i32) -> Element {
                             placeholder: "Short profile summary",
                         }
                     }
+
+                    hr {}
+                    h3 { "Preferences" }
+
+                    label {
+                        "Timezone"
+                        input {
+                            class: "text-input",
+                            value: "{timezone}",
+                            oninput: move |e| timezone.set(e.value()),
+                            placeholder: "UTC",
+                        }
+                    }
+                    label {
+                        "Topics per page (5–100)"
+                        input {
+                            class: "text-input",
+                            r#type: "number",
+                            min: "5",
+                            max: "100",
+                            value: "{disp_topics}",
+                            oninput: move |e| {
+                                if let Ok(v) = e.value().parse::<i32>() {
+                                    disp_topics.set(v.clamp(5, 100));
+                                }
+                            },
+                        }
+                    }
+                    label {
+                        "Posts per page (5–100)"
+                        input {
+                            class: "text-input",
+                            r#type: "number",
+                            min: "5",
+                            max: "100",
+                            value: "{disp_posts}",
+                            oninput: move |e| {
+                                if let Ok(v) = e.value().parse::<i32>() {
+                                    disp_posts.set(v.clamp(5, 100));
+                                }
+                            },
+                        }
+                    }
+                    label { class: "checkbox-row",
+                        input {
+                            r#type: "checkbox",
+                            checked: show_online(),
+                            onchange: move |_| show_online.toggle(),
+                        }
+                        span { "Show me in online users list" }
+                    }
+
                     button {
                         class: "primary-button",
                         disabled: submitting(),
@@ -143,6 +202,10 @@ pub fn ProfileEdit(id: i32) -> Element {
                                 email: e,
                                 location: location(),
                                 about: about(),
+                                timezone: timezone(),
+                                disp_topics: disp_topics(),
+                                disp_posts: disp_posts(),
+                                show_online: show_online(),
                             };
                             spawn(async move {
                                 submitting.set(true);

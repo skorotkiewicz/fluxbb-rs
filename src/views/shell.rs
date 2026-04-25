@@ -116,6 +116,19 @@ pub fn AppShell() -> Element {
 
                 main { class: "page-wrap", Outlet::<Route> {} }
 
+                if !shell.online_users.is_empty() {
+                    div { class: "online-users",
+                        p { class: "online-label", "Online users ({shell.online_users.len()}): " }
+                        for user in &shell.online_users {
+                            Link {
+                                class: "online-user",
+                                to: Route::Profile { id: user.id },
+                                "{user.username}"
+                            }
+                        }
+                    }
+                }
+
                 footer { class: "site-footer",
                     p { "Powered by FluxBB RS" }
                 }

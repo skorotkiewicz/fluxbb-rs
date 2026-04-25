@@ -3,14 +3,10 @@ use dioxus::prelude::*;
 #[component]
 pub fn ConfirmButton(
     label: String,
-    #[props(default = "Confirm?".to_string())]
-    confirm_text: String,
-    #[props(default = "Yes".to_string())]
-    confirm_label: String,
-    #[props(default = "No".to_string())]
-    cancel_label: String,
-    #[props(default = "danger-button".to_string())]
-    class: String,
+    #[props(default = "Confirm?".to_string())] confirm_text: String,
+    #[props(default = "Yes".to_string())] confirm_label: String,
+    #[props(default = "No".to_string())] cancel_label: String,
+    #[props(default = "danger-button".to_string())] class: String,
     on_confirm: EventHandler<MouseEvent>,
 ) -> Element {
     let mut confirming = use_signal(|| false);

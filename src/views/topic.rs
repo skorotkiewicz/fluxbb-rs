@@ -73,10 +73,18 @@ pub fn TopicPage(id: i32, page: i32) -> Element {
     let mut replying = use_signal(|| false);
     let mut move_forum_id = use_signal(|| 0_i32);
 
-    let can_move_topic = current_user().as_ref().is_some_and(|u| u.move_topic || u.is_admin);
-    let can_sticky_topic = current_user().as_ref().is_some_and(|u| u.sticky_topic || u.is_admin);
-    let can_close_topic = current_user().as_ref().is_some_and(|u| u.close_topic || u.is_admin);
-    let can_delete_topic = current_user().as_ref().is_some_and(|u| u.delete_topic || u.is_admin);
+    let can_move_topic = current_user()
+        .as_ref()
+        .is_some_and(|u| u.move_topic || u.is_admin);
+    let can_sticky_topic = current_user()
+        .as_ref()
+        .is_some_and(|u| u.sticky_topic || u.is_admin);
+    let can_close_topic = current_user()
+        .as_ref()
+        .is_some_and(|u| u.close_topic || u.is_admin);
+    let can_delete_topic = current_user()
+        .as_ref()
+        .is_some_and(|u| u.delete_topic || u.is_admin);
     let can_post_replies = current_user().as_ref().is_some_and(|u| u.post_replies);
     let is_closed = topic.closed;
 

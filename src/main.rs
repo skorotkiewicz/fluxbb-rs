@@ -1,7 +1,7 @@
 use dioxus::prelude::*;
 
 use views::{
-    Admin, AppShell, EditPost, Forum, ForumPage, ForgotPassword, Help, Index, Install, Login,
+    Admin, AppShell, EditPost, ForgotPassword, Forum, ForumPage, Help, Index, Install, Login,
     NewTopic, Profile, ProfileEdit, Register, ResetPassword, Rules, Search, Topic, TopicPage,
     Users,
 };
@@ -67,8 +67,10 @@ fn main() {
         // std::env::set_var("RUST_LOG", "warn");
         std::env::set_var("RUST_LOG", "sqlx=warn,info");
         dioxus::serve(|| async move {
-            let router = dioxus::server::router(App)
-                .route("/feed", dioxus::server::axum::routing::get(rss_feed_handler));
+            let router = dioxus::server::router(App).route(
+                "/feed",
+                dioxus::server::axum::routing::get(rss_feed_handler),
+            );
             Ok(router)
         });
     }
@@ -85,7 +87,9 @@ async fn rss_feed_handler() -> dioxus::server::axum::response::Response {
             .unwrap(),
         Err(_) => Response::builder()
             .status(500)
-            .body(dioxus::server::axum::body::Body::from("Error generating feed"))
+            .body(dioxus::server::axum::body::Body::from(
+                "Error generating feed",
+            ))
             .unwrap(),
     }
 }

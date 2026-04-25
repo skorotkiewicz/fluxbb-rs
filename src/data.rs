@@ -1398,9 +1398,13 @@ pub async fn edit_post(input: EditPostForm) -> Result<(), ServerFnError> {
         };
 
         if post.author_id != user.id {
-            check_permission(&user, "moderator").await.map_err(server_error)?;
+            check_permission(&user, "moderator")
+                .await
+                .map_err(server_error)?;
         } else {
-            check_permission(&user, "edit_posts").await.map_err(server_error)?;
+            check_permission(&user, "edit_posts")
+                .await
+                .map_err(server_error)?;
         }
 
         let message = input.message.trim();
@@ -1463,9 +1467,13 @@ pub async fn delete_post(post_id: i32) -> Result<i32, ServerFnError> {
         )).await.map_err(server_error)?;
 
         if info.author_id != user.id {
-            check_permission(&user, "moderator").await.map_err(server_error)?;
+            check_permission(&user, "moderator")
+                .await
+                .map_err(server_error)?;
         } else {
-            check_permission(&user, "delete_posts").await.map_err(server_error)?;
+            check_permission(&user, "delete_posts")
+                .await
+                .map_err(server_error)?;
         }
 
         if info.is_first {
@@ -2142,7 +2150,9 @@ pub async fn delete_topic(topic_id: i32) -> Result<(), ServerFnError> {
     #[cfg(feature = "server")]
     {
         let user = require_session_csrf(&headers).await.map_err(server_error)?;
-        check_permission(&user, "delete_topic").await.map_err(server_error)?;
+        check_permission(&user, "delete_topic")
+            .await
+            .map_err(server_error)?;
 
         #[derive(Deserialize)]
         struct PostCount {
@@ -2181,7 +2191,9 @@ pub async fn move_topic(input: MoveTopicForm) -> Result<(), ServerFnError> {
     #[cfg(feature = "server")]
     {
         let user = require_session_csrf(&headers).await.map_err(server_error)?;
-        check_permission(&user, "move_topic").await.map_err(server_error)?;
+        check_permission(&user, "move_topic")
+            .await
+            .map_err(server_error)?;
         run_exec(&format!(
             "UPDATE topics SET forum_id = {} WHERE id = {};",
             input.forum_id, input.topic_id
@@ -2202,7 +2214,9 @@ pub async fn toggle_sticky(topic_id: i32) -> Result<bool, ServerFnError> {
     #[cfg(feature = "server")]
     {
         let user = require_session_csrf(&headers).await.map_err(server_error)?;
-        check_permission(&user, "sticky_topic").await.map_err(server_error)?;
+        check_permission(&user, "sticky_topic")
+            .await
+            .map_err(server_error)?;
 
         #[derive(Deserialize)]
         struct StickyRow {
@@ -2238,7 +2252,9 @@ pub async fn toggle_topic_status(topic_id: i32) -> Result<String, ServerFnError>
     #[cfg(feature = "server")]
     {
         let user = require_session_csrf(&headers).await.map_err(server_error)?;
-        check_permission(&user, "close_topic").await.map_err(server_error)?;
+        check_permission(&user, "close_topic")
+            .await
+            .map_err(server_error)?;
 
         #[derive(Deserialize)]
         struct ClosedRow {

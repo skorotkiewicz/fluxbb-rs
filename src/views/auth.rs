@@ -4,8 +4,8 @@ use crate::{
     components::SectionHeader,
     data::{
         clean_error, cookie_max_age, cookie_name, load_shell_data, login_account, register_account,
-        request_password_reset, reset_password, LoginForm, RegisterForm,
-        RequestPasswordResetForm, ResetPasswordForm, SessionUser,
+        request_password_reset, reset_password, LoginForm, RegisterForm, RequestPasswordResetForm,
+        ResetPasswordForm, SessionUser,
     },
     Route,
 };
@@ -21,9 +21,7 @@ pub fn Login() -> Element {
     let mut is_error = use_signal(|| false);
     let mut submitting = use_signal(|| false);
 
-    let shell_data = use_resource(move || async move {
-        load_shell_data().await.ok()
-    });
+    let shell_data = use_resource(move || async move { load_shell_data().await.ok() });
 
     let smtp_enabled = shell_data()
         .and_then(|d| d)

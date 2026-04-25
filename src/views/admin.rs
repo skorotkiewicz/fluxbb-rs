@@ -8,8 +8,7 @@ use crate::{
         admin_update_forum, admin_update_user, clean_error, dismiss_report, load_admin_data,
         load_bans, load_groups, remove_ban, test_smtp_settings, update_group, zap_report,
         AdminBoardSettings, AdminCategoryForm, AdminCategoryUpdate, AdminData, AdminDeleteItem,
-        AdminForumForm, AdminForumUpdate, AdminUserUpdate, BanForm, SessionUser,
-        TestSmtpForm,
+        AdminForumForm, AdminForumUpdate, AdminUserUpdate, BanForm, SessionUser, TestSmtpForm,
     },
     Route,
 };
@@ -538,9 +537,8 @@ fn UsersPanel(
     mut is_error: Signal<bool>,
     mut refresh: Signal<()>,
 ) -> Element {
-    let groups_resource = use_resource(move || async move {
-        load_groups().await.unwrap_or_default()
-    });
+    let groups_resource =
+        use_resource(move || async move { load_groups().await.unwrap_or_default() });
 
     let groups = groups_resource().unwrap_or_default();
 
@@ -584,7 +582,11 @@ fn UsersPanel(
                                             if gid == current_group {
                                                 return;
                                             }
-                                            let title = groups.iter().find(|g| g.id == gid).map(|g| g.title.clone()).unwrap_or_else(|| "Member".to_string());
+                                            let title = groups
+                                                .iter()
+                                                .find(|g| g.id == gid)
+                                                .map(|g| g.title.clone())
+                                                .unwrap_or_else(|| "Member".to_string());
                                             let uname = uname.clone();
                                             spawn(async move {
                                                 match admin_update_user(AdminUserUpdate {
@@ -608,7 +610,11 @@ fn UsersPanel(
                                     }
                                 },
                                 for group in groups.clone() {
-                                    option { value: "{group.id}", selected: group.id == user.group_id(), "{group.title}" }
+                                    option {
+                                        value: "{group.id}",
+                                        selected: group.id == user.group_id(),
+                                        "{group.title}"
+                                    }
                                 }
                             }
                             // Delete
@@ -1084,7 +1090,10 @@ fn GroupsPanel(
         load_groups().await
     });
 
-    fn make_form(g: &crate::data::Group, mut f: impl FnMut(&mut crate::data::Group)) -> crate::data::GroupUpdateForm {
+    fn make_form(
+        g: &crate::data::Group,
+        mut f: impl FnMut(&mut crate::data::Group),
+    ) -> crate::data::GroupUpdateForm {
         let mut clone = g.clone();
         f(&mut clone);
         crate::data::GroupUpdateForm {
@@ -1127,7 +1136,10 @@ fn GroupsPanel(
                                 let g = group.clone();
                                 move |v: bool| {
                                     let g = g.clone();
-                                    spawn(async move { let _ = update_group(make_form(&g, |c| c.read_board = v)).await; refresh.set(()); });
+                                    spawn(async move {
+                                        let _ = update_group(make_form(&g, |c| c.read_board = v)).await;
+                                        refresh.set(());
+                                    });
                                 }
                             },
                         }
@@ -1138,7 +1150,10 @@ fn GroupsPanel(
                                 let g = group.clone();
                                 move |v: bool| {
                                     let g = g.clone();
-                                    spawn(async move { let _ = update_group(make_form(&g, |c| c.post_topics = v)).await; refresh.set(()); });
+                                    spawn(async move {
+                                        let _ = update_group(make_form(&g, |c| c.post_topics = v)).await;
+                                        refresh.set(());
+                                    });
                                 }
                             },
                         }
@@ -1149,7 +1164,10 @@ fn GroupsPanel(
                                 let g = group.clone();
                                 move |v: bool| {
                                     let g = g.clone();
-                                    spawn(async move { let _ = update_group(make_form(&g, |c| c.post_replies = v)).await; refresh.set(()); });
+                                    spawn(async move {
+                                        let _ = update_group(make_form(&g, |c| c.post_replies = v)).await;
+                                        refresh.set(());
+                                    });
                                 }
                             },
                         }
@@ -1160,7 +1178,10 @@ fn GroupsPanel(
                                 let g = group.clone();
                                 move |v: bool| {
                                     let g = g.clone();
-                                    spawn(async move { let _ = update_group(make_form(&g, |c| c.edit_posts = v)).await; refresh.set(()); });
+                                    spawn(async move {
+                                        let _ = update_group(make_form(&g, |c| c.edit_posts = v)).await;
+                                        refresh.set(());
+                                    });
                                 }
                             },
                         }
@@ -1171,7 +1192,10 @@ fn GroupsPanel(
                                 let g = group.clone();
                                 move |v: bool| {
                                     let g = g.clone();
-                                    spawn(async move { let _ = update_group(make_form(&g, |c| c.delete_posts = v)).await; refresh.set(()); });
+                                    spawn(async move {
+                                        let _ = update_group(make_form(&g, |c| c.delete_posts = v)).await;
+                                        refresh.set(());
+                                    });
                                 }
                             },
                         }
@@ -1182,7 +1206,10 @@ fn GroupsPanel(
                                 let g = group.clone();
                                 move |v: bool| {
                                     let g = g.clone();
-                                    spawn(async move { let _ = update_group(make_form(&g, |c| c.delete_topic = v)).await; refresh.set(()); });
+                                    spawn(async move {
+                                        let _ = update_group(make_form(&g, |c| c.delete_topic = v)).await;
+                                        refresh.set(());
+                                    });
                                 }
                             },
                         }
@@ -1193,7 +1220,10 @@ fn GroupsPanel(
                                 let g = group.clone();
                                 move |v: bool| {
                                     let g = g.clone();
-                                    spawn(async move { let _ = update_group(make_form(&g, |c| c.move_topic = v)).await; refresh.set(()); });
+                                    spawn(async move {
+                                        let _ = update_group(make_form(&g, |c| c.move_topic = v)).await;
+                                        refresh.set(());
+                                    });
                                 }
                             },
                         }
@@ -1204,7 +1234,10 @@ fn GroupsPanel(
                                 let g = group.clone();
                                 move |v: bool| {
                                     let g = g.clone();
-                                    spawn(async move { let _ = update_group(make_form(&g, |c| c.sticky_topic = v)).await; refresh.set(()); });
+                                    spawn(async move {
+                                        let _ = update_group(make_form(&g, |c| c.sticky_topic = v)).await;
+                                        refresh.set(());
+                                    });
                                 }
                             },
                         }
@@ -1215,7 +1248,10 @@ fn GroupsPanel(
                                 let g = group.clone();
                                 move |v: bool| {
                                     let g = g.clone();
-                                    spawn(async move { let _ = update_group(make_form(&g, |c| c.close_topic = v)).await; refresh.set(()); });
+                                    spawn(async move {
+                                        let _ = update_group(make_form(&g, |c| c.close_topic = v)).await;
+                                        refresh.set(());
+                                    });
                                 }
                             },
                         }
@@ -1226,7 +1262,10 @@ fn GroupsPanel(
                                 let g = group.clone();
                                 move |v: bool| {
                                     let g = g.clone();
-                                    spawn(async move { let _ = update_group(make_form(&g, |c| c.manage_users = v)).await; refresh.set(()); });
+                                    spawn(async move {
+                                        let _ = update_group(make_form(&g, |c| c.manage_users = v)).await;
+                                        refresh.set(());
+                                    });
                                 }
                             },
                         }
@@ -1237,7 +1276,10 @@ fn GroupsPanel(
                                 let g = group.clone();
                                 move |v: bool| {
                                     let g = g.clone();
-                                    spawn(async move { let _ = update_group(make_form(&g, |c| c.manage_forums = v)).await; refresh.set(()); });
+                                    spawn(async move {
+                                        let _ = update_group(make_form(&g, |c| c.manage_forums = v)).await;
+                                        refresh.set(());
+                                    });
                                 }
                             },
                         }
@@ -1248,7 +1290,10 @@ fn GroupsPanel(
                                 let g = group.clone();
                                 move |v: bool| {
                                     let g = g.clone();
-                                    spawn(async move { let _ = update_group(make_form(&g, |c| c.manage_categories = v)).await; refresh.set(()); });
+                                    spawn(async move {
+                                        let _ = update_group(make_form(&g, |c| c.manage_categories = v)).await;
+                                        refresh.set(());
+                                    });
                                 }
                             },
                         }
@@ -1259,7 +1304,10 @@ fn GroupsPanel(
                                 let g = group.clone();
                                 move |v: bool| {
                                     let g = g.clone();
-                                    spawn(async move { let _ = update_group(make_form(&g, |c| c.manage_bans = v)).await; refresh.set(()); });
+                                    spawn(async move {
+                                        let _ = update_group(make_form(&g, |c| c.manage_bans = v)).await;
+                                        refresh.set(());
+                                    });
                                 }
                             },
                         }
@@ -1270,7 +1318,10 @@ fn GroupsPanel(
                                 let g = group.clone();
                                 move |v: bool| {
                                     let g = g.clone();
-                                    spawn(async move { let _ = update_group(make_form(&g, |c| c.manage_groups = v)).await; refresh.set(()); });
+                                    spawn(async move {
+                                        let _ = update_group(make_form(&g, |c| c.manage_groups = v)).await;
+                                        refresh.set(());
+                                    });
                                 }
                             },
                         }
@@ -1281,7 +1332,10 @@ fn GroupsPanel(
                                 let g = group.clone();
                                 move |v: bool| {
                                     let g = g.clone();
-                                    spawn(async move { let _ = update_group(make_form(&g, |c| c.manage_settings = v)).await; refresh.set(()); });
+                                    spawn(async move {
+                                        let _ = update_group(make_form(&g, |c| c.manage_settings = v)).await;
+                                        refresh.set(());
+                                    });
                                 }
                             },
                         }
@@ -1292,7 +1346,10 @@ fn GroupsPanel(
                                 let g = group.clone();
                                 move |v: bool| {
                                     let g = g.clone();
-                                    spawn(async move { let _ = update_group(make_form(&g, |c| c.is_moderator = v)).await; refresh.set(()); });
+                                    spawn(async move {
+                                        let _ = update_group(make_form(&g, |c| c.is_moderator = v)).await;
+                                        refresh.set(());
+                                    });
                                 }
                             },
                         }
@@ -1303,7 +1360,10 @@ fn GroupsPanel(
                                 let g = group.clone();
                                 move |v: bool| {
                                     let g = g.clone();
-                                    spawn(async move { let _ = update_group(make_form(&g, |c| c.is_admin = v)).await; refresh.set(()); });
+                                    spawn(async move {
+                                        let _ = update_group(make_form(&g, |c| c.is_admin = v)).await;
+                                        refresh.set(());
+                                    });
                                 }
                             },
                         }

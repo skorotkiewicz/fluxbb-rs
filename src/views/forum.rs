@@ -59,7 +59,9 @@ pub fn ForumPage(id: i32, page: i32) -> Element {
     let current_page = data.page;
 
     let can_post_topics = current_user().as_ref().is_some_and(|u| u.post_topics);
-    let can_close_topic = current_user().as_ref().is_some_and(|u| u.close_topic || u.is_admin);
+    let can_close_topic = current_user()
+        .as_ref()
+        .is_some_and(|u| u.close_topic || u.is_admin);
 
     let new_topic_ids: std::collections::HashSet<i32> = if data.last_visit > 0 {
         topics

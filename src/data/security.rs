@@ -20,7 +20,7 @@ use serde::Deserialize;
 #[cfg(feature = "server")]
 use super::{
     db::{run_parameterized_json, run_parameterized_scalar_i64, PgBind},
-    Group, SessionUser,
+    /*Group,*/ SessionUser,
 };
 
 const SESSION_COOKIE: &str = "fluxbb_rs_session";
@@ -66,12 +66,12 @@ pub(crate) enum Permission {
     MoveTopic,
     StickyTopic,
     CloseTopic,
-    ManageUsers,
-    ManageForums,
-    ManageCategories,
-    ManageBans,
-    ManageGroups,
-    ManageSettings,
+    // ManageUsers,
+    // ManageForums,
+    // ManageCategories,
+    // ManageBans,
+    // ManageGroups,
+    // ManageSettings,
     Moderator,
 }
 
@@ -127,15 +127,15 @@ pub(crate) async fn require_session_csrf(headers: &HeaderMap) -> Result<SessionU
     Ok(user)
 }
 
-#[cfg(feature = "server")]
-pub(crate) async fn get_group(group_id: i32) -> Result<Group, String> {
-    run_parameterized_json::<Option<Group>>(
-        "SELECT COALESCE((SELECT row_to_json(r) FROM (SELECT id, title, read_board, post_topics, post_replies, edit_posts, delete_posts, is_moderator, is_admin FROM groups WHERE id = $1) r), 'null'::json);",
-        &[&group_id],
-    )
-    .await?
-    .ok_or_else(|| "Group not found.".to_string())
-}
+// #[cfg(feature = "server")]
+// pub(crate) async fn get_group(group_id: i32) -> Result<Group, String> {
+//     run_parameterized_json::<Option<Group>>(
+//         "SELECT COALESCE((SELECT row_to_json(r) FROM (SELECT id, title, read_board, post_topics, post_replies, edit_posts, delete_posts, is_moderator, is_admin FROM groups WHERE id = $1) r), 'null'::json);",
+//         &[&group_id],
+//     )
+//     .await?
+//     .ok_or_else(|| "Group not found.".to_string())
+// }
 
 #[cfg(feature = "server")]
 pub(crate) async fn check_flood(user_id: i32, is_admin: bool) -> Result<(), String> {
@@ -174,12 +174,12 @@ pub(crate) async fn check_permission(
         Permission::MoveTopic => user.move_topic,
         Permission::StickyTopic => user.sticky_topic,
         Permission::CloseTopic => user.close_topic,
-        Permission::ManageUsers => user.manage_users,
-        Permission::ManageForums => user.manage_forums,
-        Permission::ManageCategories => user.manage_categories,
-        Permission::ManageBans => user.manage_bans,
-        Permission::ManageGroups => user.manage_groups,
-        Permission::ManageSettings => user.manage_settings,
+        // Permission::ManageUsers => user.manage_users,
+        // Permission::ManageForums => user.manage_forums,
+        // Permission::ManageCategories => user.manage_categories,
+        // Permission::ManageBans => user.manage_bans,
+        // Permission::ManageGroups => user.manage_groups,
+        // Permission::ManageSettings => user.manage_settings,
         Permission::Moderator => user.is_moderator,
     };
 

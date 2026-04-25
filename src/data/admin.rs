@@ -8,6 +8,7 @@ use serde::Deserialize;
 use super::{
     db::{run_exec, run_json_query, run_scalar_i64, server_error, sql_literal},
     security::{require_session, require_session_csrf, unix_now},
+    // security::{check_permission, require_session, require_session_csrf, unix_now, Permission},
 };
 use super::{
     AdminBoardSettings, AdminCategoryForm, AdminCategoryUpdate, AdminData, AdminDeleteItem,
@@ -61,6 +62,9 @@ pub async fn admin_add_category(input: AdminCategoryForm) -> Result<(), ServerFn
         if !u.is_admin {
             return Err(server_error("Admin only.".into()));
         }
+        // check_permission(&u, Permission::ManageCategories)
+        //     .await
+        //     .map_err(server_error)?;
         run_exec(&format!(
             "INSERT INTO categories (name, description, sort_order) VALUES ({}, {}, (SELECT COALESCE(MAX(sort_order),0)+1 FROM categories));",
             sql_literal(input.name.trim()),
@@ -84,6 +88,9 @@ pub async fn admin_add_forum(input: AdminForumForm) -> Result<(), ServerFnError>
         if !u.is_admin {
             return Err(server_error("Admin only.".into()));
         }
+        // check_permission(&u, Permission::ManageForums)
+        //     .await
+        //     .map_err(server_error)?;
         run_exec(&format!(
             "INSERT INTO forums (category_id, name, description, sort_order) VALUES ({}, {}, {}, (SELECT COALESCE(MAX(sort_order),0)+1 FROM forums WHERE category_id={}));",
             input.category_id,
@@ -109,6 +116,9 @@ pub async fn admin_delete_category(input: AdminDeleteItem) -> Result<(), ServerF
         if !u.is_admin {
             return Err(server_error("Admin only.".into()));
         }
+        // check_permission(&u, Permission::ManageCategories)
+        //     .await
+        //     .map_err(server_error)?;
         run_exec(&format!("DELETE FROM categories WHERE id = {};", input.id))
             .await
             .map_err(server_error)
@@ -128,6 +138,9 @@ pub async fn admin_delete_forum(input: AdminDeleteItem) -> Result<(), ServerFnEr
         if !u.is_admin {
             return Err(server_error("Admin only.".into()));
         }
+        // check_permission(&u, Permission::ManageForums)
+        //     .await
+        //     .map_err(server_error)?;
         run_exec(&format!("DELETE FROM forums WHERE id = {};", input.id))
             .await
             .map_err(server_error)
@@ -147,6 +160,9 @@ pub async fn admin_update_category(input: AdminCategoryUpdate) -> Result<(), Ser
         if !u.is_admin {
             return Err(server_error("Admin only.".into()));
         }
+        // check_permission(&u, Permission::ManageCategories)
+        //     .await
+        //     .map_err(server_error)?;
         run_exec(&format!(
             "UPDATE categories SET name = {}, description = {}, sort_order = {} WHERE id = {};",
             sql_literal(input.name.trim()),
@@ -172,6 +188,9 @@ pub async fn admin_update_forum(input: AdminForumUpdate) -> Result<(), ServerFnE
         if !u.is_admin {
             return Err(server_error("Admin only.".into()));
         }
+        // check_permission(&u, Permission::ManageForums)
+        //     .await
+        //     .map_err(server_error)?;
         run_exec(&format!(
             "UPDATE forums SET category_id = {}, name = {}, description = {}, sort_order = {} WHERE id = {};",
             input.category_id,
@@ -198,6 +217,9 @@ pub async fn admin_update_user(input: AdminUserUpdate) -> Result<(), ServerFnErr
         if !u.is_admin {
             return Err(server_error("Admin only.".into()));
         }
+        // check_permission(&u, Permission::ManageUsers)
+        //     .await
+        //     .map_err(server_error)?;
         run_exec(&format!(
             "UPDATE users SET group_id = {}, title = {} WHERE id = {};",
             input.group_id,
@@ -222,6 +244,9 @@ pub async fn admin_delete_user(input: AdminDeleteItem) -> Result<(), ServerFnErr
         if !u.is_admin {
             return Err(server_error("Admin only.".into()));
         }
+        // check_permission(&u, Permission::ManageUsers)
+        //     .await
+        //     .map_err(server_error)?;
         if input.id == u.id {
             return Err(server_error("Cannot delete yourself.".into()));
         }
@@ -250,6 +275,9 @@ pub async fn admin_delete_topic(input: AdminDeleteItem) -> Result<(), ServerFnEr
         if !u.is_admin {
             return Err(server_error("Admin only.".into()));
         }
+        // check_permission(&u, Permission::DeleteTopic)
+        //     .await
+        //     .map_err(server_error)?;
         run_exec(&format!("DELETE FROM topics WHERE id = {};", input.id))
             .await
             .map_err(server_error)
@@ -269,6 +297,9 @@ pub async fn admin_update_board(input: AdminBoardSettings) -> Result<(), ServerF
         if !u.is_admin {
             return Err(server_error("Admin only.".into()));
         }
+        // check_permission(&u, Permission::ManageSettings)
+        //     .await
+        //     .map_err(server_error)?;
         run_exec(&format!(
             "UPDATE board_meta SET title = {}, tagline = {}, announcement_title = {}, announcement_body = {}, smtp_host = {}, smtp_port = {}, smtp_user = {}, smtp_pass = {}, smtp_from_email = {}, smtp_from_name = {}, smtp_enable = {} WHERE id = 1;",
             sql_literal(input.title.trim()),
@@ -301,6 +332,9 @@ pub async fn admin_clean_sessions() -> Result<i64, ServerFnError> {
         if !u.is_admin {
             return Err(server_error("Admin only.".into()));
         }
+        // check_permission(&u, Permission::ManageSettings)
+        //     .await
+        //     .map_err(server_error)?;
         let deleted = run_scalar_i64(
             "WITH deleted AS (DELETE FROM forum_sessions WHERE expires_at < EXTRACT(EPOCH FROM now())::bigint RETURNING *) SELECT COUNT(*) FROM deleted;"
         )
@@ -350,6 +384,9 @@ pub async fn dismiss_report(report_id: i32) -> Result<(), ServerFnError> {
         if !u.is_admin {
             return Err(server_error("Admin only.".into()));
         }
+        // check_permission(&u, Permission::Moderator)
+        //     .await
+        //     .map_err(server_error)?;
         run_exec(&format!(
             "UPDATE reports SET zapped = true WHERE id = {};",
             report_id
@@ -372,6 +409,9 @@ pub async fn zap_report(report_id: i32) -> Result<(), ServerFnError> {
         if !u.is_admin {
             return Err(server_error("Admin only.".into()));
         }
+        // check_permission(&u, Permission::Moderator)
+        //     .await
+        //     .map_err(server_error)?;
         run_exec(&format!(
             "UPDATE reports SET zapped = true WHERE id = {};",
             report_id
@@ -459,6 +499,9 @@ pub async fn update_group(input: GroupUpdateForm) -> Result<(), ServerFnError> {
         if !user.is_admin {
             return Err(server_error("Admin only.".into()));
         }
+        // check_permission(&user, Permission::ManageGroups)
+        //     .await
+        //     .map_err(server_error)?;
         run_exec(&format!(
             "UPDATE groups SET title = {title}, read_board = {rb}, post_topics = {pt}, post_replies = {pr}, edit_posts = {ep}, delete_posts = {dp},
                              delete_topic = {dt}, move_topic = {mt}, sticky_topic = {st}, close_topic = {ct},
@@ -520,6 +563,9 @@ pub async fn add_ban(input: BanForm) -> Result<(), ServerFnError> {
         if !user.is_admin {
             return Err(server_error("Admin only.".into()));
         }
+        // check_permission(&user, Permission::ManageBans)
+        //     .await
+        //     .map_err(server_error)?;
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
@@ -556,6 +602,9 @@ pub async fn remove_ban(ban_id: i32) -> Result<(), ServerFnError> {
         if !user.is_admin {
             return Err(server_error("Admin only.".into()));
         }
+        // check_permission(&user, Permission::ManageBans)
+        //     .await
+        //     .map_err(server_error)?;
         run_exec(&format!("DELETE FROM bans WHERE id = {};", ban_id))
             .await
             .map_err(server_error)?;
@@ -576,6 +625,9 @@ pub async fn test_smtp_settings(input: TestSmtpForm) -> Result<String, ServerFnE
         if !u.is_admin {
             return Err(server_error("Admin only.".into()));
         }
+        // check_permission(&u, Permission::ManageSettings)
+        //     .await
+        //     .map_err(server_error)?;
 
         let config = run_json_query::<Option<serde_json::Value>>(
             "SELECT COALESCE((SELECT row_to_json(m) FROM (SELECT smtp_enable, smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from_email, smtp_from_name FROM board_meta LIMIT 1) m), 'null'::json);"

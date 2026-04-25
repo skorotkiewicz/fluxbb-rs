@@ -8,8 +8,15 @@ use serde::Deserialize;
 use super::{
     db::{run_exec, run_json_query, run_scalar_i64, server_error, sql_literal},
     security::{
-        check_ban, check_flood, check_permission, hash_password, parse_session_cookie,
-        require_session, require_session_csrf, unix_now, Permission,
+        check_ban,
+        check_flood,
+        check_permission,
+        hash_password,
+        parse_session_cookie,
+        require_session_csrf,
+        unix_now,
+        Permission,
+        // require_session,
     },
 };
 use super::{

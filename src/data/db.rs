@@ -96,23 +96,23 @@ pub(crate) async fn run_parameterized_scalar_i64(
     Ok(val)
 }
 
-/// Run a parameterized exec (INSERT/UPDATE/DELETE) with bind params.
-#[cfg(feature = "server")]
-pub(crate) async fn run_parameterized_exec(
-    sql: &str,
-    args: &[&(dyn PgBind + Sync)],
-) -> Result<(), String> {
-    let pool = db_pool().await?;
-    let mut query = sqlx::query(sql);
-    for arg in args {
-        query = arg.bind_to(query);
-    }
-    query
-        .execute(pool)
-        .await
-        .map_err(|e| format!("exec failed: {e}"))?;
-    Ok(())
-}
+// /// Run a parameterized exec (INSERT/UPDATE/DELETE) with bind params.
+// #[cfg(feature = "server")]
+// pub(crate) async fn run_parameterized_exec(
+//     sql: &str,
+//     args: &[&(dyn PgBind + Sync)],
+// ) -> Result<(), String> {
+//     let pool = db_pool().await?;
+//     let mut query = sqlx::query(sql);
+//     for arg in args {
+//         query = arg.bind_to(query);
+//     }
+//     query
+//         .execute(pool)
+//         .await
+//         .map_err(|e| format!("exec failed: {e}"))?;
+//     Ok(())
+// }
 
 /// Trait that lets us pass heterogeneous parameter slices (`&[&dyn PgBind]`)
 /// to the parameterized helpers above.

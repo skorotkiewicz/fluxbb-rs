@@ -43,6 +43,112 @@ pub(crate) fn server_error(message: String) -> ServerFnError {
     ServerFnError::new(message)
 }
 
+// ---------------------------------------------------------------------------
+// Parameterized query helpers (preferred — immune to SQL injection)
+// ---------------------------------------------------------------------------
+
+/// Run a parameterized JSON query with `$1`, `$2`, … placeholders.
+///
+/// Callers build a `PgArguments` via the `params!` helper or by calling
+/// `.add()` manually and pass it here.
+#[cfg(feature = "server")]
+pub(crate) async fn run_parameterized_json<T>(
+    sql: &str,
+    args: &[&(dyn PgBind + Sync)],
+) -> Result<T, String>
+where
+    T: DeserializeOwned,
+{
+    let pool = db_pool().await?;
+    let mut query = sqlx::query(sql);
+    for arg in args {
+        query = arg.bind_to(query);
+    }
+    let row = query
+        .fetch_one(pool)
+        .await
+        .map_err(|e| format!("query failed: {e}"))?;
+    let payload: serde_json::Value = row.get(0);
+    serde_json::from_value(payload).map_err(|e| format!("failed to parse postgres json: {e}"))
+}
+
+/// Run a parameterized scalar query returning a single `i64`.
+#[cfg(feature = "server")]
+pub(crate) async fn run_parameterized_scalar_i64(
+    sql: &str,
+    args: &[&(dyn PgBind + Sync)],
+) -> Result<i64, String> {
+    let pool = db_pool().await?;
+    let mut query = sqlx::query(sql);
+    for arg in args {
+        query = arg.bind_to(query);
+    }
+    let row = query
+        .fetch_one(pool)
+        .await
+        .map_err(|e| format!("query failed: {e}"))?;
+    let val: i64 = match row.try_get::<i32, _>(0) {
+        Ok(v) => v as i64,
+        Err(_) => row
+            .try_get::<i64, _>(0)
+            .map_err(|e| format!("scalar decode failed: {e}"))?,
+    };
+    Ok(val)
+}
+
+/// Run a parameterized exec (INSERT/UPDATE/DELETE) with bind params.
+#[cfg(feature = "server")]
+pub(crate) async fn run_parameterized_exec(
+    sql: &str,
+    args: &[&(dyn PgBind + Sync)],
+) -> Result<(), String> {
+    let pool = db_pool().await?;
+    let mut query = sqlx::query(sql);
+    for arg in args {
+        query = arg.bind_to(query);
+    }
+    query
+        .execute(pool)
+        .await
+        .map_err(|e| format!("exec failed: {e}"))?;
+    Ok(())
+}
+
+/// Trait that lets us pass heterogeneous parameter slices (`&[&dyn PgBind]`)
+/// to the parameterized helpers above.
+///
+/// Implemented for the common types used in this codebase.
+#[cfg(feature = "server")]
+pub(crate) trait PgBind {
+    fn bind_to<'q>(
+        &'q self,
+        query: sqlx::query::Query<'q, sqlx::Postgres, sqlx::postgres::PgArguments>,
+    ) -> sqlx::query::Query<'q, sqlx::Postgres, sqlx::postgres::PgArguments>;
+}
+
+#[cfg(feature = "server")]
+macro_rules! impl_pg_bind {
+    ($($ty:ty),*) => {
+        $(
+            impl PgBind for $ty {
+                fn bind_to<'q>(
+                    &'q self,
+                    query: sqlx::query::Query<'q, sqlx::Postgres, sqlx::postgres::PgArguments>,
+                ) -> sqlx::query::Query<'q, sqlx::Postgres, sqlx::postgres::PgArguments> {
+                    query.bind(self)
+                }
+            }
+        )*
+    };
+}
+
+#[cfg(feature = "server")]
+impl_pg_bind!(String, i32, i64, bool);
+
+// ---------------------------------------------------------------------------
+// Legacy unparameterized helpers (to be migrated incrementally)
+// ---------------------------------------------------------------------------
+
 #[cfg(feature = "server")]
 pub(crate) async fn run_json_query<T>(sql: &str) -> Result<T, String>
 where
@@ -82,3 +188,4 @@ pub(crate) async fn run_exec(sql: &str) -> Result<(), String> {
         .map_err(|e| format!("exec failed: {e}"))?;
     Ok(())
 }
+

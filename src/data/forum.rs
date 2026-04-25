@@ -8,7 +8,7 @@ use serde::Deserialize;
 use super::{
     db::{run_exec, run_json_query, run_scalar_i64, server_error, sql_literal},
     security::{
-        check_ban, check_flood, check_permission, hash_password, parse_session_cookie, random_hex,
+        check_ban, check_flood, check_permission, hash_password, parse_session_cookie,
         require_session, require_session_csrf, unix_now, Permission,
     },
 };
@@ -652,8 +652,7 @@ pub async fn change_password(input: ChangePasswordForm) -> Result<(), ServerFnEr
                 "Password must be at least 9 characters.".into(),
             ));
         }
-        let salt = random_hex(16);
-        let hash = hash_password(&input.password, &salt);
+        let hash = hash_password(&input.password);
         run_exec(&format!(
             "UPDATE users SET password_hash = {} WHERE id = {};",
             sql_literal(&hash),

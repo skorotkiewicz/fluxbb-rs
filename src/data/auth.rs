@@ -279,8 +279,7 @@ pub async fn reset_password(input: ResetPasswordForm) -> Result<String, ServerFn
             ));
         }
 
-        let salt = random_hex(16);
-        let hash = hash_password(&input.password, &salt);
+        let hash = hash_password(&input.password);
         run_exec(&format!(
             "UPDATE users SET password_hash = {} WHERE id = {};",
             sql_literal(&hash),
@@ -330,8 +329,7 @@ async fn register_account_impl(input: RegisterForm) -> Result<AuthResponse, Stri
         return Err("That email address is already in use.".to_string());
     }
 
-    let salt = random_hex(16);
-    let password_hash = hash_password(&input.password, &salt);
+    let password_hash = hash_password(&input.password);
 
     let mut user = run_json_query::<SessionUser>(&format!(
         "WITH inserted AS (
@@ -588,8 +586,7 @@ async fn install_board_impl(input: InstallForm) -> Result<AuthResponse, String> 
     ))
     .await?;
 
-    let salt = random_hex(16);
-    let password_hash = hash_password(&input.admin_password, &salt);
+    let password_hash = hash_password(&input.admin_password);
     let mut user = run_json_query::<SessionUser>(&format!(
         "WITH inserted AS (
              INSERT INTO users (

@@ -19,6 +19,7 @@ getrandom = { version = "0.3.4", features = ["wasm_js"], optional = true }
 
 # Only needed for server builds
 sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "sqlite"], optional = true }
+lettre = { version = "0.11", features = ["tokio1-native-tls"], optional = true }
 dotenvy = "0.15"
 
 [features]
@@ -30,4 +31,4 @@ desktop = ["dioxus/desktop"]
 # The feature that are only required for the mobile = ["dioxus/mobile"] build target should be optional and only enabled in the mobile = ["dioxus/mobile"] feature
 mobile = ["dioxus/mobile"]
 # The feature that are only required for the server = ["dioxus/server"] build target should be optional and only enabled in the server = ["dioxus/server"] feature
-server = ["dioxus/server", "dep:sqlx"]
+server = ["dioxus/server", "dep:sqlx", "dep:lettre"]

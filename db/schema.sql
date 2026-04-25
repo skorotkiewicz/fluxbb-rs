@@ -3,7 +3,14 @@ CREATE TABLE IF NOT EXISTS board_meta (
     title TEXT NOT NULL,
     tagline TEXT NOT NULL,
     announcement_title TEXT NOT NULL DEFAULT '',
-    announcement_body TEXT NOT NULL DEFAULT ''
+    announcement_body TEXT NOT NULL DEFAULT '',
+    smtp_host TEXT NOT NULL DEFAULT '',
+    smtp_port INTEGER NOT NULL DEFAULT 587,
+    smtp_user TEXT NOT NULL DEFAULT '',
+    smtp_pass TEXT NOT NULL DEFAULT '',
+    smtp_from_email TEXT NOT NULL DEFAULT '',
+    smtp_from_name TEXT NOT NULL DEFAULT '',
+    smtp_enable BOOLEAN NOT NULL DEFAULT false
 );
 
 CREATE TABLE IF NOT EXISTS categories (
@@ -112,3 +119,14 @@ CREATE INDEX IF NOT EXISTS bans_username_idx ON bans (username);
 CREATE INDEX IF NOT EXISTS bans_email_idx ON bans (LOWER(email));
 CREATE INDEX IF NOT EXISTS reports_post_id_idx ON reports (post_id);
 CREATE INDEX IF NOT EXISTS reports_zapped_idx ON reports (zapped) WHERE zapped = false;
+
+CREATE TABLE IF NOT EXISTS password_resets (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token TEXT NOT NULL UNIQUE,
+    created_at BIGINT NOT NULL DEFAULT 0,
+    expires_at BIGINT NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS password_resets_token_idx ON password_resets (token);
+CREATE INDEX IF NOT EXISTS password_resets_expires_idx ON password_resets (expires_at);

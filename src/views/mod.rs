@@ -15,7 +15,7 @@ mod topic;
 mod users;
 
 pub use admin::Admin;
-pub use auth::{Login, Register};
+pub use auth::{ForgotPassword, Login, Register, ResetPassword};
 pub use edit_post::EditPost;
 pub use forum::{Forum, ForumPage};
 pub use help::Help;

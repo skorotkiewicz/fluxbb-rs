@@ -3,8 +3,9 @@ use dioxus::{document, prelude::*};
 use crate::{
     components::SectionHeader,
     data::{
-        clean_error, cookie_max_age, cookie_name, login_account, register_account, LoginForm,
-        RegisterForm, SessionUser,
+        clean_error, cookie_max_age, cookie_name, load_shell_data, login_account, register_account,
+        request_password_reset, reset_password, LoginForm, RegisterForm,
+        RequestPasswordResetForm, ResetPasswordForm, SessionUser,
     },
     Route,
 };
@@ -19,6 +20,15 @@ pub fn Login() -> Element {
     let mut status = use_signal(String::new);
     let mut is_error = use_signal(|| false);
     let mut submitting = use_signal(|| false);
+
+    let shell_data = use_resource(move || async move {
+        load_shell_data().await.ok()
+    });
+
+    let smtp_enabled = shell_data()
+        .and_then(|d| d)
+        .map(|d| d.meta.smtp_enable)
+        .unwrap_or(false);
 
     rsx! {
         section { class: "page",
@@ -111,6 +121,12 @@ pub fn Login() -> Element {
                             "Signing in…"
                         } else {
                             "Sign in"
+                        }
+                    }
+
+                    if smtp_enabled {
+                        p { class: "form-link-row",
+                            Link { to: Route::ForgotPassword {}, "Forgot password?" }
                         }
                     }
                 }
@@ -273,6 +289,208 @@ pub fn Register() -> Element {
                     h3 { "Registration rules" }
                     p { "Username must be 2–25 characters. Password must be at least 9 characters." }
                     p { "Duplicate usernames and email addresses are not allowed." }
+                }
+            }
+        }
+    }
+}
+
+#[component]
+pub fn ForgotPassword() -> Element {
+    let mut email = use_signal(String::new);
+    let mut status = use_signal(String::new);
+    let mut is_error = use_signal(|| false);
+    let mut submitting = use_signal(|| false);
+
+    rsx! {
+        section { class: "page",
+            article { class: "hero-card compact-hero",
+                SectionHeader {
+                    kicker: "Account".to_string(),
+                    title: "Forgot password".to_string(),
+                    subtitle: "Enter your email address to request a password reset.".to_string(),
+                }
+            }
+
+            div { class: "auth-grid",
+                article { class: "form-card",
+                    h3 { "Reset your password" }
+
+                    if !status().is_empty() {
+                        p { class: if is_error() { "form-message form-error" } else { "form-message form-success" },
+                            "{status}"
+                        }
+                    }
+
+                    label {
+                        "Email"
+                        input {
+                            class: "text-input",
+                            value: "{email}",
+                            oninput: move |event| email.set(event.value()),
+                            placeholder: "you@example.com",
+                        }
+                    }
+
+                    button {
+                        class: "primary-button",
+                        disabled: submitting(),
+                        onclick: move |_| {
+                            let e = email();
+                            if e.trim().is_empty() || !e.contains('@') {
+                                is_error.set(true);
+                                status.set("Please enter a valid email address.".to_string());
+                                return;
+                            }
+
+                            spawn(async move {
+                                submitting.set(true);
+                                match request_password_reset(RequestPasswordResetForm {
+                                        email: e,
+                                    })
+                                    .await
+                                {
+                                    Ok(msg) => {
+                                        is_error.set(false);
+                                        status.set(msg);
+                                    }
+                                    Err(error) => {
+                                        is_error.set(true);
+                                        status.set(clean_error(error));
+                                    }
+                                }
+                                submitting.set(false);
+                            });
+                        },
+                        if submitting() {
+                            "Requesting…"
+                        } else {
+                            "Request reset"
+                        }
+                    }
+
+                    p { class: "form-link-row",
+                        Link { to: Route::Login {}, "Back to login" }
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[component]
+pub fn ResetPassword() -> Element {
+    let mut token = use_signal(String::new);
+    let mut password = use_signal(String::new);
+    let mut confirm_password = use_signal(String::new);
+    let mut status = use_signal(String::new);
+    let mut is_error = use_signal(|| false);
+    let mut submitting = use_signal(|| false);
+
+    rsx! {
+        section { class: "page",
+            article { class: "hero-card compact-hero",
+                SectionHeader {
+                    kicker: "Account".to_string(),
+                    title: "Reset password".to_string(),
+                    subtitle: "Enter your new password.".to_string(),
+                }
+            }
+
+            div { class: "auth-grid",
+                article { class: "form-card",
+                    h3 { "Choose a new password" }
+
+                    if !status().is_empty() {
+                        p { class: if is_error() { "form-message form-error" } else { "form-message form-success" },
+                            "{status}"
+                        }
+                    }
+
+                    label {
+                        "Reset token"
+                        input {
+                            class: "text-input",
+                            value: "{token}",
+                            oninput: move |event| token.set(event.value()),
+                            placeholder: "Paste your reset token here",
+                        }
+                    }
+                    label {
+                        "New password"
+                        input {
+                            class: "text-input",
+                            r#type: "password",
+                            value: "{password}",
+                            oninput: move |event| password.set(event.value()),
+                            placeholder: "Minimum 9 characters",
+                        }
+                    }
+                    label {
+                        "Confirm password"
+                        input {
+                            class: "text-input",
+                            r#type: "password",
+                            value: "{confirm_password}",
+                            oninput: move |event| confirm_password.set(event.value()),
+                            placeholder: "Re-enter your new password",
+                        }
+                    }
+
+                    button {
+                        class: "primary-button",
+                        disabled: submitting(),
+                        onclick: move |_| {
+                            let t = token();
+                            let p = password();
+                            let cp = confirm_password();
+
+                            let validation = if t.trim().is_empty() {
+                                "Please enter a reset token."
+                            } else if p.len() < 9 {
+                                "Password must be at least 9 characters."
+                            } else if p != cp {
+                                "Passwords do not match."
+                            } else {
+                                ""
+                            };
+
+                            if !validation.is_empty() {
+                                is_error.set(true);
+                                status.set(validation.to_string());
+                                return;
+                            }
+
+                            spawn(async move {
+                                submitting.set(true);
+                                match reset_password(ResetPasswordForm {
+                                        token: t,
+                                        password: p,
+                                    })
+                                    .await
+                                {
+                                    Ok(msg) => {
+                                        is_error.set(false);
+                                        status.set(msg);
+                                    }
+                                    Err(error) => {
+                                        is_error.set(true);
+                                        status.set(clean_error(error));
+                                    }
+                                }
+                                submitting.set(false);
+                            });
+                        },
+                        if submitting() {
+                            "Updating…"
+                        } else {
+                            "Update password"
+                        }
+                    }
+
+                    p { class: "form-link-row",
+                        Link { to: Route::Login {}, "Back to login" }
+                    }
                 }
             }
         }

@@ -4,12 +4,12 @@ use crate::{
     components::{ConfirmButton, SectionHeader},
     data::{
         add_ban, admin_add_category, admin_add_forum, admin_clean_sessions, admin_delete_category,
-        admin_delete_forum, admin_delete_user, admin_update_board,
-        admin_update_category, admin_update_forum, admin_update_user,
-        clean_error, dismiss_report, load_admin_data, load_bans, load_groups, remove_ban,
-        update_group, zap_report, AdminBoardSettings, AdminCategoryForm, AdminCategoryUpdate,
-        AdminData, AdminDeleteItem, AdminForumForm, AdminForumUpdate,
-        AdminUserUpdate, BanForm, GroupUpdateForm, SessionUser,
+        admin_delete_forum, admin_delete_user, admin_update_board, admin_update_category,
+        admin_update_forum, admin_update_user, clean_error, dismiss_report, load_admin_data,
+        load_bans, load_groups, remove_ban, test_smtp_settings, update_group, zap_report,
+        AdminBoardSettings, AdminCategoryForm, AdminCategoryUpdate, AdminData, AdminDeleteItem,
+        AdminForumForm, AdminForumUpdate, AdminUserUpdate, BanForm, GroupUpdateForm, SessionUser,
+        TestSmtpForm,
     },
     Route,
 };
@@ -812,6 +812,13 @@ fn SettingsPanel(
     let mut tagline = use_signal(|| data.meta.tagline.clone());
     let mut ann_title = use_signal(|| data.meta.announcement_title.clone());
     let mut ann_body = use_signal(|| data.meta.announcement_body.clone());
+    let mut smtp_host = use_signal(|| data.meta.smtp_host.clone());
+    let mut smtp_port = use_signal(|| data.meta.smtp_port.to_string());
+    let mut smtp_user = use_signal(|| data.meta.smtp_user.clone());
+    let mut smtp_pass = use_signal(|| data.meta.smtp_pass.clone());
+    let mut smtp_from_email = use_signal(|| data.meta.smtp_from_email.clone());
+    let mut smtp_from_name = use_signal(|| data.meta.smtp_from_name.clone());
+    let mut smtp_enable = use_signal(|| data.meta.smtp_enable);
 
     rsx! {
         article { class: "form-card",
@@ -849,14 +856,111 @@ fn SettingsPanel(
                     oninput: move |e| ann_body.set(e.value()),
                 }
             }
+
+            hr {}
+            h4 { "SMTP / Email settings" }
+            p { class: "form-hint", "Configure email server to enable password reset emails." }
+
+            label { class: "checkbox-row",
+                input {
+                    r#type: "checkbox",
+                    checked: smtp_enable(),
+                    onchange: move |_| smtp_enable.toggle(),
+                }
+                span { "Enable email sending" }
+            }
+            label {
+                "SMTP host"
+                input {
+                    class: "text-input",
+                    value: "{smtp_host}",
+                    oninput: move |e| smtp_host.set(e.value()),
+                    placeholder: "smtp.example.com",
+                }
+            }
+            label {
+                "SMTP port"
+                input {
+                    class: "text-input",
+                    r#type: "number",
+                    value: "{smtp_port}",
+                    oninput: move |e| smtp_port.set(e.value()),
+                }
+            }
+            label {
+                "SMTP username"
+                input {
+                    class: "text-input",
+                    value: "{smtp_user}",
+                    oninput: move |e| smtp_user.set(e.value()),
+                }
+            }
+            label {
+                "SMTP password"
+                input {
+                    class: "text-input",
+                    r#type: "password",
+                    value: "{smtp_pass}",
+                    oninput: move |e| smtp_pass.set(e.value()),
+                }
+            }
+            label {
+                "From email"
+                input {
+                    class: "text-input",
+                    value: "{smtp_from_email}",
+                    oninput: move |e| smtp_from_email.set(e.value()),
+                    placeholder: "noreply@example.com",
+                }
+            }
+            label {
+                "From name"
+                input {
+                    class: "text-input",
+                    value: "{smtp_from_name}",
+                    oninput: move |e| smtp_from_name.set(e.value()),
+                    placeholder: "FluxBB Forum",
+                }
+            }
+
+            button {
+                class: "secondary-button",
+                disabled: !smtp_enable() || smtp_host().trim().is_empty()
+                    || smtp_from_email().trim().is_empty(),
+                onclick: move |_| {
+                    let test_email = smtp_from_email().clone();
+                    spawn(async move {
+                        match test_smtp_settings(TestSmtpForm { test_email }).await {
+                            Ok(msg) => {
+                                is_error.set(false);
+                                status.set(msg);
+                            }
+                            Err(e) => {
+                                is_error.set(true);
+                                status.set(clean_error(e));
+                            }
+                        }
+                    });
+                },
+                "Test SMTP (sends to from-email)"
+            }
+
             button {
                 class: "primary-button",
                 onclick: move |_| {
+                    let port = smtp_port().parse::<i32>().unwrap_or(587);
                     let form = AdminBoardSettings {
                         title: title(),
                         tagline: tagline(),
                         announcement_title: ann_title(),
                         announcement_body: ann_body(),
+                        smtp_host: smtp_host(),
+                        smtp_port: port,
+                        smtp_user: smtp_user(),
+                        smtp_pass: smtp_pass(),
+                        smtp_from_email: smtp_from_email(),
+                        smtp_from_name: smtp_from_name(),
+                        smtp_enable: smtp_enable(),
                     };
                     spawn(async move {
                         match admin_update_board(form).await {

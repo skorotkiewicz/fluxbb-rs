@@ -53,6 +53,13 @@ pub struct BoardMeta {
     pub tagline: String,
     pub announcement_title: String,
     pub announcement_body: String,
+    pub smtp_host: String,
+    pub smtp_port: i32,
+    pub smtp_user: String,
+    pub smtp_pass: String,
+    pub smtp_from_email: String,
+    pub smtp_from_name: String,
+    pub smtp_enable: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -317,6 +324,17 @@ pub struct ChangePasswordForm {
     pub password: String,
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct RequestPasswordResetForm {
+    pub email: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ResetPasswordForm {
+    pub token: String,
+    pub password: String,
+}
+
 // ── Admin forms ──
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -345,6 +363,13 @@ pub struct AdminBoardSettings {
     pub tagline: String,
     pub announcement_title: String,
     pub announcement_body: String,
+    pub smtp_host: String,
+    pub smtp_port: i32,
+    pub smtp_user: String,
+    pub smtp_pass: String,
+    pub smtp_from_email: String,
+    pub smtp_from_name: String,
+    pub smtp_enable: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -410,7 +435,7 @@ pub async fn load_shell_data() -> Result<ShellData, ServerFnError> {
     {
         let data = run_json_query::<ShellData>(
             "SELECT json_build_object(
-                'meta', (SELECT row_to_json(m) FROM (SELECT title, tagline, announcement_title, announcement_body FROM board_meta LIMIT 1) m),
+                'meta', (SELECT row_to_json(m) FROM (SELECT title, tagline, announcement_title, announcement_body, smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from_email, smtp_from_name, smtp_enable FROM board_meta LIMIT 1) m),
                 'stats', json_build_object(
                     'members', (SELECT COUNT(*)::int FROM users),
                     'topics', (SELECT COUNT(*)::int FROM topics),
@@ -442,7 +467,7 @@ pub async fn load_index_data() -> Result<IndexData, ServerFnError> {
         };
         let data = run_json_query::<IndexData>(&format!(
             "SELECT json_build_object(
-                'meta', (SELECT row_to_json(m) FROM (SELECT title, tagline, announcement_title, announcement_body FROM board_meta LIMIT 1) m),
+                'meta', (SELECT row_to_json(m) FROM (SELECT title, tagline, announcement_title, announcement_body, smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from_email, smtp_from_name, smtp_enable FROM board_meta LIMIT 1) m),
                 'categories', (SELECT COALESCE(json_agg(row_to_json(c)), '[]'::json) FROM (SELECT id, name, description, sort_order FROM categories ORDER BY sort_order, id) c),
                 'forums', (SELECT COALESCE(json_agg(row_to_json(f)), '[]'::json) FROM (SELECT id, category_id, name, description, moderators, sort_order FROM forums ORDER BY category_id, sort_order, id) f),
                 'forum_stats', (SELECT COALESCE(json_agg(row_to_json(fa)), '[]'::json) FROM (
@@ -709,7 +734,7 @@ pub async fn load_admin_data() -> Result<AdminData, ServerFnError> {
         }
         let data = run_json_query::<AdminData>(
             "SELECT json_build_object(
-                'meta', (SELECT row_to_json(m) FROM (SELECT title, tagline, announcement_title, announcement_body FROM board_meta LIMIT 1) m),
+                'meta', (SELECT row_to_json(m) FROM (SELECT title, tagline, announcement_title, announcement_body, smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from_email, smtp_from_name, smtp_enable FROM board_meta LIMIT 1) m),
                 'categories', (SELECT COALESCE(json_agg(row_to_json(c)), '[]'::json) FROM (SELECT id, name, description, sort_order FROM categories ORDER BY sort_order, id) c),
                 'forums', (SELECT COALESCE(json_agg(row_to_json(f)), '[]'::json) FROM (SELECT id, category_id, name, description, moderators, sort_order FROM forums ORDER BY category_id, sort_order, id) f),
                 'users', (SELECT COALESCE(json_agg(row_to_json(u)), '[]'::json) FROM (SELECT id, username, title, status, joined_at, post_count, location, about, last_seen, email, group_id FROM users ORDER BY id) u),
@@ -1050,9 +1075,20 @@ pub async fn admin_update_board(input: AdminBoardSettings) -> Result<(), ServerF
         if u.group_id != 1 {
             return Err(server_error("Admin only.".into()));
         }
-        run_exec(&format!("UPDATE board_meta SET title = {}, tagline = {}, announcement_title = {}, announcement_body = {} WHERE id = 1;",
-        sql_literal(input.title.trim()), sql_literal(input.tagline.trim()),
-        sql_literal(input.announcement_title.trim()), sql_literal(input.announcement_body.trim()))).await.map_err(server_error)
+        run_exec(&format!(
+            "UPDATE board_meta SET title = {}, tagline = {}, announcement_title = {}, announcement_body = {}, smtp_host = {}, smtp_port = {}, smtp_user = {}, smtp_pass = {}, smtp_from_email = {}, smtp_from_name = {}, smtp_enable = {} WHERE id = 1;",
+            sql_literal(input.title.trim()),
+            sql_literal(input.tagline.trim()),
+            sql_literal(input.announcement_title.trim()),
+            sql_literal(input.announcement_body.trim()),
+            sql_literal(input.smtp_host.trim()),
+            input.smtp_port,
+            sql_literal(input.smtp_user.trim()),
+            sql_literal(input.smtp_pass.trim()),
+            sql_literal(input.smtp_from_email.trim()),
+            sql_literal(input.smtp_from_name.trim()),
+            if input.smtp_enable { "true" } else { "false" }
+        )).await.map_err(server_error)
     }
     #[cfg(not(feature = "server"))]
     {
@@ -1562,6 +1598,233 @@ pub async fn change_password(input: ChangePasswordForm) -> Result<(), ServerFnEr
         .await
         .map_err(server_error)?;
         Ok(())
+    }
+    #[cfg(not(feature = "server"))]
+    {
+        let _ = input;
+        Err(ServerFnError::new("server only"))
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct TestSmtpForm {
+    pub test_email: String,
+}
+
+#[post("/api/admin/test-smtp", headers: HeaderMap)]
+pub async fn test_smtp_settings(input: TestSmtpForm) -> Result<String, ServerFnError> {
+    #[cfg(feature = "server")]
+    {
+        let u = require_session_csrf(&headers).await.map_err(server_error)?;
+        if u.group_id != 1 {
+            return Err(server_error("Admin only.".into()));
+        }
+
+        let config = run_json_query::<Option<serde_json::Value>>(
+            "SELECT COALESCE((SELECT row_to_json(m) FROM (SELECT smtp_enable, smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from_email, smtp_from_name FROM board_meta LIMIT 1) m), 'null'::json);"
+        ).await.map_err(server_error)?;
+
+        let config = config.ok_or_else(|| server_error("No SMTP configuration found.".into()))?;
+
+        let enabled = config.get("smtp_enable").and_then(|v| v.as_bool()).unwrap_or(false);
+        if !enabled {
+            return Err(server_error("Email sending is not enabled.".into()));
+        }
+
+        let host = config.get("smtp_host").and_then(|v| v.as_str()).unwrap_or("");
+        let port = config.get("smtp_port").and_then(|v| v.as_i64()).unwrap_or(587) as u16;
+        let user_smtp = config.get("smtp_user").and_then(|v| v.as_str()).unwrap_or("").to_string();
+        let pass = config.get("smtp_pass").and_then(|v| v.as_str()).unwrap_or("").to_string();
+        let from_email = config.get("smtp_from_email").and_then(|v| v.as_str()).unwrap_or("").to_string();
+        let from_name = config.get("smtp_from_name").and_then(|v| v.as_str()).unwrap_or("FluxBB").to_string();
+
+        if host.is_empty() || from_email.is_empty() {
+            return Err(server_error("SMTP host and from email are required.".into()));
+        }
+
+        use lettre::{
+            message::header::ContentType, transport::smtp::authentication::Credentials,
+            AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor,
+        };
+
+        let from = format!("{} <{}>", from_name, from_email);
+        let to = input.test_email.trim().to_string();
+
+        let email = Message::builder()
+            .from(from.parse().map_err(|e| server_error(format!("Invalid from address: {e}")))?)
+            .to(format!("Test Recipient <{}>", to).parse().map_err(|e| server_error(format!("Invalid to address: {e}")))?)
+            .subject("SMTP Test - FluxBB Forum")
+            .header(ContentType::TEXT_PLAIN)
+            .body(format!(
+                "Hello,\n\nThis is a test email from your FluxBB forum.\n\nIf you received this message, your SMTP settings are working correctly.\n\nBoard: {}\n\nRegards,\n{}",
+                from_name,
+                from_name
+            ))
+            .map_err(|e| server_error(format!("Failed to build email: {e}")))?;
+
+        let creds = Credentials::new(user_smtp, pass);
+
+        let mailer = AsyncSmtpTransport::<Tokio1Executor>::relay(host)
+            .map_err(|e| server_error(format!("Failed to create mailer: {e}")))?
+            .port(port)
+            .credentials(creds)
+            .build();
+
+        mailer
+            .send(email)
+            .await
+            .map_err(|e| server_error(format!("Failed to send email: {e}")))?;
+
+        Ok(format!("Test email sent successfully to {}.", to))
+    }
+    #[cfg(not(feature = "server"))]
+    {
+        let _ = input;
+        Err(ServerFnError::new("server only"))
+    }
+}
+
+#[post("/api/forgot-password")]
+pub async fn request_password_reset(
+    input: RequestPasswordResetForm,
+) -> Result<String, ServerFnError> {
+    #[cfg(feature = "server")]
+    {
+        let email = input.email.trim().to_lowercase();
+        if email.is_empty() || !email.contains('@') {
+            return Err(server_error("Enter a valid email address.".into()));
+        }
+
+        // Check if password reset is enabled (smtp_enable is the feature flag)
+        let smtp_config = run_json_query::<Option<serde_json::Value>>(
+            "SELECT COALESCE((SELECT row_to_json(m) FROM (SELECT smtp_enable, smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from_email, smtp_from_name FROM board_meta LIMIT 1) m), 'null'::json);"
+        ).await.map_err(server_error)?;
+
+        let config = match smtp_config {
+            Some(c) => c,
+            None => return Err(server_error("Password reset is not enabled.".into())),
+        };
+
+        let enabled = config.get("smtp_enable").and_then(|v| v.as_bool()).unwrap_or(false);
+        if !enabled {
+            return Err(server_error("Password reset is not enabled.".into()));
+        }
+
+        // Look up user by email
+        let user = run_json_query::<Option<SessionUser>>(&format!(
+            "SELECT COALESCE((SELECT row_to_json(r) FROM (SELECT id, username, title, group_id FROM users WHERE LOWER(email) = LOWER({email}) LIMIT 1) r), 'null'::json);",
+            email = sql_literal(&email),
+        ))
+        .await
+        .map_err(server_error)?;
+
+        if let Some(user) = user {
+            let host = config.get("smtp_host").and_then(|v| v.as_str()).unwrap_or("");
+            let from_email = config.get("smtp_from_email").and_then(|v| v.as_str()).unwrap_or("");
+
+            if host.is_empty() || from_email.is_empty() {
+                return Err(server_error("Password reset is not properly configured.".into()));
+            }
+
+            // Clean up old tokens for this user
+            let _ = run_exec(&format!(
+                "DELETE FROM password_resets WHERE user_id = {};",
+                user.id
+            )).await;
+
+            // Generate new token (valid for 24 hours)
+            let token = random_hex(32);
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs() as i64;
+            let expires = now + 86400;
+
+            run_exec(&format!(
+                "INSERT INTO password_resets (user_id, token, created_at, expires_at) VALUES ({}, {}, {}, {});",
+                user.id,
+                sql_literal(&token),
+                now,
+                expires,
+            )).await.map_err(server_error)?;
+
+            let port = config.get("smtp_port").and_then(|v| v.as_i64()).unwrap_or(587) as u16;
+            let user_smtp = config.get("smtp_user").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let pass = config.get("smtp_pass").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let from_name = config.get("smtp_from_name").and_then(|v| v.as_str()).unwrap_or("FluxBB").to_string();
+
+            let email_result = send_reset_email(
+                host, port, &user_smtp, &pass,
+                from_email, &from_name, &email, &user.username, &token,
+            ).await;
+
+            if email_result.is_ok() {
+                return Ok("A password reset link has been sent to your email address.".to_string());
+            } else {
+                return Err(server_error("Failed to send reset email. Please try again later.".into()));
+            }
+        }
+
+        // User not found - return same generic success message (don't reveal account existence)
+        Ok("If an account with that email exists, a password reset link has been sent.".to_string())
+    }
+    #[cfg(not(feature = "server"))]
+    {
+        let _ = input;
+        Err(ServerFnError::new("server only"))
+    }
+}
+
+#[post("/api/reset-password")]
+pub async fn reset_password(input: ResetPasswordForm) -> Result<String, ServerFnError> {
+    #[cfg(feature = "server")]
+    {
+        if input.password.len() < 9 {
+            return Err(server_error(
+                "Password must be at least 9 characters.".into(),
+            ));
+        }
+
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as i64;
+
+        // Find valid token
+        let user_id = run_scalar_i64(&format!(
+            "SELECT COALESCE((SELECT user_id FROM password_resets WHERE token = {} AND expires_at > {} LIMIT 1), 0);",
+            sql_literal(&input.token),
+            now,
+        ))
+        .await
+        .map_err(server_error)?;
+
+        if user_id == 0 {
+            return Err(server_error(
+                "Invalid or expired reset token. Please request a new password reset.".into(),
+            ));
+        }
+
+        // Update password
+        let salt = random_hex(16);
+        let hash = hash_password(&input.password, &salt);
+        run_exec(&format!(
+            "UPDATE users SET password_hash = {} WHERE id = {};",
+            sql_literal(&hash),
+            user_id,
+        ))
+        .await
+        .map_err(server_error)?;
+
+        // Delete the used token
+        run_exec(&format!(
+            "DELETE FROM password_resets WHERE token = {};",
+            sql_literal(&input.token),
+        ))
+        .await
+        .map_err(server_error)?;
+
+        Ok("Password updated successfully. You can now sign in with your new password.".to_string())
     }
     #[cfg(not(feature = "server"))]
     {
@@ -2381,6 +2644,53 @@ fn validate_email(email: &str) -> Result<(), String> {
 #[cfg(feature = "server")]
 fn normalize_username(username: &str) -> String {
     username.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+#[cfg(feature = "server")]
+async fn send_reset_email(
+    host: &str,
+    port: u16,
+    username: &str,
+    password: &str,
+    from_email: &str,
+    from_name: &str,
+    to_email: &str,
+    to_username: &str,
+    token: &str,
+) -> Result<(), String> {
+    use lettre::{
+        message::header::ContentType, transport::smtp::authentication::Credentials, AsyncSmtpTransport,
+        AsyncTransport, Message, Tokio1Executor,
+    };
+
+    let from = format!("{} <{}>", from_name, from_email);
+    let to = format!("{} <{}>", to_username, to_email);
+
+    let email = Message::builder()
+        .from(from.parse().map_err(|e| format!("Invalid from address: {e}"))?)
+        .to(to.parse().map_err(|e| format!("Invalid to address: {e}"))?)
+        .subject("Password reset request")
+        .header(ContentType::TEXT_PLAIN)
+        .body(format!(
+            "Hello {},\n\nYou have requested a password reset for your account.\n\nClick the link below to reset your password:\n\n/reset-password?token={}\n\nIf you did not request this, please ignore this email. The link will expire in 24 hours.\n\nRegards,\n{}",
+            to_username, token, from_name
+        ))
+        .map_err(|e| format!("Failed to build email: {e}"))?;
+
+    let creds = Credentials::new(username.to_string(), password.to_string());
+
+    let mailer = AsyncSmtpTransport::<Tokio1Executor>::relay(host)
+        .map_err(|e| format!("Failed to create mailer: {e}"))?
+        .port(port)
+        .credentials(creds)
+        .build();
+
+    mailer
+        .send(email)
+        .await
+        .map_err(|e| format!("Failed to send email: {e}"))?;
+
+    Ok(())
 }
 
 #[cfg(feature = "server")]

@@ -1,8 +1,9 @@
 use dioxus::prelude::*;
 
 use views::{
-    Admin, AppShell, EditPost, Forum, ForumPage, Help, Index, Install, Login, NewTopic, Profile,
-    ProfileEdit, Register, Rules, Search, Topic, TopicPage, Users,
+    Admin, AppShell, EditPost, Forum, ForumPage, ForgotPassword, Help, Index, Install, Login,
+    NewTopic, Profile, ProfileEdit, Register, ResetPassword, Rules, Search, Topic, TopicPage,
+    Users,
 };
 
 mod components;
@@ -44,6 +45,10 @@ enum Route {
         Login {},
         #[route("/register")]
         Register {},
+        #[route("/forgot-password")]
+        ForgotPassword {},
+        #[route("/reset-password")]
+        ResetPassword {},
         #[route("/admin")]
         Admin {},
         #[route("/help")]

@@ -53,7 +53,7 @@ pub fn Profile(id: i32) -> Element {
                     p { class: "user-meta", "Posts: {user.post_count}" }
                     p { class: "user-meta", "Last seen: {user.last_seen}" }
 
-                    if current_user().as_ref().is_some_and(|u| u.id == id || u.group_id == 1) {
+                    if current_user().as_ref().is_some_and(|u| u.id == id || u.manage_users || u.is_admin) {
                         Link {
                             class: "small-button",
                             to: Route::ProfileEdit { id },

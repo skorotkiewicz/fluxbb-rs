@@ -67,7 +67,7 @@ pub fn ProfileEdit(id: i32) -> Element {
     let user = data.user.clone();
     let can_edit = current_user()
         .as_ref()
-        .is_some_and(|u| u.id == id || u.group_id == 1);
+        .is_some_and(|u| u.id == id || u.manage_users || u.is_admin);
 
     rsx! {
         section { class: "page",

@@ -94,9 +94,31 @@ CREATE TABLE IF NOT EXISTS groups (
     post_replies BOOLEAN NOT NULL DEFAULT true,
     edit_posts BOOLEAN NOT NULL DEFAULT true,
     delete_posts BOOLEAN NOT NULL DEFAULT false,
+    delete_topic BOOLEAN NOT NULL DEFAULT false,
+    move_topic BOOLEAN NOT NULL DEFAULT false,
+    sticky_topic BOOLEAN NOT NULL DEFAULT false,
+    close_topic BOOLEAN NOT NULL DEFAULT false,
+    manage_users BOOLEAN NOT NULL DEFAULT false,
+    manage_forums BOOLEAN NOT NULL DEFAULT false,
+    manage_categories BOOLEAN NOT NULL DEFAULT false,
+    manage_bans BOOLEAN NOT NULL DEFAULT false,
+    manage_groups BOOLEAN NOT NULL DEFAULT false,
+    manage_settings BOOLEAN NOT NULL DEFAULT false,
     is_moderator BOOLEAN NOT NULL DEFAULT false,
     is_admin BOOLEAN NOT NULL DEFAULT false
 );
+
+-- Migration: add new permission columns if upgrading from older schema
+ALTER TABLE groups ADD COLUMN IF NOT EXISTS delete_topic BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE groups ADD COLUMN IF NOT EXISTS move_topic BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE groups ADD COLUMN IF NOT EXISTS sticky_topic BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE groups ADD COLUMN IF NOT EXISTS close_topic BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE groups ADD COLUMN IF NOT EXISTS manage_users BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE groups ADD COLUMN IF NOT EXISTS manage_forums BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE groups ADD COLUMN IF NOT EXISTS manage_categories BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE groups ADD COLUMN IF NOT EXISTS manage_bans BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE groups ADD COLUMN IF NOT EXISTS manage_groups BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE groups ADD COLUMN IF NOT EXISTS manage_settings BOOLEAN NOT NULL DEFAULT false;
 
 CREATE TABLE IF NOT EXISTS bans (
     id SERIAL PRIMARY KEY,

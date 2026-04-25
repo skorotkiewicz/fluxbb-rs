@@ -58,7 +58,8 @@ pub fn ForumPage(id: i32, page: i32) -> Element {
     let total_pages = ((data.total_topics + data.per_page - 1) / data.per_page).max(1);
     let current_page = data.page;
 
-    let is_admin = current_user().as_ref().is_some_and(|u| u.group_id == 1);
+    let can_post_topics = current_user().as_ref().is_some_and(|u| u.post_topics);
+    let can_close_topic = current_user().as_ref().is_some_and(|u| u.close_topic || u.is_admin);
 
     let new_topic_ids: std::collections::HashSet<i32> = if data.last_visit > 0 {
         topics
@@ -87,7 +88,7 @@ pub fn ForumPage(id: i32, page: i32) -> Element {
                 p { class: "forum-moderators", "Moderators: {forum.moderators.join(\", \")}" }
             }
 
-            if current_user().is_some() {
+            if can_post_topics {
                 div { class: "forum-actions",
                     Link { class: "primary-button", to: Route::NewTopic { id }, "New topic" }
                     // button {
@@ -148,7 +149,7 @@ pub fn ForumPage(id: i32, page: i32) -> Element {
                                         p { class: "topic-meta",
                                             "by {author.username} · {topic.created_at}"
                                         }
-                                        if is_admin {
+                                        if can_close_topic {
                                             div { class: "topic-admin-actions",
                                                 button {
                                                     class: "tiny-button",

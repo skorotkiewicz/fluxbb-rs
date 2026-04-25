@@ -68,7 +68,7 @@ pub fn EditPost(id: i32) -> Element {
 
     let can_edit = current_user()
         .as_ref()
-        .is_some_and(|u| u.id == post.author_id || u.group_id == 1);
+        .is_some_and(|u| (u.id == post.author_id && u.edit_posts) || u.is_moderator || u.is_admin);
 
     if !can_edit {
         return rsx! {

@@ -278,6 +278,38 @@ pub struct SessionUser {
     pub disp_posts: i32,
     #[serde(default = "default_show_online")]
     pub show_online: bool,
+    #[serde(default)]
+    pub post_topics: bool,
+    #[serde(default)]
+    pub post_replies: bool,
+    #[serde(default)]
+    pub edit_posts: bool,
+    #[serde(default)]
+    pub delete_posts: bool,
+    #[serde(default)]
+    pub delete_topic: bool,
+    #[serde(default)]
+    pub move_topic: bool,
+    #[serde(default)]
+    pub sticky_topic: bool,
+    #[serde(default)]
+    pub close_topic: bool,
+    #[serde(default)]
+    pub manage_users: bool,
+    #[serde(default)]
+    pub manage_forums: bool,
+    #[serde(default)]
+    pub manage_categories: bool,
+    #[serde(default)]
+    pub manage_bans: bool,
+    #[serde(default)]
+    pub manage_groups: bool,
+    #[serde(default)]
+    pub manage_settings: bool,
+    #[serde(default)]
+    pub is_moderator: bool,
+    #[serde(default)]
+    pub is_admin: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -464,6 +496,22 @@ struct StoredAuthUser {
     pub disp_topics: i32,
     pub disp_posts: i32,
     pub show_online: bool,
+    pub post_topics: bool,
+    pub post_replies: bool,
+    pub edit_posts: bool,
+    pub delete_posts: bool,
+    pub delete_topic: bool,
+    pub move_topic: bool,
+    pub sticky_topic: bool,
+    pub close_topic: bool,
+    pub manage_users: bool,
+    pub manage_forums: bool,
+    pub manage_categories: bool,
+    pub manage_bans: bool,
+    pub manage_groups: bool,
+    pub manage_settings: bool,
+    pub is_moderator: bool,
+    pub is_admin: bool,
 }
 
 // ── View-specific loaders ──
@@ -807,7 +855,7 @@ pub async fn load_admin_data() -> Result<AdminData, ServerFnError> {
     #[cfg(feature = "server")]
     {
         let u = require_session(&headers).await.map_err(server_error)?;
-        if u.group_id != 1 {
+        if !u.is_admin {
             return Err(server_error("Admin only.".into()));
         }
         let data = run_json_query::<AdminData>(
@@ -958,7 +1006,7 @@ pub async fn admin_add_category(input: AdminCategoryForm) -> Result<(), ServerFn
     #[cfg(feature = "server")]
     {
         let u = require_session_csrf(&headers).await.map_err(server_error)?;
-        if u.group_id != 1 {
+        if !u.is_admin {
             return Err(server_error("Admin only.".into()));
         }
         run_exec(&format!("INSERT INTO categories (name, description, sort_order) VALUES ({}, {}, (SELECT COALESCE(MAX(sort_order),0)+1 FROM categories));",
@@ -976,7 +1024,7 @@ pub async fn admin_add_forum(input: AdminForumForm) -> Result<(), ServerFnError>
     #[cfg(feature = "server")]
     {
         let u = require_session_csrf(&headers).await.map_err(server_error)?;
-        if u.group_id != 1 {
+        if !u.is_admin {
             return Err(server_error("Admin only.".into()));
         }
         run_exec(&format!("INSERT INTO forums (category_id, name, description, sort_order) VALUES ({}, {}, {}, (SELECT COALESCE(MAX(sort_order),0)+1 FROM forums WHERE category_id={}));",
@@ -994,7 +1042,7 @@ pub async fn admin_delete_category(input: AdminDeleteItem) -> Result<(), ServerF
     #[cfg(feature = "server")]
     {
         let u = require_session_csrf(&headers).await.map_err(server_error)?;
-        if u.group_id != 1 {
+        if !u.is_admin {
             return Err(server_error("Admin only.".into()));
         }
         run_exec(&format!("DELETE FROM categories WHERE id = {};", input.id))
@@ -1013,7 +1061,7 @@ pub async fn admin_delete_forum(input: AdminDeleteItem) -> Result<(), ServerFnEr
     #[cfg(feature = "server")]
     {
         let u = require_session_csrf(&headers).await.map_err(server_error)?;
-        if u.group_id != 1 {
+        if !u.is_admin {
             return Err(server_error("Admin only.".into()));
         }
         run_exec(&format!("DELETE FROM forums WHERE id = {};", input.id))
@@ -1032,7 +1080,7 @@ pub async fn admin_update_category(input: AdminCategoryUpdate) -> Result<(), Ser
     #[cfg(feature = "server")]
     {
         let u = require_session_csrf(&headers).await.map_err(server_error)?;
-        if u.group_id != 1 {
+        if !u.is_admin {
             return Err(server_error("Admin only.".into()));
         }
         run_exec(&format!(
@@ -1057,7 +1105,7 @@ pub async fn admin_update_forum(input: AdminForumUpdate) -> Result<(), ServerFnE
     #[cfg(feature = "server")]
     {
         let u = require_session_csrf(&headers).await.map_err(server_error)?;
-        if u.group_id != 1 {
+        if !u.is_admin {
             return Err(server_error("Admin only.".into()));
         }
         run_exec(&format!(
@@ -1081,7 +1129,7 @@ pub async fn admin_update_user(input: AdminUserUpdate) -> Result<(), ServerFnErr
     #[cfg(feature = "server")]
     {
         let u = require_session_csrf(&headers).await.map_err(server_error)?;
-        if u.group_id != 1 {
+        if !u.is_admin {
             return Err(server_error("Admin only.".into()));
         }
         run_exec(&format!(
@@ -1105,7 +1153,7 @@ pub async fn admin_delete_user(input: AdminDeleteItem) -> Result<(), ServerFnErr
     #[cfg(feature = "server")]
     {
         let u = require_session_csrf(&headers).await.map_err(server_error)?;
-        if u.group_id != 1 {
+        if !u.is_admin {
             return Err(server_error("Admin only.".into()));
         }
         if input.id == u.id {
@@ -1133,7 +1181,7 @@ pub async fn admin_delete_topic(input: AdminDeleteItem) -> Result<(), ServerFnEr
     #[cfg(feature = "server")]
     {
         let u = require_session_csrf(&headers).await.map_err(server_error)?;
-        if u.group_id != 1 {
+        if !u.is_admin {
             return Err(server_error("Admin only.".into()));
         }
         run_exec(&format!("DELETE FROM topics WHERE id = {};", input.id))
@@ -1152,7 +1200,7 @@ pub async fn admin_update_board(input: AdminBoardSettings) -> Result<(), ServerF
     #[cfg(feature = "server")]
     {
         let u = require_session_csrf(&headers).await.map_err(server_error)?;
-        if u.group_id != 1 {
+        if !u.is_admin {
             return Err(server_error("Admin only.".into()));
         }
         run_exec(&format!(
@@ -1182,7 +1230,7 @@ pub async fn admin_clean_sessions() -> Result<i64, ServerFnError> {
     #[cfg(feature = "server")]
     {
         let u = require_session_csrf(&headers).await.map_err(server_error)?;
-        if u.group_id != 1 {
+        if !u.is_admin {
             return Err(server_error("Admin only.".into()));
         }
         let deleted = run_scalar_i64(
@@ -1229,7 +1277,7 @@ pub async fn dismiss_report(report_id: i32) -> Result<(), ServerFnError> {
     #[cfg(feature = "server")]
     {
         let u = require_session_csrf(&headers).await.map_err(server_error)?;
-        if u.group_id != 1 {
+        if !u.is_admin {
             return Err(server_error("Admin only.".into()));
         }
         run_exec(&format!(
@@ -1251,7 +1299,7 @@ pub async fn zap_report(report_id: i32) -> Result<(), ServerFnError> {
     #[cfg(feature = "server")]
     {
         let u = require_session_csrf(&headers).await.map_err(server_error)?;
-        if u.group_id != 1 {
+        if !u.is_admin {
             return Err(server_error("Admin only.".into()));
         }
         // Mark report as zapped
@@ -1349,9 +1397,10 @@ pub async fn edit_post(input: EditPostForm) -> Result<(), ServerFnError> {
             return Err(server_error("Post not found.".into()));
         };
 
-        let group = get_group(user.group_id).await.map_err(server_error)?;
-        if post.author_id != user.id && !group.edit_posts && !group.is_admin {
-            return Err(server_error("You can only edit your own posts.".into()));
+        if post.author_id != user.id {
+            check_permission(&user, "moderator").await.map_err(server_error)?;
+        } else {
+            check_permission(&user, "edit_posts").await.map_err(server_error)?;
         }
 
         let message = input.message.trim();
@@ -1396,8 +1445,6 @@ pub async fn delete_post(post_id: i32) -> Result<i32, ServerFnError> {
         {
             return Err(server_error(format!("You are banned: {msg}")));
         }
-        let group = get_group(user.group_id).await.map_err(server_error)?;
-
         #[derive(Deserialize)]
         struct PostInfo {
             topic_id: i32,
@@ -1415,8 +1462,10 @@ pub async fn delete_post(post_id: i32) -> Result<i32, ServerFnError> {
             post_id
         )).await.map_err(server_error)?;
 
-        if info.author_id != user.id && !group.delete_posts && !group.is_admin {
-            return Err(server_error("You can only delete your own posts.".into()));
+        if info.author_id != user.id {
+            check_permission(&user, "moderator").await.map_err(server_error)?;
+        } else {
+            check_permission(&user, "delete_posts").await.map_err(server_error)?;
         }
 
         if info.is_first {
@@ -1478,6 +1527,16 @@ pub struct GroupUpdateForm {
     pub post_replies: bool,
     pub edit_posts: bool,
     pub delete_posts: bool,
+    pub delete_topic: bool,
+    pub move_topic: bool,
+    pub sticky_topic: bool,
+    pub close_topic: bool,
+    pub manage_users: bool,
+    pub manage_forums: bool,
+    pub manage_categories: bool,
+    pub manage_bans: bool,
+    pub manage_groups: bool,
+    pub manage_settings: bool,
     pub is_moderator: bool,
     pub is_admin: bool,
 }
@@ -1487,7 +1546,13 @@ pub async fn load_groups() -> Result<Vec<Group>, ServerFnError> {
     #[cfg(feature = "server")]
     {
         let groups = run_json_query::<Vec<Group>>(
-            "SELECT COALESCE(json_agg(row_to_json(r)), '[]'::json) FROM (SELECT id, title, read_board, post_topics, post_replies, edit_posts, delete_posts, is_moderator, is_admin FROM groups ORDER BY id) r;",
+            "SELECT COALESCE(json_agg(row_to_json(r)), '[]'::json) FROM (
+                SELECT id, title, read_board, post_topics, post_replies, edit_posts, delete_posts,
+                       delete_topic, move_topic, sticky_topic, close_topic,
+                       manage_users, manage_forums, manage_categories, manage_bans, manage_groups, manage_settings,
+                       is_moderator, is_admin
+                FROM groups ORDER BY id
+            ) r;",
         ).await.map_err(server_error)?;
         Ok(groups)
     }
@@ -1502,17 +1567,30 @@ pub async fn update_group(input: GroupUpdateForm) -> Result<(), ServerFnError> {
     #[cfg(feature = "server")]
     {
         let user = require_session_csrf(&headers).await.map_err(server_error)?;
-        if user.group_id != 1 {
+        if !user.is_admin {
             return Err(server_error("Admin only.".into()));
         }
         run_exec(&format!(
-            "UPDATE groups SET title = {title}, read_board = {rb}, post_topics = {pt}, post_replies = {pr}, edit_posts = {ep}, delete_posts = {dp}, is_moderator = {im}, is_admin = {ia} WHERE id = {gid};",
+            "UPDATE groups SET title = {title}, read_board = {rb}, post_topics = {pt}, post_replies = {pr}, edit_posts = {ep}, delete_posts = {dp},
+                             delete_topic = {dt}, move_topic = {mt}, sticky_topic = {st}, close_topic = {ct},
+                             manage_users = {mu}, manage_forums = {mf}, manage_categories = {mc}, manage_bans = {mb}, manage_groups = {mg}, manage_settings = {ms},
+                             is_moderator = {im}, is_admin = {ia} WHERE id = {gid};",
             title = sql_literal(input.title.trim()),
             rb = input.read_board,
             pt = input.post_topics,
             pr = input.post_replies,
             ep = input.edit_posts,
             dp = input.delete_posts,
+            dt = input.delete_topic,
+            mt = input.move_topic,
+            st = input.sticky_topic,
+            ct = input.close_topic,
+            mu = input.manage_users,
+            mf = input.manage_forums,
+            mc = input.manage_categories,
+            mb = input.manage_bans,
+            mg = input.manage_groups,
+            ms = input.manage_settings,
             im = input.is_moderator,
             ia = input.is_admin,
             gid = input.group_id,
@@ -1548,7 +1626,7 @@ pub async fn add_ban(input: BanForm) -> Result<(), ServerFnError> {
     #[cfg(feature = "server")]
     {
         let user = require_session_csrf(&headers).await.map_err(server_error)?;
-        if user.group_id != 1 {
+        if !user.is_admin {
             return Err(server_error("Admin only.".into()));
         }
         let now = std::time::SystemTime::now()
@@ -1582,7 +1660,7 @@ pub async fn remove_ban(ban_id: i32) -> Result<(), ServerFnError> {
     #[cfg(feature = "server")]
     {
         let user = require_session_csrf(&headers).await.map_err(server_error)?;
-        if user.group_id != 1 {
+        if !user.is_admin {
             return Err(server_error("Admin only.".into()));
         }
         run_exec(&format!("DELETE FROM bans WHERE id = {};", ban_id))
@@ -1644,7 +1722,7 @@ pub async fn update_profile(input: UpdateProfileForm) -> Result<(), ServerFnErro
     #[cfg(feature = "server")]
     {
         let user = require_session_csrf(&headers).await.map_err(server_error)?;
-        if input.user_id != user.id && user.group_id != 1 {
+        if input.user_id != user.id && !user.manage_users {
             return Err(server_error("You can only edit your own profile.".into()));
         }
 
@@ -1684,7 +1762,7 @@ pub async fn change_password(input: ChangePasswordForm) -> Result<(), ServerFnEr
     #[cfg(feature = "server")]
     {
         let user = require_session_csrf(&headers).await.map_err(server_error)?;
-        if input.user_id != user.id && user.group_id != 1 {
+        if input.user_id != user.id && !user.manage_users {
             return Err(server_error(
                 "You can only change your own password.".into(),
             ));
@@ -1722,7 +1800,7 @@ pub async fn test_smtp_settings(input: TestSmtpForm) -> Result<String, ServerFnE
     #[cfg(feature = "server")]
     {
         let u = require_session_csrf(&headers).await.map_err(server_error)?;
-        if u.group_id != 1 {
+        if !u.is_admin {
             return Err(server_error("Admin only.".into()));
         }
 
@@ -2035,6 +2113,16 @@ pub struct Group {
     pub post_replies: bool,
     pub edit_posts: bool,
     pub delete_posts: bool,
+    pub delete_topic: bool,
+    pub move_topic: bool,
+    pub sticky_topic: bool,
+    pub close_topic: bool,
+    pub manage_users: bool,
+    pub manage_forums: bool,
+    pub manage_categories: bool,
+    pub manage_bans: bool,
+    pub manage_groups: bool,
+    pub manage_settings: bool,
     pub is_moderator: bool,
     pub is_admin: bool,
 }
@@ -2054,9 +2142,7 @@ pub async fn delete_topic(topic_id: i32) -> Result<(), ServerFnError> {
     #[cfg(feature = "server")]
     {
         let user = require_session_csrf(&headers).await.map_err(server_error)?;
-        if user.group_id != 1 {
-            return Err(server_error("Admin only.".into()));
-        }
+        check_permission(&user, "delete_topic").await.map_err(server_error)?;
 
         #[derive(Deserialize)]
         struct PostCount {
@@ -2095,9 +2181,7 @@ pub async fn move_topic(input: MoveTopicForm) -> Result<(), ServerFnError> {
     #[cfg(feature = "server")]
     {
         let user = require_session_csrf(&headers).await.map_err(server_error)?;
-        if user.group_id != 1 {
-            return Err(server_error("Admin only.".into()));
-        }
+        check_permission(&user, "move_topic").await.map_err(server_error)?;
         run_exec(&format!(
             "UPDATE topics SET forum_id = {} WHERE id = {};",
             input.forum_id, input.topic_id
@@ -2118,9 +2202,7 @@ pub async fn toggle_sticky(topic_id: i32) -> Result<bool, ServerFnError> {
     #[cfg(feature = "server")]
     {
         let user = require_session_csrf(&headers).await.map_err(server_error)?;
-        if user.group_id != 1 {
-            return Err(server_error("Admin only.".into()));
-        }
+        check_permission(&user, "sticky_topic").await.map_err(server_error)?;
 
         #[derive(Deserialize)]
         struct StickyRow {
@@ -2156,9 +2238,7 @@ pub async fn toggle_topic_status(topic_id: i32) -> Result<String, ServerFnError>
     #[cfg(feature = "server")]
     {
         let user = require_session_csrf(&headers).await.map_err(server_error)?;
-        if user.group_id != 1 {
-            return Err(server_error("Admin only.".into()));
-        }
+        check_permission(&user, "close_topic").await.map_err(server_error)?;
 
         #[derive(Deserialize)]
         struct ClosedRow {
@@ -2256,7 +2336,12 @@ async fn register_account_impl(input: RegisterForm) -> Result<AuthResponse, Stri
                  '127.0.0.1',
                  'UTC', 25, 20, true
              )
-             RETURNING id, username, title, group_id, timezone, disp_topics, disp_posts, show_online
+                           RETURNING id, username, title, group_id, timezone, disp_topics, disp_posts, show_online,
+                        true AS post_topics, true AS post_replies, true AS edit_posts, false AS delete_posts,
+                        false AS delete_topic, false AS move_topic, false AS sticky_topic, false AS close_topic,
+                        false AS manage_users, false AS manage_forums, false AS manage_categories,
+                        false AS manage_bans, false AS manage_groups, false AS manage_settings,
+                        false AS is_moderator, false AS is_admin
          )
          SELECT row_to_json(inserted) FROM inserted;",
         username = sql_literal(&username),
@@ -2288,9 +2373,14 @@ async fn login_account_impl(input: LoginForm) -> Result<AuthResponse, String> {
         "SELECT COALESCE((
              SELECT row_to_json(user_row)
              FROM (
-                 SELECT id, username, title, group_id, email, password_hash, timezone, disp_topics, disp_posts, show_online
-                 FROM users
-                 WHERE LOWER(username) = LOWER({username})
+                 SELECT u.id, u.username, u.title, u.group_id, u.email, u.password_hash, u.timezone, u.disp_topics, u.disp_posts, u.show_online,
+                        g.post_topics, g.post_replies, g.edit_posts, g.delete_posts,
+                        g.delete_topic, g.move_topic, g.sticky_topic, g.close_topic,
+                        g.manage_users, g.manage_forums, g.manage_categories, g.manage_bans,
+                        g.manage_groups, g.manage_settings, g.is_moderator, g.is_admin
+                 FROM users u
+                 JOIN groups g ON g.id = u.group_id
+                 WHERE LOWER(u.username) = LOWER({username})
                  LIMIT 1
              ) AS user_row
          ), 'null'::json);",
@@ -2330,6 +2420,22 @@ async fn login_account_impl(input: LoginForm) -> Result<AuthResponse, String> {
             disp_topics: user.disp_topics,
             disp_posts: user.disp_posts,
             show_online: user.show_online,
+            post_topics: user.post_topics,
+            post_replies: user.post_replies,
+            edit_posts: user.edit_posts,
+            delete_posts: user.delete_posts,
+            delete_topic: user.delete_topic,
+            move_topic: user.move_topic,
+            sticky_topic: user.sticky_topic,
+            close_topic: user.close_topic,
+            manage_users: user.manage_users,
+            manage_forums: user.manage_forums,
+            manage_categories: user.manage_categories,
+            manage_bans: user.manage_bans,
+            manage_groups: user.manage_groups,
+            manage_settings: user.manage_settings,
+            is_moderator: user.is_moderator,
+            is_admin: user.is_admin,
         },
         session_token,
         message: "Signed in successfully.".to_string(),
@@ -2354,12 +2460,17 @@ async fn current_session_user_impl(headers: HeaderMap) -> Result<Option<SessionU
         "SELECT COALESCE((
              SELECT row_to_json(session_row)
              FROM (
-                  SELECT u.id, u.username, u.email, u.title, u.group_id, s.csrf_token, u.timezone, u.disp_topics, u.disp_posts, u.show_online
-                  FROM forum_sessions AS s
-                  INNER JOIN users AS u ON u.id = s.user_id
-                  WHERE s.token = {token}
-                   AND s.expires_at > EXTRACT(EPOCH FROM now())::bigint
-                 LIMIT 1
+                   SELECT u.id, u.username, u.email, u.title, u.group_id, s.csrf_token, u.timezone, u.disp_topics, u.disp_posts, u.show_online,
+                          g.post_topics, g.post_replies, g.edit_posts, g.delete_posts,
+                          g.delete_topic, g.move_topic, g.sticky_topic, g.close_topic,
+                          g.manage_users, g.manage_forums, g.manage_categories, g.manage_bans,
+                          g.manage_groups, g.manage_settings, g.is_moderator, g.is_admin
+                   FROM forum_sessions AS s
+                   INNER JOIN users AS u ON u.id = s.user_id
+                   INNER JOIN groups AS g ON g.id = u.group_id
+                   WHERE s.token = {token}
+                    AND s.expires_at > EXTRACT(EPOCH FROM now())::bigint
+                  LIMIT 1
              ) AS session_row
          ), 'null'::json);",
         token = sql_literal(&token),
@@ -2441,12 +2552,15 @@ async fn install_board_impl(input: InstallForm) -> Result<AuthResponse, String> 
 
     // Default groups
     run_exec(
-        "INSERT INTO groups (id, title, read_board, post_topics, post_replies, edit_posts, delete_posts, is_moderator, is_admin)
+        "INSERT INTO groups (id, title, read_board, post_topics, post_replies, edit_posts, delete_posts,
+                            delete_topic, move_topic, sticky_topic, close_topic,
+                            manage_users, manage_forums, manage_categories, manage_bans, manage_groups, manage_settings,
+                            is_moderator, is_admin)
          VALUES
-             (1, 'Administrators', true, true, true, true, true, true, true),
-             (2, 'Moderators', true, true, true, true, true, true, false),
-             (3, 'Guests', true, false, false, false, false, false, false),
-             (4, 'Members', true, true, true, true, false, false, false)
+             (1, 'Administrators', true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true),
+             (2, 'Moderators', true, true, true, true, true, true, true, true, true, false, false, false, true, false, false, true, false),
+             (3, 'Guests', true, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false),
+             (4, 'Members', true, true, true, true, false, false, false, false, false, false, false, false, false, false, false, false, false)
          ON CONFLICT (id) DO NOTHING;",
     ).await?;
 
@@ -2471,6 +2585,23 @@ async fn install_board_impl(input: InstallForm) -> Result<AuthResponse, String> 
         email = sql_literal(&email),
         password_hash = sql_literal(&password_hash),
     )).await?;
+    // Set admin permissions (not from DB yet since install is one-shot)
+    user.post_topics = true;
+    user.post_replies = true;
+    user.edit_posts = true;
+    user.delete_posts = true;
+    user.delete_topic = true;
+    user.move_topic = true;
+    user.sticky_topic = true;
+    user.close_topic = true;
+    user.manage_users = true;
+    user.manage_forums = true;
+    user.manage_categories = true;
+    user.manage_bans = true;
+    user.manage_groups = true;
+    user.manage_settings = true;
+    user.is_moderator = true;
+    user.is_admin = true;
 
     // Default category and forum
     run_exec("INSERT INTO categories (name, description, sort_order) VALUES ('General', 'Main discussion area.', 1);").await?;
@@ -2495,9 +2626,14 @@ async fn require_session(headers: &HeaderMap) -> Result<SessionUser, String> {
     run_json_query::<Option<SessionUser>>(&format!(
         "SELECT COALESCE((
              SELECT row_to_json(r) FROM (
-                 SELECT u.id, u.username, u.title, u.group_id
+                 SELECT u.id, u.username, u.title, u.group_id,
+                        g.post_topics, g.post_replies, g.edit_posts, g.delete_posts,
+                        g.delete_topic, g.move_topic, g.sticky_topic, g.close_topic,
+                        g.manage_users, g.manage_forums, g.manage_categories, g.manage_bans,
+                        g.manage_groups, g.manage_settings, g.is_moderator, g.is_admin
                  FROM forum_sessions s
                  JOIN users u ON u.id = s.user_id
+                 JOIN groups g ON g.id = u.group_id
                  WHERE s.token = {token} AND s.expires_at > EXTRACT(EPOCH FROM now())::bigint
                  LIMIT 1
              ) r
@@ -2541,16 +2677,35 @@ async fn check_flood(user_id: i32, is_admin: bool) -> Result<(), String> {
 }
 
 #[cfg(feature = "server")]
-async fn require_permission(
-    headers: &HeaderMap,
-    perm: fn(&Group) -> bool,
-) -> Result<SessionUser, String> {
-    let user = require_session_csrf(headers).await?;
-    let group = get_group(user.group_id).await?;
-    if !perm(&group) && !group.is_admin {
-        return Err("You do not have permission to do this.".to_string());
+async fn check_permission(user: &SessionUser, action: &str) -> Result<(), String> {
+    // Admin bypass — is_admin grants all permissions
+    if user.is_admin {
+        return Ok(());
     }
-    Ok(user)
+    let allowed = match action {
+        "post_topics" => user.post_topics,
+        "post_replies" => user.post_replies,
+        "edit_posts" => user.edit_posts,
+        "delete_posts" => user.delete_posts,
+        "delete_topic" => user.delete_topic,
+        "move_topic" => user.move_topic,
+        "sticky_topic" => user.sticky_topic,
+        "close_topic" => user.close_topic,
+        "manage_users" => user.manage_users,
+        "manage_forums" => user.manage_forums,
+        "manage_categories" => user.manage_categories,
+        "manage_bans" => user.manage_bans,
+        "manage_groups" => user.manage_groups,
+        "manage_settings" => user.manage_settings,
+        "moderator" => user.is_moderator,
+        "admin" => user.is_admin,
+        _ => false,
+    };
+    if allowed {
+        Ok(())
+    } else {
+        Err("You do not have permission to do this.".to_string())
+    }
 }
 
 #[cfg(feature = "server")]
@@ -2558,12 +2713,12 @@ async fn create_topic_impl(
     input: NewTopicForm,
     headers: HeaderMap,
 ) -> Result<NewTopicResult, String> {
-    let user = require_permission(&headers, |g| g.post_topics).await?;
+    let user = require_session_csrf(&headers).await?;
+    check_permission(&user, "post_topics").await?;
     if let Some(msg) = check_ban(&user.username, &user.email).await? {
         return Err(format!("You are banned: {msg}"));
     }
-    let group = get_group(user.group_id).await?;
-    check_flood(user.id, group.is_admin).await?;
+    check_flood(user.id, user.is_admin).await?;
     let subject = input.subject.trim();
     let message = input.message.trim();
     if subject.is_empty() {
@@ -2618,12 +2773,12 @@ async fn create_topic_impl(
 
 #[cfg(feature = "server")]
 async fn create_reply_impl(input: ReplyForm, headers: HeaderMap) -> Result<(), String> {
-    let user = require_permission(&headers, |g| g.post_replies).await?;
+    let user = require_session_csrf(&headers).await?;
+    check_permission(&user, "post_replies").await?;
     if let Some(msg) = check_ban(&user.username, &user.email).await? {
         return Err(format!("You are banned: {msg}"));
     }
-    let group = get_group(user.group_id).await?;
-    check_flood(user.id, group.is_admin).await?;
+    check_flood(user.id, user.is_admin).await?;
     let message = input.message.trim();
     if message.is_empty() {
         return Err("Message is required.".to_string());

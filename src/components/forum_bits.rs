@@ -40,10 +40,13 @@ pub fn PostCard(
 
     let can_edit = current_user
         .as_ref()
-        .is_some_and(|u| u.id == author_id || u.group_id == 1);
+        .is_some_and(|u| (u.id == author_id && u.edit_posts) || u.is_moderator || u.is_admin);
+    let can_delete = current_user
+        .as_ref()
+        .is_some_and(|u| (u.id == author_id && u.delete_posts) || u.is_moderator || u.is_admin);
     let can_report = current_user
         .as_ref()
-        .is_some_and(|u| u.id != author_id && u.group_id != 1);
+        .is_some_and(|u| u.id != author_id && !u.is_admin);
 
     let post_id = post.id;
     let mut reporting = use_signal(|| false);
@@ -64,33 +67,37 @@ pub fn PostCard(
                     p { class: "post-edited", "Edited {edited_at}" }
                 }
 
-                if can_edit {
+                if can_edit || can_delete {
                     div { class: "post-actions",
-                        Link {
-                            class: "small-button",
-                            to: Route::EditPost { id: post_id },
-                            "Edit"
+                        if can_edit {
+                            Link {
+                                class: "small-button",
+                                to: Route::EditPost { id: post_id },
+                                "Edit"
+                            }
                         }
-                        ConfirmButton {
-                            label: "Delete",
-                            class: "danger-button small-button",
-                            on_confirm: move |_| {
-                                spawn(async move {
-                                    match delete_post(post_id).await {
-                                        Ok(0) => {
-                                            refresh.set(());
+                        if can_delete {
+                            ConfirmButton {
+                                label: "Delete",
+                                class: "danger-button small-button",
+                                on_confirm: move |_| {
+                                    spawn(async move {
+                                        match delete_post(post_id).await {
+                                            Ok(0) => {
+                                                refresh.set(());
+                                            }
+                                            Ok(topic_id) => {
+                                                navigator
+                                                    .push(Route::ForumPage {
+                                                        id: topic_id,
+                                                        page: 1,
+                                                    });
+                                            }
+                                            Err(_) => {}
                                         }
-                                        Ok(topic_id) => {
-                                            navigator
-                                                .push(Route::ForumPage {
-                                                    id: topic_id,
-                                                    page: 1,
-                                                });
-                                        }
-                                        Err(_) => {}
-                                    }
-                                });
-                            },
+                                    });
+                                },
+                            }
                         }
                     }
                 }

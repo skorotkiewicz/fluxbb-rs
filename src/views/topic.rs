@@ -73,14 +73,18 @@ pub fn TopicPage(id: i32, page: i32) -> Element {
     let mut replying = use_signal(|| false);
     let mut move_forum_id = use_signal(|| 0_i32);
 
-    let is_admin = current_user().as_ref().is_some_and(|u| u.group_id == 1);
+    let can_move_topic = current_user().as_ref().is_some_and(|u| u.move_topic || u.is_admin);
+    let can_sticky_topic = current_user().as_ref().is_some_and(|u| u.sticky_topic || u.is_admin);
+    let can_close_topic = current_user().as_ref().is_some_and(|u| u.close_topic || u.is_admin);
+    let can_delete_topic = current_user().as_ref().is_some_and(|u| u.delete_topic || u.is_admin);
+    let can_post_replies = current_user().as_ref().is_some_and(|u| u.post_replies);
     let is_closed = topic.closed;
 
     let total_pages = ((data.total_posts + data.per_page - 1) / data.per_page).max(1);
     let current_page = data.page;
 
     let forums_resource = use_resource(move || async move {
-        if is_admin {
+        if can_move_topic {
             load_forums().await.unwrap_or_default()
         } else {
             Vec::new()
@@ -125,9 +129,9 @@ pub fn TopicPage(id: i32, page: i32) -> Element {
                     "Views: {topic.views} · Replies: {topic.reply_count} · Updated: {topic.updated_at}"
                 }
 
-                if is_admin {
+                if can_move_topic || can_sticky_topic || can_close_topic || can_delete_topic {
                     div { class: "post-actions",
-                        if !forums.is_empty() {
+                        if can_move_topic && !forums.is_empty() {
                             select {
                                 class: "small-select",
                                 value: "{move_forum_id}",
@@ -174,56 +178,62 @@ pub fn TopicPage(id: i32, page: i32) -> Element {
                                 "Move"
                             }
                         }
-                        button {
-                            class: "small-button",
-                            onclick: move |_| {
-                                let tid = id;
-                                spawn(async move {
-                                    let _ = toggle_sticky(tid).await;
-                                    refresh.set(());
-                                });
-                            },
-                            if topic.sticky {
-                                "Unstick topic"
-                            } else {
-                                "Stick topic"
+                        if can_sticky_topic {
+                            button {
+                                class: "small-button",
+                                onclick: move |_| {
+                                    let tid = id;
+                                    spawn(async move {
+                                        let _ = toggle_sticky(tid).await;
+                                        refresh.set(());
+                                    });
+                                },
+                                if topic.sticky {
+                                    "Unstick topic"
+                                } else {
+                                    "Stick topic"
+                                }
                             }
                         }
-                        button {
-                            class: "small-button",
-                            onclick: move |_| {
-                                let tid = id;
-                                spawn(async move {
-                                    let _ = toggle_topic_status(tid).await;
-                                    refresh.set(());
-                                });
-                            },
-                            if is_closed {
-                                "Open topic"
-                            } else {
-                                "Close topic"
+                        if can_close_topic {
+                            button {
+                                class: "small-button",
+                                onclick: move |_| {
+                                    let tid = id;
+                                    spawn(async move {
+                                        let _ = toggle_topic_status(tid).await;
+                                        refresh.set(());
+                                    });
+                                },
+                                if is_closed {
+                                    "Open topic"
+                                } else {
+                                    "Close topic"
+                                }
                             }
                         }
-                        ConfirmButton {
-                            label: "Delete topic",
-                            class: "danger-button small-button",
-                            on_confirm: move |_| {
-                                let tid = id;
-                                let fid = forum_id;
-                                let navigator = navigator.clone();
-                                spawn(async move {
-                                    match delete_topic(tid).await {
-                                        Ok(_) => {
-                                            navigator
-                                                .push(Route::ForumPage {
-                                                    id: fid,
-                                                    page: 1,
-                                                });
+                        if can_delete_topic {
+                            ConfirmButton {
+                                label: "Delete topic",
+                                class: "danger-button small-button",
+                                on_confirm: move |_| {
+                                    let tid = id;
+                                    let fid = forum_id;
+                                    let navigator = navigator.clone();
+                                    spawn(async move {
+                                        match delete_topic(tid).await {
+                                            Ok(_) => {
+                                                navigator
+                                                    .push(Route::ForumPage {
+                                                        id: fid,
+                                                        page: 1,
+                                                    });
+                                            }
+                                            Err(_) => {}
                                         }
-                                        Err(_) => {}
-                                    }
-                                });
-                            },
+                                    });
+                                },
+                            }
                         }
                     }
                 }
@@ -278,7 +288,7 @@ pub fn TopicPage(id: i32, page: i32) -> Element {
                 }
             }
 
-            if current_user().is_some() && !is_closed {
+            if can_post_replies && !is_closed {
                 if total_pages > 1 && !review_posts.is_empty() {
                     article { class: "panel topic-review",
                         div { class: "panel-heading",

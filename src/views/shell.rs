@@ -24,7 +24,7 @@ pub fn AppShell() -> Element {
     let refresh = use_signal(|| ());
     use_context_provider(|| refresh);
 
-    let is_admin = current_user().as_ref().is_some_and(|u| u.group_id == 1);
+    let is_admin = current_user().as_ref().is_some_and(|u| u.is_admin);
 
     // Watch for refresh trigger
     use_effect(move || {

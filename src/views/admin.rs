@@ -8,7 +8,7 @@ use crate::{
         admin_update_forum, admin_update_user, clean_error, dismiss_report, load_admin_data,
         load_bans, load_groups, remove_ban, test_smtp_settings, update_group, zap_report,
         AdminBoardSettings, AdminCategoryForm, AdminCategoryUpdate, AdminData, AdminDeleteItem,
-        AdminForumForm, AdminForumUpdate, AdminUserUpdate, BanForm, GroupUpdateForm, SessionUser,
+        AdminForumForm, AdminForumUpdate, AdminUserUpdate, BanForm, SessionUser,
         TestSmtpForm,
     },
     Route,
@@ -24,7 +24,7 @@ pub fn Admin() -> Element {
         load_admin_data().await
     });
 
-    let is_admin = current_user().as_ref().is_some_and(|u| u.group_id == 1);
+    let is_admin = current_user().as_ref().is_some_and(|u| u.is_admin);
 
     let mut tab = use_signal(|| "structure");
     let status = use_signal(String::new);
@@ -538,14 +538,11 @@ fn UsersPanel(
     mut is_error: Signal<bool>,
     mut refresh: Signal<()>,
 ) -> Element {
-    fn group_label(gid: i32) -> &'static str {
-        match gid {
-            1 => "Admin",
-            2 => "Moderator",
-            3 => "Guest",
-            _ => "Member",
-        }
-    }
+    let groups_resource = use_resource(move || async move {
+        load_groups().await.unwrap_or_default()
+    });
+
+    let groups = groups_resource().unwrap_or_default();
 
     rsx! {
         article { class: "panel",
@@ -572,29 +569,34 @@ fn UsersPanel(
                                 "Joined {user.joined_at} · {user.email_display()}"
                             }
                         }
-                        p { class: "topic-metric", "{group_label(user.group_id())}" }
+                        p { class: "topic-metric", "{user.title}" }
                         p { class: "topic-metric", "{user.post_count}" }
                         div { class: "admin-actions",
-                            // Promote to admin
-                            if user.group_id() != 1 {
-                                button {
-                                    class: "small-button",
-                                    onclick: {
-                                        let uid = user.id;
-                                        let uname = user.username.clone();
-                                        move |_| {
+                            select {
+                                class: "small-select",
+                                onchange: {
+                                    let uid = user.id;
+                                    let groups = groups.clone();
+                                    let uname = user.username.clone();
+                                    let current_group = user.group_id();
+                                    move |e| {
+                                        if let Ok(gid) = e.value().parse::<i32>() {
+                                            if gid == current_group {
+                                                return;
+                                            }
+                                            let title = groups.iter().find(|g| g.id == gid).map(|g| g.title.clone()).unwrap_or_else(|| "Member".to_string());
                                             let uname = uname.clone();
                                             spawn(async move {
                                                 match admin_update_user(AdminUserUpdate {
                                                         user_id: uid,
-                                                        group_id: 1,
-                                                        title: "Administrator".into(),
+                                                        group_id: gid,
+                                                        title: title.clone(),
                                                     })
                                                     .await
                                                 {
                                                     Ok(_) => {
                                                         is_error.set(false);
-                                                        status.set(format!("{uname} promoted to admin. Refresh."));
+                                                        status.set(format!("{uname} moved to {title}. Refresh."));
                                                     }
                                                     Err(e) => {
                                                         is_error.set(true);
@@ -603,72 +605,10 @@ fn UsersPanel(
                                                 }
                                             });
                                         }
-                                    },
-                                    "Make admin"
-                                }
-                            }
-                            // Promote to moderator
-                            if user.group_id() == 4 {
-                                button {
-                                    class: "small-button",
-                                    onclick: {
-                                        let uid = user.id;
-                                        let uname = user.username.clone();
-                                        move |_| {
-                                            let uname = uname.clone();
-                                            spawn(async move {
-                                                match admin_update_user(AdminUserUpdate {
-                                                        user_id: uid,
-                                                        group_id: 2,
-                                                        title: "Moderator".into(),
-                                                    })
-                                                    .await
-                                                {
-                                                    Ok(_) => {
-                                                        is_error.set(false);
-                                                        status.set(format!("{uname} promoted to moderator. Refresh."));
-                                                    }
-                                                    Err(e) => {
-                                                        is_error.set(true);
-                                                        status.set(clean_error(e));
-                                                    }
-                                                }
-                                            });
-                                        }
-                                    },
-                                    "Make moderator"
-                                }
-                            }
-                            // Demote to member
-                            if user.group_id() != 4 {
-                                button {
-                                    class: "small-button",
-                                    onclick: {
-                                        let uid = user.id;
-                                        let uname = user.username.clone();
-                                        move |_| {
-                                            let uname = uname.clone();
-                                            spawn(async move {
-                                                match admin_update_user(AdminUserUpdate {
-                                                        user_id: uid,
-                                                        group_id: 4,
-                                                        title: "Member".into(),
-                                                    })
-                                                    .await
-                                                {
-                                                    Ok(_) => {
-                                                        is_error.set(false);
-                                                        status.set(format!("{uname} demoted to member. Refresh."));
-                                                    }
-                                                    Err(e) => {
-                                                        is_error.set(true);
-                                                        status.set(clean_error(e));
-                                                    }
-                                                }
-                                            });
-                                        }
-                                    },
-                                    "Demote to member"
+                                    }
+                                },
+                                for group in groups.clone() {
+                                    option { value: "{group.id}", selected: group.id == user.group_id(), "{group.title}" }
                                 }
                             }
                             // Delete
@@ -1144,6 +1084,32 @@ fn GroupsPanel(
         load_groups().await
     });
 
+    fn make_form(g: &crate::data::Group, mut f: impl FnMut(&mut crate::data::Group)) -> crate::data::GroupUpdateForm {
+        let mut clone = g.clone();
+        f(&mut clone);
+        crate::data::GroupUpdateForm {
+            group_id: clone.id,
+            title: clone.title,
+            read_board: clone.read_board,
+            post_topics: clone.post_topics,
+            post_replies: clone.post_replies,
+            edit_posts: clone.edit_posts,
+            delete_posts: clone.delete_posts,
+            delete_topic: clone.delete_topic,
+            move_topic: clone.move_topic,
+            sticky_topic: clone.sticky_topic,
+            close_topic: clone.close_topic,
+            manage_users: clone.manage_users,
+            manage_forums: clone.manage_forums,
+            manage_categories: clone.manage_categories,
+            manage_bans: clone.manage_bans,
+            manage_groups: clone.manage_groups,
+            manage_settings: clone.manage_settings,
+            is_moderator: clone.is_moderator,
+            is_admin: clone.is_admin,
+        }
+    }
+
     rsx! {
         if let Some(Ok(groups)) = groups_resource() {
             for group in groups {
@@ -1158,25 +1124,10 @@ fn GroupsPanel(
                             label: "Read board".to_string(),
                             value: group.read_board,
                             onchange: {
-                                let gid = group.id;
                                 let g = group.clone();
                                 move |v: bool| {
                                     let g = g.clone();
-                                    spawn(async move {
-                                        let _ = update_group(GroupUpdateForm {
-                                                group_id: gid,
-                                                title: g.title.clone(),
-                                                read_board: v,
-                                                post_topics: g.post_topics,
-                                                post_replies: g.post_replies,
-                                                edit_posts: g.edit_posts,
-                                                delete_posts: g.delete_posts,
-                                                is_moderator: g.is_moderator,
-                                                is_admin: g.is_admin,
-                                            })
-                                            .await;
-                                        refresh.set(());
-                                    });
+                                    spawn(async move { let _ = update_group(make_form(&g, |c| c.read_board = v)).await; refresh.set(()); });
                                 }
                             },
                         }
@@ -1184,25 +1135,10 @@ fn GroupsPanel(
                             label: "Post topics".to_string(),
                             value: group.post_topics,
                             onchange: {
-                                let gid = group.id;
                                 let g = group.clone();
                                 move |v: bool| {
                                     let g = g.clone();
-                                    spawn(async move {
-                                        let _ = update_group(GroupUpdateForm {
-                                                group_id: gid,
-                                                title: g.title.clone(),
-                                                read_board: g.read_board,
-                                                post_topics: v,
-                                                post_replies: g.post_replies,
-                                                edit_posts: g.edit_posts,
-                                                delete_posts: g.delete_posts,
-                                                is_moderator: g.is_moderator,
-                                                is_admin: g.is_admin,
-                                            })
-                                            .await;
-                                        refresh.set(());
-                                    });
+                                    spawn(async move { let _ = update_group(make_form(&g, |c| c.post_topics = v)).await; refresh.set(()); });
                                 }
                             },
                         }
@@ -1210,25 +1146,10 @@ fn GroupsPanel(
                             label: "Post replies".to_string(),
                             value: group.post_replies,
                             onchange: {
-                                let gid = group.id;
                                 let g = group.clone();
                                 move |v: bool| {
                                     let g = g.clone();
-                                    spawn(async move {
-                                        let _ = update_group(GroupUpdateForm {
-                                                group_id: gid,
-                                                title: g.title.clone(),
-                                                read_board: g.read_board,
-                                                post_topics: g.post_topics,
-                                                post_replies: v,
-                                                edit_posts: g.edit_posts,
-                                                delete_posts: g.delete_posts,
-                                                is_moderator: g.is_moderator,
-                                                is_admin: g.is_admin,
-                                            })
-                                            .await;
-                                        refresh.set(());
-                                    });
+                                    spawn(async move { let _ = update_group(make_form(&g, |c| c.post_replies = v)).await; refresh.set(()); });
                                 }
                             },
                         }
@@ -1236,25 +1157,10 @@ fn GroupsPanel(
                             label: "Edit posts".to_string(),
                             value: group.edit_posts,
                             onchange: {
-                                let gid = group.id;
                                 let g = group.clone();
                                 move |v: bool| {
                                     let g = g.clone();
-                                    spawn(async move {
-                                        let _ = update_group(GroupUpdateForm {
-                                                group_id: gid,
-                                                title: g.title.clone(),
-                                                read_board: g.read_board,
-                                                post_topics: g.post_topics,
-                                                post_replies: g.post_replies,
-                                                edit_posts: v,
-                                                delete_posts: g.delete_posts,
-                                                is_moderator: g.is_moderator,
-                                                is_admin: g.is_admin,
-                                            })
-                                            .await;
-                                        refresh.set(());
-                                    });
+                                    spawn(async move { let _ = update_group(make_form(&g, |c| c.edit_posts = v)).await; refresh.set(()); });
                                 }
                             },
                         }
@@ -1262,25 +1168,120 @@ fn GroupsPanel(
                             label: "Delete posts".to_string(),
                             value: group.delete_posts,
                             onchange: {
-                                let gid = group.id;
                                 let g = group.clone();
                                 move |v: bool| {
                                     let g = g.clone();
-                                    spawn(async move {
-                                        let _ = update_group(GroupUpdateForm {
-                                                group_id: gid,
-                                                title: g.title.clone(),
-                                                read_board: g.read_board,
-                                                post_topics: g.post_topics,
-                                                post_replies: g.post_replies,
-                                                edit_posts: g.edit_posts,
-                                                delete_posts: v,
-                                                is_moderator: g.is_moderator,
-                                                is_admin: g.is_admin,
-                                            })
-                                            .await;
-                                        refresh.set(());
-                                    });
+                                    spawn(async move { let _ = update_group(make_form(&g, |c| c.delete_posts = v)).await; refresh.set(()); });
+                                }
+                            },
+                        }
+                        PermissionRow {
+                            label: "Delete topic".to_string(),
+                            value: group.delete_topic,
+                            onchange: {
+                                let g = group.clone();
+                                move |v: bool| {
+                                    let g = g.clone();
+                                    spawn(async move { let _ = update_group(make_form(&g, |c| c.delete_topic = v)).await; refresh.set(()); });
+                                }
+                            },
+                        }
+                        PermissionRow {
+                            label: "Move topic".to_string(),
+                            value: group.move_topic,
+                            onchange: {
+                                let g = group.clone();
+                                move |v: bool| {
+                                    let g = g.clone();
+                                    spawn(async move { let _ = update_group(make_form(&g, |c| c.move_topic = v)).await; refresh.set(()); });
+                                }
+                            },
+                        }
+                        PermissionRow {
+                            label: "Sticky topic".to_string(),
+                            value: group.sticky_topic,
+                            onchange: {
+                                let g = group.clone();
+                                move |v: bool| {
+                                    let g = g.clone();
+                                    spawn(async move { let _ = update_group(make_form(&g, |c| c.sticky_topic = v)).await; refresh.set(()); });
+                                }
+                            },
+                        }
+                        PermissionRow {
+                            label: "Close topic".to_string(),
+                            value: group.close_topic,
+                            onchange: {
+                                let g = group.clone();
+                                move |v: bool| {
+                                    let g = g.clone();
+                                    spawn(async move { let _ = update_group(make_form(&g, |c| c.close_topic = v)).await; refresh.set(()); });
+                                }
+                            },
+                        }
+                        PermissionRow {
+                            label: "Manage users".to_string(),
+                            value: group.manage_users,
+                            onchange: {
+                                let g = group.clone();
+                                move |v: bool| {
+                                    let g = g.clone();
+                                    spawn(async move { let _ = update_group(make_form(&g, |c| c.manage_users = v)).await; refresh.set(()); });
+                                }
+                            },
+                        }
+                        PermissionRow {
+                            label: "Manage forums".to_string(),
+                            value: group.manage_forums,
+                            onchange: {
+                                let g = group.clone();
+                                move |v: bool| {
+                                    let g = g.clone();
+                                    spawn(async move { let _ = update_group(make_form(&g, |c| c.manage_forums = v)).await; refresh.set(()); });
+                                }
+                            },
+                        }
+                        PermissionRow {
+                            label: "Manage categories".to_string(),
+                            value: group.manage_categories,
+                            onchange: {
+                                let g = group.clone();
+                                move |v: bool| {
+                                    let g = g.clone();
+                                    spawn(async move { let _ = update_group(make_form(&g, |c| c.manage_categories = v)).await; refresh.set(()); });
+                                }
+                            },
+                        }
+                        PermissionRow {
+                            label: "Manage bans".to_string(),
+                            value: group.manage_bans,
+                            onchange: {
+                                let g = group.clone();
+                                move |v: bool| {
+                                    let g = g.clone();
+                                    spawn(async move { let _ = update_group(make_form(&g, |c| c.manage_bans = v)).await; refresh.set(()); });
+                                }
+                            },
+                        }
+                        PermissionRow {
+                            label: "Manage groups".to_string(),
+                            value: group.manage_groups,
+                            onchange: {
+                                let g = group.clone();
+                                move |v: bool| {
+                                    let g = g.clone();
+                                    spawn(async move { let _ = update_group(make_form(&g, |c| c.manage_groups = v)).await; refresh.set(()); });
+                                }
+                            },
+                        }
+                        PermissionRow {
+                            label: "Manage settings".to_string(),
+                            value: group.manage_settings,
+                            onchange: {
+                                let g = group.clone();
+                                move |v: bool| {
+                                    let g = g.clone();
+                                    spawn(async move { let _ = update_group(make_form(&g, |c| c.manage_settings = v)).await; refresh.set(()); });
                                 }
                             },
                         }
@@ -1288,25 +1289,10 @@ fn GroupsPanel(
                             label: "Moderator".to_string(),
                             value: group.is_moderator,
                             onchange: {
-                                let gid = group.id;
                                 let g = group.clone();
                                 move |v: bool| {
                                     let g = g.clone();
-                                    spawn(async move {
-                                        let _ = update_group(GroupUpdateForm {
-                                                group_id: gid,
-                                                title: g.title.clone(),
-                                                read_board: g.read_board,
-                                                post_topics: g.post_topics,
-                                                post_replies: g.post_replies,
-                                                edit_posts: g.edit_posts,
-                                                delete_posts: g.delete_posts,
-                                                is_moderator: v,
-                                                is_admin: g.is_admin,
-                                            })
-                                            .await;
-                                        refresh.set(());
-                                    });
+                                    spawn(async move { let _ = update_group(make_form(&g, |c| c.is_moderator = v)).await; refresh.set(()); });
                                 }
                             },
                         }
@@ -1314,25 +1300,10 @@ fn GroupsPanel(
                             label: "Admin".to_string(),
                             value: group.is_admin,
                             onchange: {
-                                let gid = group.id;
                                 let g = group.clone();
                                 move |v: bool| {
                                     let g = g.clone();
-                                    spawn(async move {
-                                        let _ = update_group(GroupUpdateForm {
-                                                group_id: gid,
-                                                title: g.title.clone(),
-                                                read_board: g.read_board,
-                                                post_topics: g.post_topics,
-                                                post_replies: g.post_replies,
-                                                edit_posts: g.edit_posts,
-                                                delete_posts: g.delete_posts,
-                                                is_moderator: g.is_moderator,
-                                                is_admin: v,
-                                            })
-                                            .await;
-                                        refresh.set(());
-                                    });
+                                    spawn(async move { let _ = update_group(make_form(&g, |c| c.is_admin = v)).await; refresh.set(()); });
                                 }
                             },
                         }

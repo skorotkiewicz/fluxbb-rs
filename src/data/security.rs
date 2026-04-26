@@ -323,8 +323,7 @@ pub(crate) fn hash_password(password: &str) -> String {
 
 /// Verify a password against a stored hash.
 ///
-/// Supports both Argon2 (PHC format starting with `$argon2`) and the legacy
-/// SHA-256 scheme (`sha256$salt$hex`) for seamless migration.
+/// Only supports Argon2 (PHC format starting with `$argon2`).
 #[cfg(feature = "server")]
 pub(crate) fn verify_password(password: &str, stored_hash: &str) -> bool {
     if stored_hash.starts_with("$argon2") {
@@ -335,39 +334,9 @@ pub(crate) fn verify_password(password: &str, stored_hash: &str) -> bool {
         Argon2::default()
             .verify_password(password.as_bytes(), &parsed)
             .is_ok()
-    } else if stored_hash.starts_with("sha256$") {
-        // Legacy SHA-256 migration path
-        verify_legacy_sha256(password, stored_hash)
     } else {
         false
     }
-}
-
-/// Verify against the legacy sha256$salt$hex format.
-///
-/// Kept around so existing users can still log in; new hashes always use Argon2.
-#[cfg(feature = "server")]
-fn verify_legacy_sha256(password: &str, stored_hash: &str) -> bool {
-    use sha2::{Digest, Sha256};
-
-    let mut parts = stored_hash.splitn(3, '$');
-    let _algo = parts.next(); // "sha256"
-    let Some(salt) = parts.next() else {
-        return false;
-    };
-    let Some(expected_hex) = parts.next() else {
-        return false;
-    };
-
-    let mut digest = Sha256::new();
-    digest.update(salt.as_bytes());
-    digest.update(password.as_bytes());
-    let computed = digest.finalize();
-    let computed_hex = bytes_to_hex(&computed);
-
-    // Constant-time comparison would be ideal, but the old scheme is only
-    // used during migration and argon2 handles it for new hashes.
-    computed_hex == expected_hex
 }
 
 #[cfg(feature = "server")]

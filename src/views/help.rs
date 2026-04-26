@@ -89,11 +89,11 @@ pub fn Help() -> Element {
                         }
                     }
 
-                    h4 { "Headings" }
+                    h4 { "Size" }
                     div { class: "help-row",
-                        code { "[h]Heading[/h]" }
+                        code { "[size=5]Large[/size]" }
                         span { "→" }
-                        h5 { "Heading" }
+                        span { style: "font-size: 18px", "Large" }
                     }
 
                     h4 { "Colors" }

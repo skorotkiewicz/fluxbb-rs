@@ -1,11 +1,11 @@
 use dioxus::prelude::*;
 
 use crate::{
-    components::{ConfirmButton, EmptyState, Pagination, PostCard, StatusMessage},
+    components::{ConfirmButton, EmptyState, Pagination, PollSection, PostCard, StatusMessage},
     data::{
         clean_error, create_reply, delete_topic, increment_topic_views, load_forums,
-        load_topic_data, move_topic, toggle_sticky, toggle_topic_status, MoveTopicForm, ReplyForm,
-        SessionUser,
+        load_topic_data, move_topic, render_paragraph, toggle_sticky, toggle_topic_status,
+        MoveTopicForm, ReplyForm, SessionUser,
     },
     Route,
 };
@@ -269,6 +269,13 @@ pub fn TopicPage(id: i32, page: i32) -> Element {
                 }
             }
 
+            PollSection {
+                topic_id: id,
+                author_id: topic.author_id,
+                current_user: current_user(),
+                refresh,
+            }
+
             for post in posts {
                 if let Some(author) = users.get(&post.author_id) {
                     PostCard {
@@ -309,7 +316,7 @@ pub fn TopicPage(id: i32, page: i32) -> Element {
                                         span { class: "review-date", "{post.posted_at}" }
                                     }
                                     for line in post.body.clone() {
-                                        p { class: "review-body", "{line}" }
+                                        p { class: "review-body", dangerous_inner_html: render_paragraph(&line) }
                                     }
                                 }
                             }
@@ -332,6 +339,7 @@ pub fn TopicPage(id: i32, page: i32) -> Element {
                             placeholder: "Write your reply…",
                         }
                     }
+                    p { class: "form-hint", "Tip: After posting, click 'Edit' to add attachments." }
                     button {
                         class: "primary-button",
                         disabled: replying(),

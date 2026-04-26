@@ -6,9 +6,10 @@ use crate::{
         add_ban, admin_add_category, admin_add_forum, admin_clean_sessions, admin_delete_category,
         admin_delete_forum, admin_delete_user, admin_update_board, admin_update_category,
         admin_update_forum, admin_update_user, clean_error, dismiss_report, load_admin_data,
-        load_bans, load_groups, remove_ban, test_smtp_settings, update_group, zap_report,
-        AdminBoardSettings, AdminCategoryForm, AdminCategoryUpdate, AdminData, AdminDeleteItem,
-        AdminForumForm, AdminForumUpdate, AdminUserUpdate, BanForm, SessionUser, TestSmtpForm,
+        load_bans, load_groups, remove_ban, render_paragraph, test_smtp_settings, update_group,
+        zap_report, AdminBoardSettings, AdminCategoryForm, AdminCategoryUpdate, AdminData,
+        AdminDeleteItem, AdminForumForm, AdminForumUpdate, AdminUserUpdate, BanForm, SessionUser,
+        TestSmtpForm,
     },
     Route,
 };
@@ -691,7 +692,7 @@ fn ModerationPanel(
                         p { class: "report-reason", "Reason: {report.reason}" }
                         div { class: "report-body",
                             for line in report.post_body.iter().take(3) {
-                                p { "{line}" }
+                                p { dangerous_inner_html: render_paragraph(line) }
                             }
                         }
                         div { class: "admin-actions",

@@ -27,6 +27,8 @@ pub fn ProfileEdit(id: i32) -> Element {
     let mut disp_topics = use_signal(|| 25_i32);
     let mut disp_posts = use_signal(|| 20_i32);
     let mut show_online = use_signal(|| true);
+    let mut theme = use_signal(|| "light".to_string());
+    let mut old_password = use_signal(String::new);
     let mut password = use_signal(String::new);
     let mut password_confirm = use_signal(String::new);
     let mut status = use_signal(String::new);
@@ -48,6 +50,7 @@ pub fn ProfileEdit(id: i32) -> Element {
             disp_topics.set(u.disp_topics);
             disp_posts.set(u.disp_posts);
             show_online.set(u.show_online);
+            theme.set(u.theme.clone());
             initialized.set(true);
         }
     });
@@ -187,6 +190,17 @@ pub fn ProfileEdit(id: i32) -> Element {
                         }
                         span { "Show me in online users list" }
                     }
+                    label {
+                        "Theme"
+                        select {
+                            class: "text-input",
+                            value: "{theme}",
+                            onchange: move |e| theme.set(e.value()),
+                            option { value: "light", "Light" }
+                            option { value: "dark", "Dark" }
+                            option { value: "high-contrast", "High Contrast" }
+                        }
+                    }
 
                     button {
                         class: "primary-button",
@@ -212,6 +226,7 @@ pub fn ProfileEdit(id: i32) -> Element {
                                 disp_topics: disp_topics(),
                                 disp_posts: disp_posts(),
                                 show_online: show_online(),
+                                theme: theme(),
                             };
                             spawn(async move {
                                 submitting.set(true);
@@ -241,6 +256,16 @@ pub fn ProfileEdit(id: i32) -> Element {
 
                     h3 { "Change password" }
                     label {
+                        "Old password"
+                        input {
+                            class: "text-input",
+                            r#type: "password",
+                            value: "{old_password}",
+                            oninput: move |e| old_password.set(e.value()),
+                            placeholder: "Current password",
+                        }
+                    }
+                    label {
                         "New password"
                         input {
                             class: "text-input",
@@ -264,9 +289,12 @@ pub fn ProfileEdit(id: i32) -> Element {
                         class: "primary-button",
                         disabled: submitting(),
                         onclick: move |_| {
+                            let op = old_password();
                             let p = password();
                             let pc = password_confirm();
-                            let validation = if p.len() < 9 {
+                            let validation = if op.is_empty() {
+                                "Old password is required."
+                            } else if p.len() < 9 {
                                 "Password must be at least 9 characters."
                             } else if p != pc {
                                 "Passwords do not match."
@@ -279,8 +307,9 @@ pub fn ProfileEdit(id: i32) -> Element {
                                 return;
                             }
                             let form = ChangePasswordForm {
-                                user_id: id,
-                                password: p,
+                                old_password: op,
+                                new_password: p,
+                                confirm_password: pc,
                             };
                             spawn(async move {
                                 submitting.set(true);
@@ -288,6 +317,7 @@ pub fn ProfileEdit(id: i32) -> Element {
                                     Ok(_) => {
                                         is_error.set(false);
                                         status.set("Password changed.".to_string());
+                                        old_password.set(String::new());
                                         password.set(String::new());
                                         password_confirm.set(String::new());
                                     }

@@ -1101,7 +1101,116 @@ label em {
     padding: 0 0 6px;
 }
 
-/* ── 26. RESPONSIVE ── */
+/* ── 26. BBCODE RENDERING ── */
+.bbcode-quote {
+    background: #f4f8fb;
+    border: 1px dashed #c8d4e0;
+    border-left: 3px solid #44699c;
+    margin: 8px 0;
+    padding: 10px 14px;
+    border-radius: 0 4px 4px 0;
+}
+
+.bbcode-quote-author {
+    display: block;
+    font-weight: 600;
+    color: #44699c;
+    font-size: 0.9em;
+    margin-bottom: 6px;
+    padding-bottom: 4px;
+    border-bottom: 1px dotted #d3dce5;
+}
+
+.bbcode-quote-content {
+    color: #444;
+    line-height: 1.5;
+}
+
+.bbcode-quote-content p {
+    padding: 3px 0;
+}
+
+.bbcode-code {
+    background: #f8f9fa;
+    border: 1px solid #e1e4e8;
+    border-radius: 4px;
+    padding: 12px 14px;
+    margin: 8px 0;
+    overflow-x: auto;
+}
+
+.bbcode-code code {
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: 0.9em;
+    color: #333;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.bbcode-url {
+    color: #2365b0;
+    text-decoration: underline;
+}
+
+.bbcode-url:hover {
+    color: #b50000;
+}
+
+.bbcode-img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 4px;
+    margin: 8px 0;
+}
+
+.bbcode-email {
+    color: #2365b0;
+    text-decoration: underline;
+}
+
+.bbcode-list {
+    margin: 8px 0;
+    padding-left: 24px;
+}
+
+.bbcode-list li {
+    margin: 4px 0;
+    line-height: 1.5;
+}
+
+.bbcode-color {
+    /* color is inline style */
+}
+
+.bbcode-size {
+    /* font-size is inline style */
+}
+
+/* Inline formatting within posts */
+.post-body strong,
+.post-body b {
+    font-weight: 600;
+    color: #222;
+}
+
+.post-body em,
+.post-body i {
+    font-style: italic;
+}
+
+.post-body u {
+    text-decoration: underline;
+    text-decoration-color: #44699c;
+}
+
+.post-body del,
+.post-body s {
+    text-decoration: line-through;
+    color: #777;
+}
+
+/* ── 27. RESPONSIVE ── */
 @media (max-width: 920px) {
     .site-shell {
         padding: 18px 12px;
@@ -1141,4 +1250,146 @@ label em {
     .search-grid {
         grid-template-columns: 1fr;
     }
+}
+
+/* ── 28. POLLS ── */
+.poll-creator,
+.poll-display {
+    background: #fff;
+    border: 1px solid #dfe6ee;
+    border-radius: 4px;
+    padding: 16px 20px;
+    margin: 16px 0;
+}
+
+.poll-creator h4,
+.poll-display h4 {
+    color: #333;
+    font-size: 1.15em;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #dfe6ee;
+}
+
+.poll-option-input {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.poll-option-input input {
+    flex: 1;
+}
+
+.poll-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.poll-badge {
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 0.85em;
+    font-weight: 600;
+}
+
+.poll-badge.closed {
+    background: #ef4444;
+    color: #fff;
+}
+
+.poll-badge.voted {
+    background: #22c55e;
+    color: #fff;
+}
+
+.poll-results {
+    margin: 12px 0;
+}
+
+.poll-result-item {
+    margin-bottom: 12px;
+}
+
+.poll-result-label {
+    margin-bottom: 4px;
+    color: #333;
+}
+
+.your-vote {
+    color: #22c55e;
+    font-weight: 600;
+}
+
+.poll-result-bar-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.poll-result-bar {
+    height: 20px;
+    background: #44699c;
+    border-radius: 3px;
+    min-width: 4px;
+    transition: width 0.3s ease;
+}
+
+.poll-result-count {
+    font-size: 0.9em;
+    color: #566579;
+    white-space: nowrap;
+}
+
+.poll-total {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #dfe6ee;
+    color: #566579;
+    font-size: 0.95em;
+}
+
+.poll-voting {
+    margin: 12px 0;
+}
+
+.poll-option {
+    margin-bottom: 8px;
+    padding: 8px 12px;
+    background: #f8f9fa;
+    border-radius: 3px;
+}
+
+.poll-option label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+.poll-option input[type="radio"],
+.poll-option input[type="checkbox"] {
+    margin: 0;
+}
+
+.poll-actions {
+    margin-top: 16px;
+}
+
+.poll-login-prompt {
+    margin-top: 12px;
+    padding: 12px;
+    background: #f8f9fa;
+    border-radius: 3px;
+    text-align: center;
+}
+
+.poll-admin-actions {
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid #dfe6ee;
+    display: flex;
+    gap: 8px;
 }

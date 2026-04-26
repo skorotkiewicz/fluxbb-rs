@@ -56,6 +56,8 @@ pub struct UserProfile {
     pub disp_posts: i32,
     #[serde(default = "default_show_online")]
     pub show_online: bool,
+    #[serde(default = "default_theme")]
+    pub theme: String,
 }
 
 fn default_group_id() -> i32 {
@@ -72,6 +74,10 @@ fn default_disp_posts() -> i32 {
 
 fn default_show_online() -> bool {
     true
+}
+
+fn default_theme() -> String {
+    "light".to_string()
 }
 
 impl UserProfile {
@@ -119,6 +125,19 @@ pub struct Post {
     pub body: Vec<String>,
     pub signature: Option<String>,
     pub position: i32,
+    #[serde(default)]
+    pub attachments: Vec<Attachment>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Attachment {
+    pub id: i32,
+    pub post_id: i32,
+    pub filename: String,
+    pub file_size: i64,
+    pub mime_type: String,
+    pub storage_path: String,
+    pub uploaded_at: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -232,6 +251,8 @@ pub struct SessionUser {
     pub disp_posts: i32,
     #[serde(default = "default_show_online")]
     pub show_online: bool,
+    #[serde(default = "default_theme")]
+    pub theme: String,
     #[serde(default)]
     pub post_topics: bool,
     #[serde(default)]
@@ -337,12 +358,14 @@ pub struct UpdateProfileForm {
     pub disp_topics: i32,
     pub disp_posts: i32,
     pub show_online: bool,
+    pub theme: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ChangePasswordForm {
-    pub user_id: i32,
-    pub password: String,
+    pub old_password: String,
+    pub new_password: String,
+    pub confirm_password: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -509,4 +532,144 @@ pub struct BanForm {
     pub email: String,
     pub message: String,
     pub duration_days: Option<i32>,
+}
+
+// Poll models
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Poll {
+    pub id: i32,
+    pub topic_id: i32,
+    pub question: String,
+    pub created_at: i64,
+    pub ends_at: Option<i64>,
+    pub allow_multiple: bool,
+    pub allow_change: bool,
+    pub is_closed: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct PollOption {
+    pub id: i32,
+    pub poll_id: i32,
+    pub option_text: String,
+    pub sort_order: i32,
+    pub vote_count: i32,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct PollVote {
+    pub id: i32,
+    pub poll_id: i32,
+    pub option_id: i32,
+    pub user_id: i32,
+    pub voted_at: i64,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct CreatePollForm {
+    pub topic_id: i32,
+    pub question: String,
+    pub options: Vec<String>,
+    pub allow_multiple: bool,
+    pub allow_change: bool,
+    pub duration_hours: Option<i32>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct CastVoteForm {
+    pub poll_id: i32,
+    pub option_id: i32,
+}
+
+// Private messaging models
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Conversation {
+    pub id: i32,
+    pub subject: String,
+    pub created_at: i64,
+    pub updated_at: i64,
+    pub last_message_at: i64,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ConversationParticipant {
+    pub id: i32,
+    pub conversation_id: i32,
+    pub user_id: i32,
+    pub joined_at: i64,
+    pub last_read_at: i64,
+    pub is_deleted: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Message {
+    pub id: i32,
+    pub conversation_id: i32,
+    pub sender_id: i32,
+    pub body: String,
+    pub created_at: i64,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct MessageWithSender {
+    pub id: i32,
+    pub conversation_id: i32,
+    pub sender_id: i32,
+    pub sender_name: String,
+    pub sender_title: String,
+    pub body: String,
+    pub created_at: i64,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ConversationWithParticipants {
+    pub id: i32,
+    pub subject: String,
+    pub created_at: i64,
+    pub updated_at: i64,
+    pub last_message_at: i64,
+    pub participants: Vec<ConversationParticipantUser>,
+    pub unread_count: i32,
+    pub last_message: Option<MessageWithSender>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ConversationParticipantUser {
+    pub user_id: i32,
+    pub username: String,
+    pub title: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ConversationThread {
+    pub conversation: Conversation,
+    pub participants: Vec<ConversationParticipantUser>,
+    pub messages: Vec<MessageWithSender>,
+    pub current_user_id: i32,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct InboxData {
+    pub conversations: Vec<ConversationWithParticipants>,
+    pub total_count: i32,
+    pub unread_count: i32,
+}
+
+// Private messaging forms
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ComposeMessageForm {
+    pub recipient_username: String,
+    pub subject: String,
+    pub body: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ReplyMessageForm {
+    pub conversation_id: i32,
+    pub body: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct NewConversationResult {
+    pub conversation_id: i32,
 }

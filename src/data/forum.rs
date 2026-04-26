@@ -15,14 +15,15 @@ use super::{
         parse_session_cookie,
         require_session_csrf,
         unix_now,
+        verify_password,
         Permission,
         // require_session,
     },
 };
 use super::{
-    ChangePasswordForm, EditPostForm, Forum, ForumData, IndexData, MoveTopicForm, NewTopicForm,
-    NewTopicResult, Post, ProfileData, ReplyForm, SearchResults, ShellData, TopicData,
-    UpdateProfileForm, UserProfile,
+    Attachment, ChangePasswordForm, EditPostForm, Forum, ForumData, IndexData, MoveTopicForm,
+    NewTopicForm, NewTopicResult, Post, ProfileData, ReplyForm, SearchResults, ShellData,
+    TopicData, UpdateProfileForm, UserProfile,
 };
 
 #[post("/api/shell-data")]
@@ -238,7 +239,11 @@ pub async fn load_topic_data(id: i32, page: i32) -> Result<TopicData, ServerFnEr
                     FROM topics WHERE id = {id}
                 ) t),
                 'posts', (SELECT COALESCE(json_agg(row_to_json(p)), '[]'::json) FROM (
-                    SELECT id, topic_id, author_id, posted_at, edited_at, body, signature, position
+                    SELECT id, topic_id, author_id, posted_at, edited_at, body, signature, position,
+                        COALESCE((SELECT json_agg(row_to_json(a)) FROM (
+                            SELECT id, post_id, filename, file_size, mime_type, storage_path, uploaded_at
+                            FROM attachments WHERE post_id = posts.id
+                        ) a), '[]'::json) AS attachments
                     FROM posts WHERE topic_id = {id} ORDER BY position, id
                     LIMIT {per_page} OFFSET {offset}
                 ) p),
@@ -285,7 +290,7 @@ pub async fn load_profile_data(id: i32) -> Result<ProfileData, ServerFnError> {
         let data = run_json_query::<ProfileData>(&format!(
             "SELECT json_build_object(
                 'user', (SELECT row_to_json(u) FROM (
-                    SELECT id, username, title, status, joined_at, post_count, location, about, last_seen, email, group_id, timezone, disp_topics, disp_posts, show_online
+                    SELECT id, username, title, status, joined_at, post_count, location, about, last_seen, email, group_id, timezone, disp_topics, disp_posts, show_online, theme
                     FROM users WHERE id = {id}
                 ) u),
                 'topics', (SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json) FROM (
@@ -494,89 +499,24 @@ pub async fn edit_post(input: EditPostForm) -> Result<(), ServerFnError> {
     }
 }
 
-#[post("/api/delete-post", headers: HeaderMap)]
-pub async fn delete_post(post_id: i32) -> Result<i32, ServerFnError> {
+// Attachment constants
+pub const MAX_ATTACHMENT_SIZE: usize = 10 * 1024 * 1024; // 10MB
+pub const ALLOWED_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "gif", "pdf", "txt", "zip", "mp4"];
+
+#[post("/api/attachments/:post_id")]
+pub async fn load_attachments(post_id: i32) -> Result<Vec<Attachment>, ServerFnError> {
     #[cfg(feature = "server")]
     {
-        let user = require_session_csrf(&headers).await.map_err(server_error)?;
-        if let Some(msg) = check_ban(&user.username, &user.email)
-            .await
-            .map_err(server_error)?
-        {
-            return Err(server_error(format!("You are banned: {msg}")));
-        }
-        #[derive(Deserialize)]
-        struct PostInfo {
-            topic_id: i32,
-            author_id: i32,
-            is_first: bool,
-        }
-
-        let info = run_json_query::<PostInfo>(&format!(
-            "SELECT row_to_json(r) FROM (
-                SELECT p.topic_id, p.author_id,
-                       CASE WHEN p.id = (SELECT MIN(id) FROM posts WHERE topic_id = p.topic_id) THEN true ELSE false END AS is_first
-                FROM posts p
-                WHERE p.id = {}
-            ) r;",
+        let attachments = run_json_query::<Vec<Attachment>>(&format!(
+            "SELECT COALESCE(json_agg(row_to_json(a)), '[]'::json) FROM (
+                SELECT id, post_id, filename, file_size, mime_type, storage_path, uploaded_at
+                FROM attachments WHERE post_id = {} ORDER BY id
+            ) a;",
             post_id
         ))
         .await
         .map_err(server_error)?;
-
-        if info.author_id != user.id {
-            check_permission(&user, Permission::Moderator)
-                .await
-                .map_err(server_error)?;
-        } else {
-            check_permission(&user, Permission::DeletePosts)
-                .await
-                .map_err(server_error)?;
-        }
-
-        if info.is_first {
-            #[derive(Deserialize)]
-            struct PostCount {
-                author_id: i32,
-                cnt: i64,
-            }
-
-            let post_counts = run_json_query::<Vec<PostCount>>(&format!(
-                "SELECT COALESCE(json_agg(row_to_json(r)), '[]'::json) FROM (SELECT author_id, COUNT(*)::bigint AS cnt FROM posts WHERE topic_id = {} GROUP BY author_id) r;",
-                info.topic_id
-            ))
-            .await
-            .map_err(server_error)?;
-            for pc in post_counts {
-                run_exec(&format!(
-                    "UPDATE users SET post_count = GREATEST(post_count - {}, 0) WHERE id = {};",
-                    pc.cnt, pc.author_id
-                ))
-                .await
-                .map_err(server_error)?;
-            }
-            run_exec(&format!(
-                "DELETE FROM posts WHERE topic_id = {};",
-                info.topic_id
-            ))
-            .await
-            .map_err(server_error)?;
-            run_exec(&format!("DELETE FROM topics WHERE id = {};", info.topic_id))
-                .await
-                .map_err(server_error)?;
-            Ok(info.topic_id)
-        } else {
-            run_exec(&format!(
-                "UPDATE users SET post_count = GREATEST(post_count - 1, 0) WHERE id = {};",
-                info.author_id
-            ))
-            .await
-            .map_err(server_error)?;
-            run_exec(&format!("DELETE FROM posts WHERE id = {};", post_id))
-                .await
-                .map_err(server_error)?;
-            Ok(0)
-        }
+        Ok(attachments)
     }
     #[cfg(not(feature = "server"))]
     {
@@ -585,255 +525,167 @@ pub async fn delete_post(post_id: i32) -> Result<i32, ServerFnError> {
     }
 }
 
-#[post("/api/mark-read", headers: HeaderMap)]
-pub async fn mark_all_read() -> Result<(), ServerFnError> {
+#[post("/api/upload-attachment", headers: HeaderMap)]
+pub async fn upload_attachment(
+    post_id: i32,
+    filename: String,
+    content: Vec<u8>,
+) -> Result<Attachment, ServerFnError> {
     #[cfg(feature = "server")]
     {
-        let user = require_session_csrf(&headers).await.map_err(server_error)?;
-        run_exec(&format!(
-            "UPDATE users SET last_visit = EXTRACT(EPOCH FROM now())::bigint WHERE id = {};",
-            user.id
-        ))
-        .await
-        .map_err(server_error)?;
-        Ok(())
-    }
-    #[cfg(not(feature = "server"))]
-    {
-        Err(ServerFnError::new("server only"))
-    }
-}
-
-#[post("/api/update-profile", headers: HeaderMap)]
-pub async fn update_profile(input: UpdateProfileForm) -> Result<(), ServerFnError> {
-    #[cfg(feature = "server")]
-    {
-        let user = require_session_csrf(&headers).await.map_err(server_error)?;
-        if input.user_id != user.id && !user.manage_users {
-            return Err(server_error("You can only edit your own profile.".into()));
-        }
-
-        let email = input.email.trim().to_lowercase();
-        if email.is_empty() || !email.contains('@') {
-            return Err(server_error("Enter a valid email address.".into()));
-        }
-
-        let disp_topics = input.disp_topics.clamp(5, 100);
-        let disp_posts = input.disp_posts.clamp(5, 100);
-
-        run_exec(&format!(
-            "UPDATE users SET email = {}, location = {}, about = {}, timezone = {}, disp_topics = {}, disp_posts = {}, show_online = {} WHERE id = {};",
-            sql_literal(&email),
-            sql_literal(input.location.trim()),
-            sql_literal(input.about.trim()),
-            sql_literal(input.timezone.trim()),
-            disp_topics,
-            disp_posts,
-            if input.show_online { "true" } else { "false" },
-            input.user_id,
-        ))
-        .await
-        .map_err(server_error)?;
-
-        Ok(())
-    }
-    #[cfg(not(feature = "server"))]
-    {
-        let _ = input;
-        Err(ServerFnError::new("server only"))
-    }
-}
-
-#[post("/api/change-password", headers: HeaderMap)]
-pub async fn change_password(input: ChangePasswordForm) -> Result<(), ServerFnError> {
-    #[cfg(feature = "server")]
-    {
-        let user = require_session_csrf(&headers).await.map_err(server_error)?;
-        if input.user_id != user.id && !user.manage_users {
-            return Err(server_error(
-                "You can only change your own password.".into(),
-            ));
-        }
-        if input.password.len() < 9 {
-            return Err(server_error(
-                "Password must be at least 9 characters.".into(),
-            ));
-        }
-        let hash = hash_password(&input.password);
-        run_exec(&format!(
-            "UPDATE users SET password_hash = {} WHERE id = {};",
-            sql_literal(&hash),
-            input.user_id,
-        ))
-        .await
-        .map_err(server_error)?;
-        Ok(())
-    }
-    #[cfg(not(feature = "server"))]
-    {
-        let _ = input;
-        Err(ServerFnError::new("server only"))
-    }
-}
-
-#[post("/api/delete-topic", headers: HeaderMap)]
-pub async fn delete_topic(topic_id: i32) -> Result<(), ServerFnError> {
-    #[cfg(feature = "server")]
-    {
-        let user = require_session_csrf(&headers).await.map_err(server_error)?;
-        check_permission(&user, Permission::DeleteTopic)
+        upload_attachment_impl(post_id, filename, content, headers)
             .await
-            .map_err(server_error)?;
+            .map_err(server_error)
+    }
+    #[cfg(not(feature = "server"))]
+    {
+        let _ = post_id;
+        let _ = filename;
+        let _ = content;
+        Err(ServerFnError::new("server only"))
+    }
+}
 
+#[post("/api/delete-attachment", headers: HeaderMap)]
+pub async fn delete_attachment(attachment_id: i32) -> Result<(), ServerFnError> {
+    #[cfg(feature = "server")]
+    {
+        let user = require_session_csrf(&headers).await.map_err(server_error)?;
+
+        // Get attachment info to check ownership and get storage path
         #[derive(Deserialize)]
-        struct PostCount {
-            author_id: i32,
-            cnt: i64,
+        struct AttachmentInfo {
+            post_id: i32,
+            storage_path: String,
         }
-        let post_counts = run_json_query::<Vec<PostCount>>(&format!(
-            "SELECT COALESCE(json_agg(row_to_json(r)), '[]'::json) FROM (SELECT author_id, COUNT(*)::bigint AS cnt FROM posts WHERE topic_id = {} GROUP BY author_id) r;",
-            topic_id
+
+        let info = run_json_query::<AttachmentInfo>(&format!(
+            "SELECT row_to_json(r) FROM (
+                SELECT post_id, storage_path FROM attachments WHERE id = {}
+            ) r;",
+            attachment_id
         ))
         .await
         .map_err(server_error)?;
-        for pc in post_counts {
-            run_exec(&format!(
-                "UPDATE users SET post_count = GREATEST(post_count - {}, 0) WHERE id = {};",
-                pc.cnt, pc.author_id
-            ))
-            .await
-            .map_err(server_error)?;
+
+        // Get post author to verify ownership
+        let author_id: i32 = run_scalar_i64(&format!(
+            "SELECT author_id FROM posts WHERE id = {};",
+            info.post_id
+        ))
+        .await
+        .map_err(server_error)? as i32;
+
+        // Only post author or moderators can delete attachments
+        if author_id != user.id {
+            check_permission(&user, Permission::Moderator)
+                .await
+                .map_err(server_error)?;
         }
-        run_exec(&format!("DELETE FROM posts WHERE topic_id = {};", topic_id))
-            .await
-            .map_err(server_error)?;
-        run_exec(&format!("DELETE FROM topics WHERE id = {};", topic_id))
-            .await
-            .map_err(server_error)?;
+
+        // Delete file from storage
+        let _ = std::fs::remove_file(&info.storage_path);
+
+        // Delete from database
+        run_exec(&format!(
+            "DELETE FROM attachments WHERE id = {};",
+            attachment_id
+        ))
+        .await
+        .map_err(server_error)?;
+
         Ok(())
     }
     #[cfg(not(feature = "server"))]
     {
-        let _ = topic_id;
+        let _ = attachment_id;
         Err(ServerFnError::new("server only"))
     }
 }
 
-#[post("/api/move-topic", headers: HeaderMap)]
-pub async fn move_topic(input: MoveTopicForm) -> Result<(), ServerFnError> {
-    #[cfg(feature = "server")]
-    {
-        let user = require_session_csrf(&headers).await.map_err(server_error)?;
-        check_permission(&user, Permission::MoveTopic)
-            .await
-            .map_err(server_error)?;
-        run_exec(&format!(
-            "UPDATE topics SET forum_id = {} WHERE id = {};",
-            input.forum_id, input.topic_id
-        ))
-        .await
-        .map_err(server_error)?;
-        Ok(())
+#[cfg(feature = "server")]
+async fn upload_attachment_impl(
+    post_id: i32,
+    filename: String,
+    content: Vec<u8>,
+    headers: HeaderMap,
+) -> Result<Attachment, String> {
+    let user = require_session_csrf(&headers).await?;
+
+    // Verify post ownership
+    let author_id: i32 = run_scalar_i64(&format!(
+        "SELECT author_id FROM posts WHERE id = {};",
+        post_id
+    ))
+    .await? as i32;
+
+    if author_id != user.id {
+        return Err("You can only attach files to your own posts.".to_string());
     }
-    #[cfg(not(feature = "server"))]
-    {
-        let _ = input;
-        Err(ServerFnError::new("server only"))
+
+    // Check file size
+    if content.len() > MAX_ATTACHMENT_SIZE {
+        return Err(format!(
+            "File too large. Maximum size is {} MB.",
+            MAX_ATTACHMENT_SIZE / (1024 * 1024)
+        ));
     }
-}
 
-#[post("/api/toggle-sticky", headers: HeaderMap)]
-pub async fn toggle_sticky(topic_id: i32) -> Result<bool, ServerFnError> {
-    #[cfg(feature = "server")]
-    {
-        let user = require_session_csrf(&headers).await.map_err(server_error)?;
-        check_permission(&user, Permission::StickyTopic)
-            .await
-            .map_err(server_error)?;
-
-        #[derive(Deserialize)]
-        struct StickyRow {
-            sticky: bool,
-        }
-
-        let row = run_json_query::<StickyRow>(&format!(
-            "SELECT row_to_json(r) FROM (SELECT sticky FROM topics WHERE id = {}) AS r;",
-            topic_id
-        ))
-        .await
-        .map_err(server_error)?;
-
-        let new_sticky = !row.sticky;
-        run_exec(&format!(
-            "UPDATE topics SET sticky = {} WHERE id = {};",
-            new_sticky, topic_id
-        ))
-        .await
-        .map_err(server_error)?;
-
-        Ok(new_sticky)
+    // Validate extension
+    let ext = filename.rsplit('.').next().unwrap_or("").to_lowercase();
+    if !ALLOWED_EXTENSIONS.contains(&ext.as_str()) {
+        return Err(format!(
+            "File type not allowed. Allowed: {}",
+            ALLOWED_EXTENSIONS.join(", ")
+        ));
     }
-    #[cfg(not(feature = "server"))]
-    {
-        let _ = topic_id;
-        Err(ServerFnError::new("server only"))
+
+    // Determine MIME type
+    let mime_type = match ext.as_str() {
+        "jpg" | "jpeg" => "image/jpeg",
+        "png" => "image/png",
+        "gif" => "image/gif",
+        "pdf" => "application/pdf",
+        "txt" => "text/plain",
+        "zip" => "application/zip",
+        "mp4" => "video/mp4",
+        _ => "application/octet-stream",
+    };
+
+    // Create storage directory if needed
+    let storage_dir = std::path::Path::new("uploads");
+    if !storage_dir.exists() {
+        std::fs::create_dir_all(storage_dir)
+            .map_err(|e| format!("Failed to create uploads dir: {e}"))?;
     }
-}
 
-#[post("/api/toggle-topic-status", headers: HeaderMap)]
-pub async fn toggle_topic_status(topic_id: i32) -> Result<String, ServerFnError> {
-    #[cfg(feature = "server")]
-    {
-        let user = require_session_csrf(&headers).await.map_err(server_error)?;
-        check_permission(&user, Permission::CloseTopic)
-            .await
-            .map_err(server_error)?;
+    // Generate unique filename
+    let unique_name = format!("{}_{}_{}", user.id, unix_now(), filename);
+    let storage_path = storage_dir.join(&unique_name);
 
-        #[derive(Deserialize)]
-        struct ClosedRow {
-            closed: bool,
-        }
+    // Write file
+    std::fs::write(&storage_path, &content).map_err(|e| format!("Failed to save file: {e}"))?;
 
-        let row = run_json_query::<ClosedRow>(&format!(
-            "SELECT row_to_json(r) FROM (SELECT closed FROM topics WHERE id = {}) AS r;",
-            topic_id
-        ))
-        .await
-        .map_err(server_error)?;
+    let storage_path_str = storage_path.to_string_lossy().to_string();
+    let now_str = "to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI UTC')";
 
-        let new_closed = !row.closed;
-        run_exec(&format!(
-            "UPDATE topics SET closed = {} WHERE id = {};",
-            new_closed, topic_id
-        ))
-        .await
-        .map_err(server_error)?;
+    // Insert into database
+    let attachment = run_json_query::<Attachment>(&format!(
+        "WITH ins AS (
+            INSERT INTO attachments (post_id, filename, file_size, mime_type, storage_path, uploaded_at)
+            VALUES ({}, {}, {}, {}, {}, {})
+            RETURNING id, post_id, filename, file_size, mime_type, storage_path, uploaded_at
+        ) SELECT row_to_json(ins) FROM ins;",
+        post_id,
+        sql_literal(&filename),
+        content.len() as i64,
+        sql_literal(mime_type),
+        sql_literal(&storage_path_str),
+        now_str,
+    ))
+    .await?;
 
-        Ok(if new_closed { "closed" } else { "open" }.to_string())
-    }
-    #[cfg(not(feature = "server"))]
-    {
-        let _ = topic_id;
-        Err(ServerFnError::new("server only"))
-    }
-}
-
-#[post("/api/view-topic")]
-pub async fn increment_topic_views(topic_id: i32) -> Result<(), ServerFnError> {
-    #[cfg(feature = "server")]
-    {
-        run_exec(&format!(
-            "UPDATE topics SET views = views + 1 WHERE id = {};",
-            topic_id
-        ))
-        .await
-        .map_err(server_error)
-    }
-    #[cfg(not(feature = "server"))]
-    {
-        let _ = topic_id;
-        Ok(())
-    }
+    Ok(attachment)
 }
 
 #[cfg(feature = "server")]
@@ -956,4 +808,289 @@ async fn create_reply_impl(input: ReplyForm, headers: HeaderMap) -> Result<(), S
     .await?;
 
     Ok(())
+}
+
+#[post("/api/delete-post", headers: HeaderMap)]
+pub async fn delete_post(post_id: i32) -> Result<(), ServerFnError> {
+    #[cfg(feature = "server")]
+    {
+        let user = require_session_csrf(&headers).await.map_err(server_error)?;
+
+        // Get post info
+        #[derive(Deserialize)]
+        struct PostInfo {
+            author_id: i32,
+            topic_id: i32,
+        }
+        let info = run_json_query::<PostInfo>(&format!(
+            "SELECT row_to_json(r) FROM (SELECT author_id, topic_id FROM posts WHERE id = {}) AS r;",
+            post_id
+        ))
+        .await
+        .map_err(server_error)?;
+
+        // Check if user is author or has delete permission
+        if info.author_id != user.id {
+            check_permission(&user, Permission::DeletePosts)
+                .await
+                .map_err(server_error)?;
+        }
+
+        // Delete the post
+        run_exec(&format!("DELETE FROM posts WHERE id = {};", post_id))
+            .await
+            .map_err(server_error)?;
+
+        // Update user post count
+        run_exec(&format!(
+            "UPDATE users SET post_count = post_count - 1 WHERE id = {};",
+            info.author_id
+        ))
+        .await
+        .map_err(server_error)?;
+
+        Ok(())
+    }
+    #[cfg(not(feature = "server"))]
+    {
+        let _ = post_id;
+        Err(ServerFnError::new("server only"))
+    }
+}
+
+#[post("/api/delete-topic", headers: HeaderMap)]
+pub async fn delete_topic(topic_id: i32) -> Result<(), ServerFnError> {
+    #[cfg(feature = "server")]
+    {
+        let user = require_session_csrf(&headers).await.map_err(server_error)?;
+        check_permission(&user, Permission::DeleteTopic)
+            .await
+            .map_err(server_error)?;
+
+        // Delete topic and all posts
+        run_exec(&format!("DELETE FROM posts WHERE topic_id = {};", topic_id))
+            .await
+            .map_err(server_error)?;
+
+        run_exec(&format!("DELETE FROM topics WHERE id = {};", topic_id))
+            .await
+            .map_err(server_error)?;
+
+        Ok(())
+    }
+    #[cfg(not(feature = "server"))]
+    {
+        let _ = topic_id;
+        Err(ServerFnError::new("server only"))
+    }
+}
+
+#[post("/api/move-topic", headers: HeaderMap)]
+pub async fn move_topic(input: MoveTopicForm) -> Result<(), ServerFnError> {
+    #[cfg(feature = "server")]
+    {
+        let user = require_session_csrf(&headers).await.map_err(server_error)?;
+        check_permission(&user, Permission::MoveTopic)
+            .await
+            .map_err(server_error)?;
+
+        run_exec(&format!(
+            "UPDATE topics SET forum_id = {} WHERE id = {};",
+            input.forum_id, input.topic_id
+        ))
+        .await
+        .map_err(server_error)?;
+
+        Ok(())
+    }
+    #[cfg(not(feature = "server"))]
+    {
+        let _ = input;
+        Err(ServerFnError::new("server only"))
+    }
+}
+
+#[post("/api/toggle-sticky", headers: HeaderMap)]
+pub async fn toggle_sticky(topic_id: i32) -> Result<(), ServerFnError> {
+    #[cfg(feature = "server")]
+    {
+        let user = require_session_csrf(&headers).await.map_err(server_error)?;
+        check_permission(&user, Permission::StickyTopic)
+            .await
+            .map_err(server_error)?;
+
+        run_exec(&format!(
+            "UPDATE topics SET sticky = NOT sticky WHERE id = {};",
+            topic_id
+        ))
+        .await
+        .map_err(server_error)?;
+
+        Ok(())
+    }
+    #[cfg(not(feature = "server"))]
+    {
+        let _ = topic_id;
+        Err(ServerFnError::new("server only"))
+    }
+}
+
+#[post("/api/toggle-topic-status", headers: HeaderMap)]
+pub async fn toggle_topic_status(topic_id: i32) -> Result<(), ServerFnError> {
+    #[cfg(feature = "server")]
+    {
+        let user = require_session_csrf(&headers).await.map_err(server_error)?;
+        check_permission(&user, Permission::CloseTopic)
+            .await
+            .map_err(server_error)?;
+
+        run_exec(&format!(
+            "UPDATE topics SET closed = NOT closed WHERE id = {};",
+            topic_id
+        ))
+        .await
+        .map_err(server_error)?;
+
+        Ok(())
+    }
+    #[cfg(not(feature = "server"))]
+    {
+        let _ = topic_id;
+        Err(ServerFnError::new("server only"))
+    }
+}
+
+#[post("/api/mark-all-read", headers: HeaderMap)]
+pub async fn mark_all_read() -> Result<(), ServerFnError> {
+    #[cfg(feature = "server")]
+    {
+        let user = require_session_csrf(&headers).await.map_err(server_error)?;
+        run_exec(&format!(
+            "UPDATE users SET last_visit = EXTRACT(EPOCH FROM now())::bigint WHERE id = {};",
+            user.id
+        ))
+        .await
+        .map_err(server_error)?;
+        Ok(())
+    }
+    #[cfg(not(feature = "server"))]
+    {
+        Err(ServerFnError::new("server only"))
+    }
+}
+
+#[post("/api/update-profile", headers: HeaderMap)]
+pub async fn update_profile(input: UpdateProfileForm) -> Result<(), ServerFnError> {
+    #[cfg(feature = "server")]
+    {
+        let user = require_session_csrf(&headers).await.map_err(server_error)?;
+
+        // Can only update own profile unless admin
+        if input.user_id != user.id && !user.is_admin {
+            return Err(ServerFnError::new("Not authorized"));
+        }
+
+        let email = input.email.trim();
+        let location = input.location.trim();
+        let about = input.about.trim();
+
+        if email.is_empty() {
+            return Err(ServerFnError::new("Email is required."));
+        }
+
+        run_exec(&format!(
+            "UPDATE users SET email = {}, location = {}, about = {},
+             timezone = {}, disp_topics = {}, disp_posts = {}, show_online = {}, theme = {} WHERE id = {};",
+            sql_literal(email),
+            sql_literal(location),
+            sql_literal(about),
+            sql_literal(&input.timezone),
+            input.disp_topics,
+            input.disp_posts,
+            input.show_online,
+            sql_literal(&input.theme),
+            input.user_id
+        ))
+        .await
+        .map_err(server_error)?;
+
+        Ok(())
+    }
+    #[cfg(not(feature = "server"))]
+    {
+        let _ = input;
+        Err(ServerFnError::new("server only"))
+    }
+}
+
+#[post("/api/change-password", headers: HeaderMap)]
+pub async fn change_password(input: ChangePasswordForm) -> Result<(), ServerFnError> {
+    #[cfg(feature = "server")]
+    {
+        let user = require_session_csrf(&headers).await.map_err(server_error)?;
+
+        // Verify old password
+        #[derive(Deserialize)]
+        struct UserPass {
+            password_hash: String,
+        }
+        let stored = run_json_query::<UserPass>(&format!(
+            "SELECT row_to_json(r) FROM (SELECT password_hash FROM users WHERE id = {}) AS r;",
+            user.id
+        ))
+        .await
+        .map_err(server_error)?;
+
+        if !verify_password(&input.old_password, &stored.password_hash) {
+            return Err(ServerFnError::new("Current password is incorrect."));
+        }
+
+        // Validate new password
+        if input.new_password.len() < 6 {
+            return Err(ServerFnError::new(
+                "Password must be at least 6 characters.",
+            ));
+        }
+
+        if input.new_password != input.confirm_password {
+            return Err(ServerFnError::new("New passwords do not match."));
+        }
+
+        // Hash and update
+        let new_hash = hash_password(&input.new_password);
+
+        run_exec(&format!(
+            "UPDATE users SET password_hash = {} WHERE id = {};",
+            sql_literal(&new_hash),
+            user.id
+        ))
+        .await
+        .map_err(server_error)?;
+
+        Ok(())
+    }
+    #[cfg(not(feature = "server"))]
+    {
+        let _ = input;
+        Err(ServerFnError::new("server only"))
+    }
+}
+
+#[post("/api/view-topic")]
+pub async fn increment_topic_views(topic_id: i32) -> Result<(), ServerFnError> {
+    #[cfg(feature = "server")]
+    {
+        run_exec(&format!(
+            "UPDATE topics SET views = views + 1 WHERE id = {};",
+            topic_id
+        ))
+        .await
+        .map_err(server_error)?;
+        Ok(())
+    }
+    #[cfg(not(feature = "server"))]
+    {
+        let _ = topic_id;
+        Err(ServerFnError::new("server only"))
+    }
 }

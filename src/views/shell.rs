@@ -1,9 +1,19 @@
 use dioxus::{document, prelude::*};
 
 use crate::{
-    data::{cookie_name, current_session_user, load_shell_data, logout_account, SessionUser},
+    data::{
+        cookie_name, current_session_user, load_inbox, load_shell_data, logout_account, SessionUser,
+    },
     Route,
 };
+
+fn theme_class(theme: &str) -> &str {
+    match theme {
+        "dark" => "theme-dark",
+        "high-contrast" => "theme-high-contrast",
+        _ => "theme-light",
+    }
+}
 
 const HEADER_ART: Asset = asset!("/assets/header.svg");
 
@@ -26,10 +36,21 @@ pub fn AppShell() -> Element {
 
     let is_admin = current_user().as_ref().is_some_and(|u| u.is_admin);
 
+    // Unread message counter
+    let mut inbox_resource = use_resource(move || async move {
+        refresh();
+        if current_user().is_some() {
+            load_inbox().await.ok().map(|d| d.unread_count).unwrap_or(0)
+        } else {
+            0
+        }
+    });
+
     // Watch for refresh trigger
     use_effect(move || {
         refresh();
         shell_resource.restart();
+        inbox_resource.restart();
     });
 
     let mut shell = use_signal(|| None::<crate::data::ShellData>);
@@ -42,9 +63,19 @@ pub fn AppShell() -> Element {
 
     use_context_provider(|| current_user);
 
+    // Get theme from current user or default to light
+    let theme = current_user()
+        .as_ref()
+        .map(|u| u.theme.clone())
+        .unwrap_or_else(|| "light".to_string());
+    let theme_class_val = theme_class(&theme);
+
+    let unread_count = inbox_resource().unwrap_or(0);
+    let show_unread = current_user().is_some() && unread_count > 0;
+
     rsx! {
         if let Some(ref shell) = shell() {
-            div { class: "site-shell",
+            div { class: "site-shell {theme_class_val}",
                 header { class: "masthead",
                     div { class: "masthead-copy",
                         p { class: "eyebrow", "Community Forum" }
@@ -63,6 +94,15 @@ pub fn AppShell() -> Element {
                     Link { class: "nav-link", to: Route::Index {}, "Forums" }
                     Link { class: "nav-link", to: Route::Search {}, "Search" }
                     Link { class: "nav-link", to: Route::Users {}, "Users" }
+
+                    if current_user().is_some() {
+                        if show_unread {
+                            Link { class: "nav-link nav-unread", to: Route::Inbox {}, "Messages ({unread_count})" }
+                        } else {
+                            Link { class: "nav-link", to: Route::Inbox {}, "Messages" }
+                        }
+                    }
+
                     Link { class: "nav-link", to: Route::Help {}, "Help" }
                     Link { class: "nav-link", to: Route::Rules {}, "Rules" }
 

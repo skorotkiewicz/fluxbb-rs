@@ -48,7 +48,8 @@ CREATE TABLE IF NOT EXISTS users (
     timezone TEXT NOT NULL DEFAULT 'UTC',
     disp_topics INTEGER NOT NULL DEFAULT 25,
     disp_posts INTEGER NOT NULL DEFAULT 20,
-    show_online BOOLEAN NOT NULL DEFAULT true
+    show_online BOOLEAN NOT NULL DEFAULT true,
+    theme TEXT NOT NULL DEFAULT 'light'
 );
 
 CREATE TABLE IF NOT EXISTS topics (
@@ -156,3 +157,87 @@ CREATE TABLE IF NOT EXISTS password_resets (
 
 CREATE INDEX IF NOT EXISTS password_resets_token_idx ON password_resets (token);
 CREATE INDEX IF NOT EXISTS password_resets_expires_idx ON password_resets (expires_at);
+
+-- Theme support migration
+ALTER TABLE users ADD COLUMN IF NOT EXISTS theme TEXT NOT NULL DEFAULT 'light';
+
+-- Polls feature tables
+CREATE TABLE IF NOT EXISTS polls (
+    id SERIAL PRIMARY KEY,
+    topic_id INTEGER NOT NULL UNIQUE REFERENCES topics(id) ON DELETE CASCADE,
+    question TEXT NOT NULL,
+    created_at BIGINT NOT NULL DEFAULT 0,
+    ends_at BIGINT DEFAULT NULL,
+    allow_multiple BOOLEAN NOT NULL DEFAULT false,
+    allow_change BOOLEAN NOT NULL DEFAULT false,
+    is_closed BOOLEAN NOT NULL DEFAULT false
+);
+
+CREATE TABLE IF NOT EXISTS poll_options (
+    id SERIAL PRIMARY KEY,
+    poll_id INTEGER NOT NULL REFERENCES polls(id) ON DELETE CASCADE,
+    option_text TEXT NOT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    vote_count INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS poll_votes (
+    id SERIAL PRIMARY KEY,
+    poll_id INTEGER NOT NULL REFERENCES polls(id) ON DELETE CASCADE,
+    option_id INTEGER NOT NULL REFERENCES poll_options(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    voted_at BIGINT NOT NULL DEFAULT 0,
+    UNIQUE (poll_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS polls_topic_id_idx ON polls (topic_id);
+CREATE INDEX IF NOT EXISTS poll_options_poll_id_idx ON poll_options (poll_id);
+CREATE INDEX IF NOT EXISTS poll_votes_poll_id_idx ON poll_votes (poll_id);
+CREATE INDEX IF NOT EXISTS poll_votes_user_id_idx ON poll_votes (user_id);
+CREATE INDEX IF NOT EXISTS poll_votes_option_id_idx ON poll_votes (option_id);
+
+-- File attachments feature
+CREATE TABLE IF NOT EXISTS attachments (
+    id SERIAL PRIMARY KEY,
+    post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+    filename TEXT NOT NULL,
+    file_size BIGINT NOT NULL DEFAULT 0,
+    mime_type TEXT NOT NULL DEFAULT 'application/octet-stream',
+    storage_path TEXT NOT NULL,
+    uploaded_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS attachments_post_id_idx ON attachments (post_id);
+
+-- Private messaging feature tables
+CREATE TABLE IF NOT EXISTS conversations (
+    id SERIAL PRIMARY KEY,
+    subject TEXT NOT NULL,
+    created_at BIGINT NOT NULL DEFAULT 0,
+    updated_at BIGINT NOT NULL DEFAULT 0,
+    last_message_at BIGINT NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS conversation_participants (
+    id SERIAL PRIMARY KEY,
+    conversation_id INTEGER NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    joined_at BIGINT NOT NULL DEFAULT 0,
+    last_read_at BIGINT NOT NULL DEFAULT 0,
+    is_deleted BOOLEAN NOT NULL DEFAULT false,
+    UNIQUE (conversation_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS messages (
+    id SERIAL PRIMARY KEY,
+    conversation_id INTEGER NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    sender_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    body TEXT NOT NULL DEFAULT '',
+    created_at BIGINT NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS conversation_participants_user_id_idx ON conversation_participants (user_id);
+CREATE INDEX IF NOT EXISTS conversation_participants_conversation_id_idx ON conversation_participants (conversation_id);
+CREATE INDEX IF NOT EXISTS messages_conversation_id_idx ON messages (conversation_id);
+CREATE INDEX IF NOT EXISTS messages_sender_id_idx ON messages (sender_id);
+CREATE INDEX IF NOT EXISTS messages_created_at_idx ON messages (created_at);

@@ -1,9 +1,9 @@
 use dioxus::prelude::*;
 
 use views::{
-    Admin, AppShell, EditPost, ForgotPassword, Forum, ForumPage, Help, Index, Install, Login,
-    NewTopic, Profile, ProfileEdit, Register, ResetPassword, Rules, Search, Topic, TopicPage,
-    Users,
+    Admin, AppShell, ComposeMessage, Conversation, EditPost, ForgotPassword, Forum, ForumPage,
+    Help, Inbox, Index, Install, Login, NewTopic, Profile, ProfileEdit, Register, ResetPassword,
+    Rules, Search, Topic, TopicPage, Users,
 };
 
 mod components;
@@ -11,7 +11,8 @@ mod data;
 mod views;
 
 const FAVICON: Asset = asset!("/assets/favicon.ico");
-const MAIN_CSS: Asset = asset!("/assets/styling/Air.css");
+const MAIN_CSS: Asset = asset!("/assets/styling/Modern.css");
+const THEMES_CSS: Asset = asset!("/assets/styling/themes.css");
 
 #[derive(Debug, Clone, Routable, PartialEq)]
 #[rustfmt::skip]
@@ -55,6 +56,12 @@ enum Route {
         Help {},
         #[route("/rules")]
         Rules {},
+        #[route("/messages")]
+        Inbox {},
+        #[route("/messages/:id")]
+        Conversation { id: i32 },
+        #[route("/messages/new")]
+        ComposeMessage {},
 }
 
 fn main() {
@@ -67,9 +74,19 @@ fn main() {
         // std::env::set_var("RUST_LOG", "warn");
         std::env::set_var("RUST_LOG", "sqlx=warn,info");
         dioxus::serve(|| async move {
+            use dioxus::server::axum::extract::DefaultBodyLimit;
+            use tower_http::services::ServeDir;
             let router = dioxus::server::router(App)
-                .route("/api/health", dioxus::server::axum::routing::get(healthcheck_handler))
-                .route("/feed", dioxus::server::axum::routing::get(rss_feed_handler));
+                .route(
+                    "/api/health",
+                    dioxus::server::axum::routing::get(healthcheck_handler),
+                )
+                .route(
+                    "/feed",
+                    dioxus::server::axum::routing::get(rss_feed_handler),
+                )
+                .nest_service("/uploads", ServeDir::new("uploads"))
+                .layer(DefaultBodyLimit::max(50 * 1024 * 1024));
             Ok(router)
         });
     }
@@ -103,6 +120,7 @@ fn App() -> Element {
     rsx! {
         document::Link { rel: "icon", href: FAVICON }
         document::Stylesheet { href: MAIN_CSS }
+        document::Stylesheet { href: THEMES_CSS }
         Router::<Route> {}
     }
 }

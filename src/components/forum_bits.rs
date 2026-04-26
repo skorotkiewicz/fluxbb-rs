@@ -1,7 +1,10 @@
 use dioxus::prelude::*;
 
 use crate::components::ConfirmButton;
-use crate::data::{delete_post, report_post, Post, ReportPostForm, SessionUser};
+use crate::data::{
+    delete_attachment, delete_post, render_paragraph, report_post, Attachment, Post,
+    ReportPostForm, SessionUser,
+};
 use crate::Route;
 
 #[component]
@@ -36,7 +39,7 @@ pub fn PostCard(
     forum_id: i32,
 ) -> Element {
     let mut refresh = use_context::<Signal<()>>();
-    let navigator = use_navigator();
+    let _navigator = use_navigator();
 
     let can_edit = current_user
         .as_ref()
@@ -82,18 +85,8 @@ pub fn PostCard(
                                 class: "danger-button small-button",
                                 on_confirm: move |_| {
                                     spawn(async move {
-                                        match delete_post(post_id).await {
-                                            Ok(0) => {
-                                                refresh.set(());
-                                            }
-                                            Ok(_) => {
-                                                navigator
-                                                    .push(Route::ForumPage {
-                                                        id: forum_id,
-                                                        page: 1,
-                                                    });
-                                            }
-                                            Err(_) => {}
+                                        if delete_post(post_id).await.is_ok() {
+                                            refresh.set(());
                                         }
                                     });
                                 },
@@ -159,11 +152,27 @@ pub fn PostCard(
 
             div { class: "post-body",
                 for paragraph in post.body {
-                    p { "{paragraph}" }
+                    p { dangerous_inner_html: render_paragraph(&paragraph) }
+                }
+
+                // Attachments section
+                if !post.attachments.is_empty() {
+                    div { class: "post-attachments",
+                        h4 { class: "attachments-title", "Attachments" }
+                        div { class: "attachments-list",
+                            for attachment in post.attachments.clone() {
+                                AttachmentItem {
+                                    attachment: attachment.clone(),
+                                    current_user: current_user.clone(),
+                                    author_id: author_id,
+                                }
+                            }
+                        }
+                    }
                 }
 
                 if let Some(signature) = post.signature {
-                    p { class: "post-signature", "{signature}" }
+                    p { class: "post-signature", dangerous_inner_html: render_paragraph(&signature) }
                 }
             }
         }
@@ -219,6 +228,64 @@ pub fn Pagination(
             }
             if let Some(route) = next_route {
                 Link { class: "page-button", to: route, "Next →" }
+            }
+        }
+    }
+}
+
+#[component]
+pub fn AttachmentItem(
+    attachment: Attachment,
+    current_user: Option<SessionUser>,
+    author_id: i32,
+) -> Element {
+    let mut refresh = use_context::<Signal<()>>();
+    let is_image = attachment.mime_type.starts_with("image/");
+    let can_delete = current_user
+        .as_ref()
+        .is_some_and(|u| (u.id == author_id && u.edit_posts) || u.is_moderator || u.is_admin);
+
+    let file_size_str = if attachment.file_size < 1024 {
+        format!("{} B", attachment.file_size)
+    } else if attachment.file_size < 1024 * 1024 {
+        format!("{:.1} KB", attachment.file_size as f64 / 1024.0)
+    } else {
+        format!("{:.1} MB", attachment.file_size as f64 / (1024.0 * 1024.0))
+    };
+
+    rsx! {
+        div { class: "attachment-item",
+            if is_image {
+                div { class: "attachment-preview",
+                    img {
+                        src: "/{attachment.storage_path}",
+                        alt: "{attachment.filename}",
+                        class: "attachment-image",
+                    }
+                }
+            }
+            div { class: "attachment-info",
+                a {
+                    class: "attachment-link",
+                    href: "/{attachment.storage_path}",
+                    download: "{attachment.filename}",
+                    "{attachment.filename}"
+                }
+                span { class: "attachment-meta", "({file_size_str})" }
+                if can_delete {
+                    button {
+                        class: "attachment-delete small-button",
+                        onclick: move |_| {
+                            let aid = attachment.id;
+                            spawn(async move {
+                                if delete_attachment(aid).await.is_ok() {
+                                    refresh.set(());
+                                }
+                            });
+                        },
+                        "Delete"
+                    }
+                }
             }
         }
     }

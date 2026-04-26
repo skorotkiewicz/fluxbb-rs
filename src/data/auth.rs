@@ -30,6 +30,7 @@ struct StoredAuthUser {
     pub disp_topics: i32,
     pub disp_posts: i32,
     pub show_online: bool,
+    pub theme: String,
     pub post_topics: bool,
     pub post_replies: bool,
     pub edit_posts: bool,
@@ -336,7 +337,7 @@ async fn register_account_impl(input: RegisterForm) -> Result<AuthResponse, Stri
              INSERT INTO users (
                  username, title, status, joined_at, post_count, location, about, last_seen,
                  email, password_hash, group_id, registered_at, last_visit, registration_ip,
-                 timezone, disp_topics, disp_posts, show_online
+                 timezone, disp_topics, disp_posts, show_online, theme
              )
              VALUES (
                  {username}, 'Member', 'Online',
@@ -351,9 +352,9 @@ async fn register_account_impl(input: RegisterForm) -> Result<AuthResponse, Stri
                  EXTRACT(EPOCH FROM now())::bigint,
                  EXTRACT(EPOCH FROM now())::bigint,
                  '127.0.0.1',
-                 'UTC', 25, 20, true
+                 'UTC', 25, 20, true, 'light'
              )
-             RETURNING id, username, title, group_id, timezone, disp_topics, disp_posts, show_online,
+             RETURNING id, username, title, group_id, timezone, disp_topics, disp_posts, show_online, theme,
                        true AS post_topics, true AS post_replies, true AS edit_posts, false AS delete_posts,
                        false AS delete_topic, false AS move_topic, false AS sticky_topic, false AS close_topic,
                        false AS manage_users, false AS manage_forums, false AS manage_categories,
@@ -390,7 +391,7 @@ async fn login_account_impl(input: LoginForm) -> Result<AuthResponse, String> {
         "SELECT COALESCE((
              SELECT row_to_json(user_row)
              FROM (
-                 SELECT u.id, u.username, u.title, u.group_id, u.email, u.password_hash, u.timezone, u.disp_topics, u.disp_posts, u.show_online,
+                 SELECT u.id, u.username, u.title, u.group_id, u.email, u.password_hash, u.timezone, u.disp_topics, u.disp_posts, u.show_online, u.theme,
                         g.post_topics, g.post_replies, g.edit_posts, g.delete_posts,
                         g.delete_topic, g.move_topic, g.sticky_topic, g.close_topic,
                         g.manage_users, g.manage_forums, g.manage_categories, g.manage_bans,
@@ -437,6 +438,7 @@ async fn login_account_impl(input: LoginForm) -> Result<AuthResponse, String> {
             disp_topics: user.disp_topics,
             disp_posts: user.disp_posts,
             show_online: user.show_online,
+            theme: user.theme,
             post_topics: user.post_topics,
             post_replies: user.post_replies,
             edit_posts: user.edit_posts,
@@ -477,7 +479,7 @@ async fn current_session_user_impl(headers: HeaderMap) -> Result<Option<SessionU
         "SELECT COALESCE((
              SELECT row_to_json(session_row)
              FROM (
-                   SELECT u.id, u.username, u.email, u.title, u.group_id, s.csrf_token, u.timezone, u.disp_topics, u.disp_posts, u.show_online,
+                   SELECT u.id, u.username, u.email, u.title, u.group_id, s.csrf_token, u.timezone, u.disp_topics, u.disp_posts, u.show_online, u.theme,
                           g.post_topics, g.post_replies, g.edit_posts, g.delete_posts,
                           g.delete_topic, g.move_topic, g.sticky_topic, g.close_topic,
                           g.manage_users, g.manage_forums, g.manage_categories, g.manage_bans,
@@ -487,7 +489,7 @@ async fn current_session_user_impl(headers: HeaderMap) -> Result<Option<SessionU
                    INNER JOIN groups AS g ON g.id = u.group_id
                    WHERE s.token = {token}
                     AND s.expires_at > EXTRACT(EPOCH FROM now())::bigint
-                  LIMIT 1
+                   LIMIT 1
              ) AS session_row
          ), 'null'::json);",
         token = sql_literal(&token),
@@ -592,7 +594,7 @@ async fn install_board_impl(input: InstallForm) -> Result<AuthResponse, String> 
              INSERT INTO users (
                  username, title, status, joined_at, post_count, location, about, last_seen,
                  email, password_hash, group_id, registered_at, last_visit, registration_ip,
-                 timezone, disp_topics, disp_posts, show_online
+                 timezone, disp_topics, disp_posts, show_online, theme
              )
              VALUES (
                  {username}, 'Administrator', 'Online',
@@ -607,10 +609,10 @@ async fn install_board_impl(input: InstallForm) -> Result<AuthResponse, String> 
                  EXTRACT(EPOCH FROM now())::bigint,
                  EXTRACT(EPOCH FROM now())::bigint,
                  '127.0.0.1',
-                 'UTC', 25, 20, true
+                 'UTC', 25, 20, true, 'light'
              )
              ON CONFLICT DO NOTHING
-             RETURNING id, username, title, group_id, timezone, disp_topics, disp_posts, show_online,
+             RETURNING id, username, title, group_id, timezone, disp_topics, disp_posts, show_online, theme,
                        true AS post_topics, true AS post_replies, true AS edit_posts, true AS delete_posts,
                        true AS delete_topic, true AS move_topic, true AS sticky_topic, true AS close_topic,
                        true AS manage_users, true AS manage_forums, true AS manage_categories,

@@ -3,9 +3,12 @@ use dioxus::prelude::ServerFnError;
 
 mod admin;
 mod auth;
+mod bbcode;
 mod db;
 mod forum;
+mod messages;
 mod models;
+mod polls;
 mod rss;
 mod security;
 
@@ -20,12 +23,19 @@ pub use auth::{
     register_account, request_password_reset, reset_password,
 };
 pub use forum::{
-    change_password, create_reply, create_topic, delete_post, delete_topic, edit_post,
-    increment_topic_views, load_forum_data, load_forums, load_index_data, load_post,
-    load_profile_data, load_shell_data, load_topic_data, load_users_data, mark_all_read,
-    move_topic, search_server, toggle_sticky, toggle_topic_status, update_profile,
+    change_password, create_reply, create_topic, delete_attachment, delete_post, delete_topic,
+    edit_post, increment_topic_views, load_attachments, load_forum_data, load_forums,
+    load_index_data, load_post, load_profile_data, load_shell_data, load_topic_data,
+    load_users_data, mark_all_read, move_topic, search_server, toggle_sticky, toggle_topic_status,
+    update_profile, upload_attachment,
+};
+
+pub use bbcode::render_paragraph;
+pub use messages::{
+    delete_conversation, load_conversation, load_inbox, reply_message, send_message,
 };
 pub use models::*;
+pub use polls::{cast_vote, close_poll, create_poll, delete_poll, get_poll_with_user_vote};
 pub use security::{clean_error, cookie_max_age, cookie_name, csrf_cookie_name};
 
 #[cfg(feature = "server")]

@@ -1,0 +1,1172 @@
+/*****************************************************************
+ CSS Variables Theme System — Light, Dark, High-Contrast
+*****************************************************************/
+
+/* ── BASE VARIABLES (Light theme default) ── */
+:root,
+.theme-light {
+    /* Backgrounds */
+    --bg-body: #f6f9fc;
+    --bg-shell: #f6f9fc;
+    --bg-panel: #fff;
+    --bg-panel-header: #ebf1f5;
+    --bg-hero: #fff;
+    --bg-card: #fff;
+    --bg-input: #fff;
+    --bg-post: #fcfdfe;
+    --bg-post-aside: #ebf1f5;
+    --bg-poll: #fff;
+    --bg-online-users: #f4f8fb;
+    --bg-quote: #f4f8fb;
+    --bg-code: #f8f9fa;
+    --bg-sticky: #f0f7fa;
+
+    /* Text */
+    --text-primary: #333;
+    --text-secondary: #566579;
+    --text-muted: #78869b;
+    --text-link: #2365b0;
+    --text-link-hover: #b50000;
+    --text-accent: #357082;
+    --text-nav: #d4dae2;
+    --text-nav-hover: #fff;
+    --text-button: #fff;
+    --text-button-secondary: #357082;
+
+    /* Borders */
+    --border-primary: #cad7e1;
+    --border-secondary: #b9c5ce;
+    --border-dotted: #b9c5ce;
+    --border-dashed: #c8d4e0;
+    --border-input: #b9c5ce;
+    --border-divider: #dfe6ee;
+
+    /* Interactive */
+    --color-primary: #44699c;
+    --color-primary-hover: #b50000;
+    --color-secondary: #ebf1f5;
+    --color-secondary-hover: #dfe6ee;
+
+    /* Badges */
+    --badge-pinned-bg: #e1f0f7;
+    --badge-pinned-text: #3399cc;
+    --badge-pinned-border: #b3d9ec;
+    --badge-closed-bg: #e8e8e8;
+    --badge-closed-text: #555;
+    --badge-closed-border: #ccc;
+    --badge-new-bg: #e1f5e1;
+    --badge-new-text: #2e7d32;
+    --badge-new-border: #a5d6a7;
+
+    /* Status */
+    --success-bg: #e1f5e1;
+    --success-text: #2e7d32;
+    --success-border: #a5d6a7;
+    --error-bg: #ffffe1;
+    --error-text: #b50000;
+    --error-border: #dfe6ee;
+    --danger-text: #dc2626;
+
+    /* Polls */
+    --poll-bar: #44699c;
+    --poll-voted-bg: #22c55e;
+    --poll-closed-bg: #ef4444;
+
+    /* Shadows */
+    --shadow-focus: rgba(68, 105, 156, 0.15);
+}
+
+/* ── DARK THEME ── */
+.theme-dark {
+    --bg-body: #1a1d21;
+    --bg-shell: #1a1d21;
+    --bg-panel: #252a30;
+    --bg-panel-header: #2d333b;
+    --bg-hero: #252a30;
+    --bg-card: #252a30;
+    --bg-input: #1e2227;
+    --bg-post: #252a30;
+    --bg-post-aside: #2d333b;
+    --bg-poll: #252a30;
+    --bg-online-users: #2d333b;
+    --bg-quote: #2d333b;
+    --bg-code: #1e2227;
+    --bg-sticky: #2a3a42;
+
+    --text-primary: #e6edf3;
+    --text-secondary: #9aa3ad;
+    --text-muted: #6e7a87;
+    --text-link: #6ca3e0;
+    --text-link-hover: #ff6b6b;
+    --text-accent: #7dc4c6;
+    --text-nav: #c9d1d9;
+    --text-nav-hover: #fff;
+    --text-button: #fff;
+    --text-button-secondary: #7dc4c6;
+
+    --border-primary: #444c56;
+    --border-secondary: #373e47;
+    --border-dotted: #444c56;
+    --border-dashed: #373e47;
+    --border-input: #444c56;
+    --border-divider: #373e47;
+
+    --color-primary: #539bf5;
+    --color-primary-hover: #7ab8ff;
+    --color-secondary: #2d333b;
+    --color-secondary-hover: #373e47;
+
+    --badge-pinned-bg: #1e4a5c;
+    --badge-pinned-text: #7dc4c6;
+    --badge-pinned-border: #2a6277;
+    --badge-closed-bg: #373e47;
+    --badge-closed-text: #9aa3ad;
+    --badge-closed-border: #444c56;
+    --badge-new-bg: #1e4a3c;
+    --badge-new-text: #6bc46a;
+    --badge-new-border: #2a624f;
+
+    --success-bg: #1e4a3c;
+    --success-text: #6bc46a;
+    --success-border: #2a624f;
+    --error-bg: #4a1e1e;
+    --error-text: #ff6b6b;
+    --error-border: #622a2a;
+    --danger-text: #ff6b6b;
+
+    --poll-bar: #539bf5;
+    --poll-voted-bg: #6bc46a;
+    --poll-closed-bg: #ff6b6b;
+
+    --shadow-focus: rgba(83, 155, 245, 0.25);
+}
+
+/* ── HIGH CONTRAST THEME ── */
+.theme-high-contrast {
+    --bg-body: #000;
+    --bg-shell: #000;
+    --bg-panel: #000;
+    --bg-panel-header: #111;
+    --bg-hero: #000;
+    --bg-card: #000;
+    --bg-input: #000;
+    --bg-post: #000;
+    --bg-post-aside: #111;
+    --bg-poll: #000;
+    --bg-online-users: #111;
+    --bg-quote: #111;
+    --bg-code: #000;
+    --bg-sticky: #0a1a22;
+
+    --text-primary: #fff;
+    --text-secondary: #fff;
+    --text-muted: #ccc;
+    --text-link: #00ffff;
+    --text-link-hover: #ff0;
+    --text-accent: #0ff;
+    --text-nav: #fff;
+    --text-nav-hover: #ff0;
+    --text-button: #000;
+    --text-button-secondary: #0ff;
+
+    --border-primary: #fff;
+    --border-secondary: #fff;
+    --border-dotted: #fff;
+    --border-dashed: #fff;
+    --border-input: #fff;
+    --border-divider: #fff;
+
+    --color-primary: #0ff;
+    --color-primary-hover: #ff0;
+    --color-secondary: #111;
+    --color-secondary-hover: #222;
+
+    --badge-pinned-bg: #001122;
+    --badge-pinned-text: #0ff;
+    --badge-pinned-border: #0ff;
+    --badge-closed-bg: #111;
+    --badge-closed-text: #fff;
+    --badge-closed-border: #fff;
+    --badge-new-bg: #002200;
+    --badge-new-text: #0f0;
+    --badge-new-border: #0f0;
+
+    --success-bg: #002200;
+    --success-text: #0f0;
+    --success-border: #0f0;
+    --error-bg: #220000;
+    --error-text: #f00;
+    --error-border: #f00;
+    --danger-text: #f00;
+
+    --poll-bar: #0ff;
+    --poll-voted-bg: #0f0;
+    --poll-closed-bg: #f00;
+
+    --shadow-focus: rgba(0, 255, 255, 0.5);
+}
+
+/* ── THEME APPLICATION ── */
+
+/* Body backgrounds */
+html, body {
+    background: var(--bg-body);
+    color: var(--text-primary);
+}
+
+/* Shell */
+.site-shell {
+    background: var(--bg-shell);
+    color: var(--text-primary);
+}
+
+/* Masthead */
+.masthead {
+    border-bottom-color: var(--border-dotted);
+}
+
+.masthead h1 {
+    color: var(--text-primary);
+}
+
+.masthead-tagline {
+    border-top-color: var(--border-dotted);
+    color: var(--text-secondary);
+}
+
+.eyebrow {
+    color: var(--text-accent);
+}
+
+/* Navigation */
+.top-nav {
+    background: var(--color-primary);
+}
+
+.top-nav a {
+    background: var(--color-primary);
+    border-right-color: var(--text-nav);
+    color: var(--text-nav);
+}
+
+.top-nav a:hover,
+.top-nav a:active,
+.top-nav a:focus {
+    background: var(--color-primary-hover);
+    color: var(--text-nav-hover);
+}
+
+.nav-unread {
+    color: #ff6b6b;
+    font-weight: 700;
+}
+
+.auth-chip {
+    color: var(--text-nav);
+}
+
+.nav-button {
+    color: var(--text-nav);
+}
+
+.nav-button:hover {
+    background: var(--color-primary-hover);
+    color: var(--text-nav-hover);
+}
+
+/* Breadcrumbs */
+.breadcrumbs {
+    border-bottom-color: var(--border-dotted);
+}
+
+.breadcrumbs a {
+    color: var(--text-link);
+}
+
+/* Hero card */
+.hero-card {
+    background: var(--bg-hero);
+    border-color: var(--border-primary);
+}
+
+.section-header {
+    border-bottom-color: var(--border-divider);
+}
+
+.section-kicker {
+    color: var(--text-accent);
+}
+
+.section-title {
+    color: var(--text-primary);
+}
+
+.section-subtitle {
+    color: var(--text-secondary);
+}
+
+/* Panels */
+.panel {
+    background: var(--bg-panel);
+    border-color: var(--border-primary);
+}
+
+.panel-heading {
+    background: var(--bg-panel-header);
+    border-bottom-color: var(--border-primary);
+    color: var(--text-accent);
+}
+
+.panel-heading h3 {
+    color: var(--text-accent);
+}
+
+/* Tables (topics/forums) */
+.topic-table-head,
+.forum-table-head {
+    background: var(--bg-panel-header);
+    border-bottom-color: var(--border-primary);
+    color: var(--text-accent);
+}
+
+.topic-row,
+.forum-row {
+    border-bottom-color: var(--border-divider);
+    background: var(--bg-post);
+}
+
+.topic-row:hover,
+.forum-row:hover {
+    background: var(--bg-shell);
+}
+
+.topic-sticky {
+    background: var(--bg-sticky);
+}
+
+.topic-link,
+.forum-link,
+.recent-topic-link {
+    color: var(--text-link);
+}
+
+.topic-link:hover,
+.forum-link:hover,
+.recent-topic-link:hover {
+    color: var(--text-link-hover);
+}
+
+.topic-meta,
+.forum-meta {
+    color: var(--text-secondary);
+}
+
+.topic-metric,
+.forum-metric {
+    color: var(--text-secondary);
+}
+
+/* Badges */
+.badge-pinned {
+    background: var(--badge-pinned-bg);
+    color: var(--badge-pinned-text);
+    border-color: var(--badge-pinned-border);
+}
+
+.badge-closed {
+    background: var(--badge-closed-bg);
+    color: var(--badge-closed-text);
+    border-color: var(--badge-closed-border);
+}
+
+.badge-new {
+    background: var(--badge-new-bg);
+    color: var(--badge-new-text);
+    border-color: var(--badge-new-border);
+}
+
+/* Post cards */
+.post-card {
+    background: var(--bg-shell);
+    border-color: var(--border-secondary);
+}
+
+.post-aside {
+    background: var(--bg-post-aside);
+    border-right-color: var(--border-divider);
+}
+
+.post-author {
+    color: var(--text-link);
+}
+
+.post-role {
+    color: var(--text-secondary);
+}
+
+.post-timestamp {
+    color: var(--text-secondary);
+}
+
+.post-edited {
+    color: var(--text-secondary);
+}
+
+.post-body {
+    background: var(--bg-post);
+}
+
+.post-signature {
+    border-top-color: var(--border-divider);
+    color: var(--text-secondary);
+}
+
+/* Topic review */
+.topic-review {
+    border-color: var(--border-dashed);
+    background: var(--bg-quote);
+}
+
+.topic-review .panel-heading {
+    background: var(--bg-panel-header);
+    border-bottom-color: var(--border-dashed);
+}
+
+.review-post {
+    border-bottom-color: var(--border-dotted);
+}
+
+.review-author {
+    color: var(--text-link);
+}
+
+.review-date {
+    color: var(--text-muted);
+}
+
+.review-body {
+    color: var(--text-primary);
+}
+
+/* Pagination */
+.pagination {
+    border-top-color: var(--border-dotted);
+}
+
+.page-button {
+    border-color: var(--border-secondary);
+    background: var(--bg-panel);
+    color: var(--text-link);
+}
+
+.page-button:hover {
+    background: var(--bg-panel-header);
+}
+
+.page-button.active {
+    background: var(--color-primary);
+    color: var(--text-button);
+    border-color: var(--color-primary);
+}
+
+/* Buttons */
+.primary-button {
+    background: var(--color-primary);
+    color: var(--text-button);
+    border-color: var(--color-primary);
+}
+
+.primary-button:hover {
+    background: var(--color-primary-hover);
+    border-color: var(--color-primary-hover);
+    color: var(--text-button);
+}
+
+.secondary-button {
+    background: var(--color-secondary);
+    color: var(--text-button-secondary);
+    border-color: var(--border-primary);
+}
+
+.secondary-button:hover {
+    background: var(--color-secondary-hover);
+}
+
+.small-button {
+    color: var(--text-link);
+}
+
+.small-button:hover {
+    /*color: var(--text-link);*/
+    background: var(--bg-panel-header);
+}
+
+.danger-button {
+    color: var(--text-link);
+}
+
+.danger-button:hover {
+    color: var(--danger-text);
+    background: var(--error-bg);
+}
+
+/* Icon buttons */
+.icon-button:hover {
+    background: var(--bg-shell);
+    border-color: var(--border-secondary);
+}
+
+.icon-button.danger:hover {
+    background: var(--error-bg);
+    border-color: var(--error-border);
+}
+
+/* Forms */
+.form-card {
+    background: var(--bg-post-aside);
+    border-color: var(--border-secondary);
+}
+
+.form-card h3 {
+    color: var(--text-accent);
+    border-bottom-color: var(--border-divider);
+}
+
+.form-card label {
+    color: var(--text-primary);
+}
+
+.text-input,
+.text-area {
+    border-color: var(--border-input);
+    background: var(--bg-input);
+    color: var(--text-primary);
+}
+
+.text-input:focus,
+.text-area:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px var(--shadow-focus);
+}
+
+label {
+    color: var(--text-accent);
+}
+
+label em {
+    color: var(--text-secondary);
+}
+
+/* Form messages */
+.form-error {
+    background: var(--error-bg);
+    border-color: var(--error-border);
+    color: var(--error-text);
+}
+
+.form-success {
+    background: var(--success-bg);
+    border-color: var(--success-border);
+    color: var(--success-text);
+}
+
+/* Admin */
+.admin-tabs {
+    border-bottom-color: var(--border-primary);
+}
+
+.admin-tab {
+    color: var(--text-link);
+}
+
+.admin-tab:hover {
+    background: var(--bg-hero);
+}
+
+.admin-tab.active {
+    color: var(--text-primary);
+    background: var(--bg-shell);
+    border-bottom-color: var(--color-primary);
+}
+
+/* User cards */
+.user-card {
+    background: var(--bg-card);
+    border-color: var(--border-primary);
+}
+
+/* Empty states */
+.empty-state {
+    color: var(--text-secondary);
+}
+
+.empty-state h3 {
+    color: var(--text-accent);
+}
+
+/* Stat cards */
+.stat-card {
+    background: var(--bg-card);
+    border-color: var(--border-primary);
+}
+
+.stat-label {
+    color: var(--text-accent);
+}
+
+.stat-value {
+    color: var(--text-primary);
+}
+
+.stat-detail {
+    color: var(--text-secondary);
+}
+
+/* Search */
+.search-input {
+    border-color: var(--border-secondary);
+    background: var(--bg-input);
+    color: var(--text-primary);
+}
+
+.search-results {
+    border-top-color: var(--border-divider);
+}
+
+.search-result-row {
+    border-bottom-color: var(--border-divider);
+}
+
+.search-result-row:hover {
+    background: var(--bg-shell);
+}
+
+.member-result-row {
+    border-bottom-color: var(--border-divider);
+}
+
+.member-result-row:hover {
+    background: var(--bg-shell);
+}
+
+/* Recent list */
+.recent-list {
+    border-top-color: var(--border-divider);
+}
+
+.recent-row {
+    border-bottom-color: var(--border-divider);
+}
+
+.recent-row:hover {
+    background: var(--bg-shell);
+}
+
+.recent-meta {
+    color: var(--text-secondary);
+}
+
+/* Footer */
+.site-meta {
+    border-top-color: var(--border-secondary);
+    color: var(--text-secondary);
+}
+
+.online-users {
+    background: var(--bg-online-users);
+    border-color: var(--border-dashed);
+    color: var(--text-secondary);
+}
+
+.online-users .online-label {
+    color: var(--color-primary);
+}
+
+.online-users a {
+    color: var(--color-primary);
+}
+
+.site-footer {
+    border-top-color: var(--border-secondary);
+    color: var(--text-secondary);
+}
+
+/* Moderator actions */
+.tiny-button {
+    border-color: var(--border-secondary);
+    background: var(--bg-panel);
+    color: var(--text-primary);
+}
+
+.tiny-button:hover {
+    background: var(--color-primary);
+    color: var(--text-button);
+    border-color: var(--color-primary);
+}
+
+/* Small select */
+.small-select {
+    border-color: var(--border-secondary);
+    background: var(--bg-input);
+    color: var(--text-primary);
+}
+
+/* Report form */
+.report-form input {
+    border-color: var(--border-secondary);
+}
+
+/* Report row */
+.report-row {
+    border-bottom-color: var(--border-dotted);
+}
+
+.report-reason {
+    color: var(--error-text);
+}
+
+.report-body {
+    background: var(--bg-quote);
+    border-color: var(--border-dashed);
+}
+
+.report-body p {
+    color: var(--text-secondary);
+}
+
+/* Side note */
+.side-note {
+    background: var(--bg-shell);
+    border-color: var(--border-divider);
+    color: var(--text-secondary);
+}
+
+.side-note h3 {
+    color: var(--text-accent);
+}
+
+/* BBCode */
+.bbcode-quote {
+    background: var(--bg-quote);
+    border-color: var(--border-dashed);
+    border-left-color: var(--color-primary);
+}
+
+.bbcode-quote-author {
+    color: var(--color-primary);
+    border-bottom-color: var(--border-dotted);
+}
+
+.bbcode-quote-content {
+    color: var(--text-primary);
+}
+
+.bbcode-code {
+    background: var(--bg-code);
+    border-color: var(--border-primary);
+}
+
+.bbcode-code code {
+    color: var(--text-primary);
+}
+
+.bbcode-url {
+    color: var(--text-link);
+}
+
+.bbcode-url:hover {
+    color: var(--text-link-hover);
+}
+
+/* Inline formatting */
+.post-body strong,
+.post-body b {
+    color: var(--text-primary);
+}
+
+.post-body del,
+.post-body s {
+    color: var(--text-muted);
+}
+
+/* Polls */
+.poll-creator,
+.poll-display {
+    background: var(--bg-poll);
+    border-color: var(--border-divider);
+}
+
+.poll-creator h4,
+.poll-display h4 {
+    color: var(--text-primary);
+    border-bottom-color: var(--border-divider);
+}
+
+.poll-badge.closed {
+    background: var(--poll-closed-bg);
+    color: var(--text-button);
+}
+
+.poll-badge.voted {
+    background: var(--poll-voted-bg);
+    color: var(--text-button);
+}
+
+.poll-result-bar {
+    background: var(--poll-bar);
+}
+
+.your-vote {
+    color: var(--poll-voted-bg);
+}
+
+.poll-total {
+    border-top-color: var(--border-divider);
+    color: var(--text-secondary);
+}
+
+.poll-option {
+    background: var(--bg-code);
+}
+
+.poll-login-prompt {
+    background: var(--bg-code);
+}
+
+.poll-admin-actions {
+    border-top-color: var(--border-divider);
+}
+
+/* Private messages */
+.message {
+    background: var(--bg-card);
+    border-color: var(--border-primary);
+}
+
+.message-own {
+    background: var(--bg-panel-header);
+    border-color: var(--color-primary);
+}
+
+.message-author {
+    color: var(--text-primary);
+}
+
+.message-role {
+    color: var(--text-muted);
+}
+
+.message-body {
+    color: var(--text-primary);
+}
+
+.reply-area {
+    border-top-color: var(--border-divider);
+}
+
+.card {
+    background: var(--bg-card);
+    border-color: var(--border-primary);
+}
+
+.card:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.card-title {
+    color: var(--text-primary);
+}
+
+.card-meta {
+    color: var(--text-secondary);
+}
+
+.card-snippet {
+    color: var(--text-muted);
+}
+
+.card-unread {
+    background: var(--bg-sticky);
+    border-left-color: var(--color-primary);
+}
+
+/* ── POLL DETAILS ── */
+.poll-creator h4,
+.poll-header h4 {
+    color: var(--text-primary);
+}
+
+.poll-display {
+    background: var(--bg-poll);
+    border-color: var(--border-primary);
+}
+
+.poll-vote-button {
+    background: var(--bg-post);
+    border-color: var(--border-primary);
+    color: var(--text-primary);
+}
+
+.poll-vote-button:hover:not(:disabled) {
+    background: var(--bg-panel-header);
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+.poll-vote-button:disabled {
+    opacity: 0.5;
+}
+
+.poll-result-bar-container {
+    background: var(--border-secondary);
+}
+
+.poll-option-label {
+    color: var(--text-primary);
+}
+
+.poll-vote-count {
+    color: var(--text-muted);
+}
+
+.poll-actions {
+    border-top-color: var(--border-divider);
+}
+
+.poll-meta {
+    color: var(--text-muted);
+}
+
+.poll-login-prompt {
+    background: var(--bg-code);
+}
+
+/* ── ICON BUTTONS ── */
+.icon-button {
+    border-color: var(--border-primary);
+    background: var(--bg-card);
+    color: var(--text-secondary);
+}
+
+.icon-button:hover {
+    background: var(--bg-shell);
+    border-color: var(--border-secondary);
+}
+
+.icon-button.danger {
+    color: var(--danger-text);
+}
+
+.icon-button.danger:hover {
+    background: var(--error-bg);
+    border-color: var(--error-border);
+}
+
+/* ── ATTACHMENTS ── */
+.attachment-item {
+    background: var(--bg-post);
+    border-color: var(--border-primary);
+}
+
+.attachment-link {
+    color: var(--text-link);
+}
+
+.attachment-link:hover {
+    color: var(--text-link-hover);
+}
+
+.attachment-meta {
+    color: var(--text-muted);
+}
+
+.attachment-delete {
+    color: var(--danger-text);
+}
+
+.attachment-delete:hover {
+    background: var(--error-bg);
+}
+
+/* ── FILE UPLOAD ── */
+.file-upload-label {
+    border-color: var(--border-secondary);
+    background: var(--bg-post);
+}
+
+.file-upload-label:hover {
+    border-color: var(--color-primary);
+    background: var(--bg-panel-header);
+}
+
+.file-upload-hint {
+    color: var(--text-secondary);
+}
+
+.file-upload-item {
+    background: var(--bg-post-aside);
+}
+
+.file-upload-name {
+    color: var(--text-primary);
+}
+
+.file-upload-size {
+    color: var(--text-muted);
+}
+
+.file-upload-remove {
+    color: var(--danger-text);
+}
+
+.file-upload-remove:hover {
+    background: var(--error-bg);
+}
+
+.file-upload-progress {
+    background: var(--bg-panel-header);
+    border-color: var(--border-primary);
+    color: var(--text-accent);
+}
+
+.file-upload-error {
+    background: var(--error-bg);
+    border-color: var(--error-border);
+    color: var(--error-text);
+}
+
+/* ── FORMS ── */
+.form-actions {
+    border-top-color: var(--border-divider);
+}
+
+/* ── LINK BUTTON ── */
+.link-button {
+    color: var(--text-link);
+}
+
+.link-button:hover {
+    color: var(--text-link-hover);
+}
+
+/* ── MISC TEXT ── */
+.poll-loading {
+    color: var(--text-muted);
+}
+
+/* ── TOPIC HERO ── */
+.topic-title {
+    color: var(--text-primary);
+}
+
+.topic-summary {
+    color: var(--text-secondary);
+}
+
+.topic-tags {
+    color: var(--text-muted);
+}
+
+/* ── FORUM DESCRIPTION ── */
+.forum-description {
+    color: var(--text-secondary);
+}
+
+/* ── ATTACHMENTS ── */
+.post-attachments {
+    border-top-color: var(--border-divider);
+}
+
+.attachments-title {
+    color: var(--text-muted);
+}
+
+/* ── POST ASIDE (user info sidebar) ── */
+.post-aside {
+    background: var(--bg-post-aside);
+    border-right-color: var(--border-divider);
+}
+
+/* ── FORM HINTS ── */
+.form-hint {
+    color: var(--text-muted);
+}
+
+/* ── INSTALLER / SETUP ── */
+.install-step {
+    background: var(--bg-panel);
+    border-color: var(--border-primary);
+}
+
+.install-step h2 {
+    color: var(--text-accent);
+}
+
+/* ── HELP / RULES CONTENT ── */
+.rules-content,
+.help-content {
+    color: var(--text-primary);
+}
+
+.rules-content h3,
+.help-content h3 {
+    color: var(--text-accent);
+}
+
+/* ── PAGINATION ── */
+.page-info {
+    color: var(--text-muted);
+}
+
+/* ── SEARCH ── */
+.search-hint {
+    color: var(--text-muted);
+}
+
+/* ── ADMIN ── */
+.admin-panel {
+    background: var(--bg-panel);
+    border-color: var(--border-primary);
+}
+
+.admin-panel h3 {
+    color: var(--text-accent);
+}
+
+/* ── DROPDOWN / SELECT ── */
+.small-select {
+    border-color: var(--border-secondary);
+    background: var(--bg-input);
+    color: var(--text-primary);
+}
+
+/* ── STATUS MESSAGES ── */
+.status-message {
+    background: var(--bg-panel-header);
+    border-color: var(--border-primary);
+    color: var(--text-primary);
+}
+
+.status-message.error {
+    background: var(--error-bg);
+    border-color: var(--error-border);
+    color: var(--error-text);
+}
+
+.status-message.success {
+    background: var(--success-bg);
+    border-color: var(--success-border);
+    color: var(--success-text);
+}
+
+/* ── LOADING / EMPTY STATES ── */
+.loading-spinner {
+    color: var(--text-muted);
+}
+
+/* Responsive */
+@media (max-width: 920px) {
+    .site-shell {
+        background: var(--bg-shell);
+    }
+}

@@ -565,15 +565,6 @@ pub struct PollOption {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct PollVote {
-    pub id: i32,
-    pub poll_id: i32,
-    pub option_id: i32,
-    pub user_id: i32,
-    pub voted_at: i64,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct CreatePollForm {
     pub topic_id: i32,
     pub question: String,
@@ -597,25 +588,6 @@ pub struct Conversation {
     pub created_at: i64,
     pub updated_at: i64,
     pub last_message_at: i64,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct ConversationParticipant {
-    pub id: i32,
-    pub conversation_id: i32,
-    pub user_id: i32,
-    pub joined_at: i64,
-    pub last_read_at: i64,
-    pub is_deleted: bool,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct Message {
-    pub id: i32,
-    pub conversation_id: i32,
-    pub sender_id: i32,
-    pub body: String,
-    pub created_at: i64,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

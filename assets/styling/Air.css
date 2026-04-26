@@ -18,12 +18,10 @@ body,
 
 html,
 body {
-    background: #f6f9fc;
     color: #333;
     font-family: "Trebuchet MS", Arial, Helvetica, sans-serif;
     font-size: 12.5px;
     line-height: 1.01;
-    /* font: 14px/1.55 Arial, Helvetica, sans-serif; */
 }
 
 a {
@@ -40,11 +38,13 @@ a:focus {
 
 /* ── 2. SHELL / LAYOUT ── */
 .site-shell {
+    padding: 30px 40px;
+    color: #333;
+}
+
+.site-inner {
     max-width: 1070px;
     margin: 0 auto;
-    padding: 30px 40px;
-    background: #f6f9fc;
-    color: #333;
 }
 
 /* ── 3. MASTHEAD ── */

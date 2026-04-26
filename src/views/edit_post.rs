@@ -3,7 +3,7 @@ use dioxus::prelude::*;
 use crate::{
     components::{AttachmentItem, EmptyState, SectionHeader, StatusMessage},
     data::{
-        clean_error, delete_attachment, edit_post, load_attachments, load_post, load_topic_data,
+        clean_error, edit_post, load_attachments, load_post, load_topic_data,
         upload_attachment, EditPostForm, SessionUser,
     },
     Route,

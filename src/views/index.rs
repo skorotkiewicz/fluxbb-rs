@@ -85,21 +85,23 @@ pub fn Index() -> Element {
                     subtitle: data.meta.announcement_body.clone(),
                 }
 
-                div { class: "stat-grid",
-                    StatCard {
-                        label: "Members".to_string(),
-                        value: stats.members.to_string(),
-                        detail: format!("Newest: {}", stats.newest_member),
-                    }
-                    StatCard {
-                        label: "Topics".to_string(),
-                        value: stats.topics.to_string(),
-                        detail: "Active discussions".to_string(),
-                    }
-                    StatCard {
-                        label: "Posts".to_string(),
-                        value: stats.posts.to_string(),
-                        detail: "Total contributions".to_string(),
+                if current_user().is_none() {
+                    div { class: "stat-grid",
+                        StatCard {
+                            label: "Members".to_string(),
+                            value: stats.members.to_string(),
+                            detail: format!("Newest: {}", stats.newest_member),
+                        }
+                        StatCard {
+                            label: "Topics".to_string(),
+                            value: stats.topics.to_string(),
+                            detail: "Active discussions".to_string(),
+                        }
+                        StatCard {
+                            label: "Posts".to_string(),
+                            value: stats.posts.to_string(),
+                            detail: "Total contributions".to_string(),
+                        }
                     }
                 }
 

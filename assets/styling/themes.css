@@ -208,9 +208,8 @@
 
 /* ── THEME APPLICATION ── */
 
-/* Body backgrounds */
+/* Body text color (background handled by .site-shell) */
 html, body {
-    background: var(--bg-body);
     color: var(--text-primary);
 }
 

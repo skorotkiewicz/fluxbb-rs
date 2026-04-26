@@ -26,8 +26,7 @@ html {
 }
 
 body {
-    background: #f8fafc;
-    color: #334155;
+    color: var(--text-primary, #334155);
 }
 
 a {
@@ -45,17 +44,20 @@ a:focus {
 
 /* ── 2. SHELL / LAYOUT ── */
 .site-shell {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 24px 32px;
-    background: #f8fafc;
     min-height: 100vh;
     display: flex;
     flex-direction: column;
 }
 
+.site-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 24px 32px;
+    width: 100%;
+}
+
 @media (max-width: 768px) {
-    .site-shell {
+    .site-inner {
         padding: 16px 20px;
     }
 }
@@ -1860,6 +1862,30 @@ label em {
     }
 }
 
+@media (max-width: 776px) {
+    /*.auth-chip,
+    .nav-button {
+        margin-left: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 38px;
+    }*/
+
+    .top-nav {
+        border-radius: 10px;
+        flex-wrap: wrap;
+        gap: 0;
+    }
+    .top-nav a {
+        padding: 10px 14px;
+        font-size: 0.85rem;
+        min-width: auto;
+        flex: 1 1 auto;
+        text-align: center;
+    }
+}
+
 @media (max-width: 640px) {
     .top-nav {
         border-radius: 10px;
@@ -1937,14 +1963,6 @@ label em {
         min-height: 38px;
     }
 }
-
-/*@media (max-width: 540px) {
-    .nav-button {
-        flex: 1 1 auto;
-        padding: 9.5px !important;
-        margin-left: 0;
-    }
-}*/
 
 /* ── 28. ATTACHMENTS ── */
 .post-attachments {
@@ -2124,6 +2142,8 @@ label em {
     flex-direction: column;
     gap: 12px;
     margin: 16px 0;
+    max-height: 60vh;
+    overflow-y: auto;
 }
 
 .message {
@@ -2171,7 +2191,6 @@ label em {
     padding-top: 16px;
     border-top: 1px solid #e2e8f0;
     display: flex;
-    flex-direction: column;
     gap: 12px;
 }
 

@@ -17,14 +17,14 @@ use crate::{
 pub fn Inbox() -> Element {
     let current_user = use_context::<Signal<Option<SessionUser>>>();
     let navigator = use_navigator();
-    let mut refresh = use_context::<Signal<()>>();
+    let refresh = use_context::<Signal<()>>();
 
     let resource = use_resource(move || async move {
         refresh();
         load_inbox().await
     });
 
-    let Some(user) = current_user() else {
+    let Some(_user) = current_user() else {
         return rsx! {
             section { class: "page",
                 EmptyState {

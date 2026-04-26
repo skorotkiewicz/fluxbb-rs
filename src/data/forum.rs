@@ -483,8 +483,10 @@ pub async fn edit_post(input: EditPostForm) -> Result<(), ServerFnError> {
     }
 }
 
-// Attachment constants
+// Attachment constants (server-only: used in upload_attachment)
+#[cfg(feature = "server")]
 pub const MAX_ATTACHMENT_SIZE: usize = 10 * 1024 * 1024; // 10MB
+#[cfg(feature = "server")]
 pub const ALLOWED_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "gif", "pdf", "txt", "zip", "mp4"];
 
 #[post("/api/attachments/:post_id")]
@@ -646,9 +648,6 @@ async fn upload_attachment_impl(
     std::fs::write(&storage_path, &content).map_err(|e| format!("Failed to save file: {e}"))?;
 
     let storage_path_str = storage_path.to_string_lossy().to_string();
-    let now_str = "to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI UTC')";
-
-    // Insert into database
     let attachment = run_parameterized_json::<Attachment>(
         "WITH ins AS (
             INSERT INTO attachments (post_id, filename, file_size, mime_type, storage_path, uploaded_at)
@@ -690,8 +689,6 @@ async fn create_topic_impl(
     if subject.len() > 70 {
         return Err("Subject must be 70 characters or fewer.".to_string());
     }
-
-    let now_str = "to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI UTC')";
 
     #[derive(Deserialize)]
     struct IdRow {
@@ -735,8 +732,6 @@ async fn create_reply_impl(input: ReplyForm, headers: HeaderMap) -> Result<(), S
     if message.is_empty() {
         return Err("Message is required.".to_string());
     }
-
-    let now_str = "to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI UTC')";
 
     #[derive(Deserialize)]
     struct TopicCheck {
@@ -789,10 +784,9 @@ pub async fn delete_post(post_id: i32) -> Result<(), ServerFnError> {
         #[derive(Deserialize)]
         struct PostInfo {
             author_id: i32,
-            topic_id: i32,
         }
         let info = run_parameterized_json::<PostInfo>(
-            "SELECT row_to_json(r) FROM (SELECT author_id, topic_id FROM posts WHERE id = $1) AS r;",
+            "SELECT row_to_json(r) FROM (SELECT author_id FROM posts WHERE id = $1) AS r;",
             &[&post_id as &(dyn PgBind + Sync)],
         )
         .await

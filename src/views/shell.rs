@@ -76,101 +76,103 @@ pub fn AppShell() -> Element {
     rsx! {
         if let Some(ref shell) = shell() {
             div { class: "site-shell {theme_class_val}",
-                header { class: "masthead",
-                    div { class: "masthead-copy",
-                        p { class: "eyebrow", "Community Forum" }
-                        h1 { "{shell.meta.title}" }
-                        p { class: "masthead-tagline", "{shell.meta.tagline}" }
-                    }
+                div { class: "site-inner",
+                    header { class: "masthead",
+                        div { class: "masthead-copy",
+                            p { class: "eyebrow", "Community Forum" }
+                            h1 { "{shell.meta.title}" }
+                            p { class: "masthead-tagline", "{shell.meta.tagline}" }
+                        }
 
-                    img {
-                        class: "masthead-art",
-                        src: HEADER_ART,
-                        alt: "FluxBB RS banner",
-                    }
-                }
-
-                nav { class: "top-nav",
-                    Link { class: "nav-link", to: Route::Index {}, "Forums" }
-                    Link { class: "nav-link", to: Route::Search {}, "Search" }
-                    Link { class: "nav-link", to: Route::Users {}, "Users" }
-
-                    if current_user().is_some() {
-                        if show_unread {
-                            Link { class: "nav-link nav-unread", to: Route::Inbox {}, "Messages ({unread_count})" }
-                        } else {
-                            Link { class: "nav-link", to: Route::Inbox {}, "Messages" }
+                        img {
+                            class: "masthead-art",
+                            src: HEADER_ART,
+                            alt: "FluxBB RS banner",
                         }
                     }
 
-                    Link { class: "nav-link", to: Route::Help {}, "Help" }
-                    Link { class: "nav-link", to: Route::Rules {}, "Rules" }
+                    nav { class: "top-nav",
+                        Link { class: "nav-link", to: Route::Index {}, "Forums" }
+                        Link { class: "nav-link", to: Route::Search {}, "Search" }
+                        Link { class: "nav-link", to: Route::Users {}, "Users" }
 
-                    if is_admin {
-                        Link { class: "nav-link", to: Route::Admin {}, "Admin" }
-                    }
-
-                    if let Some(ref user) = current_user() {
-                        Link {
-                            class: "auth-chip",
-                            to: Route::Profile { id: user.id },
-                            "Signed in as {user.username}"
+                        if current_user().is_some() {
+                            if show_unread {
+                                Link { class: "nav-link nav-unread", to: Route::Inbox {}, "Messages ({unread_count})" }
+                            } else {
+                                Link { class: "nav-link", to: Route::Inbox {}, "Messages" }
+                            }
                         }
-                        button {
-                            class: "nav-link nav-button",
-                            onclick: move |_| {
-                                spawn(async move {
-                                    let _ = logout_account().await;
-                                    let _ = document::eval(
-                                        &format!(
-                                            "document.cookie = '{}=; path=/; max-age=0; samesite=strict'; document.cookie = '{}=; path=/; max-age=0; samesite=strict';",
-                                            cookie_name(),
-                                            crate::data::csrf_cookie_name(),
-                                        ),
-                                    );
-                                    current_user.set(None);
-                                });
-                            },
-                            "Logout"
-                        }
-                    } else {
-                        Link {
-                            class: "nav-link nav-link-muted",
-                            to: Route::Login {},
-                            "Login"
-                        }
-                        Link {
-                            class: "nav-link nav-link-strong",
-                            to: Route::Register {},
-                            "Register"
-                        }
-                    }
-                }
 
-                div { class: "site-meta",
-                    p { "Members: {shell.stats.members}" }
-                    p { "Topics: {shell.stats.topics}" }
-                    p { "Posts: {shell.stats.posts}" }
-                    p { "Newest: {shell.stats.newest_member}" }
-                }
+                        Link { class: "nav-link", to: Route::Help {}, "Help" }
+                        Link { class: "nav-link", to: Route::Rules {}, "Rules" }
 
-                main { class: "page-wrap", Outlet::<Route> {} }
+                        if is_admin {
+                            Link { class: "nav-link", to: Route::Admin {}, "Admin" }
+                        }
 
-                if !shell.online_users.is_empty() {
-                    div { class: "online-users",
-                        p { class: "online-label", "Online users ({shell.online_users.len()}): " }
-                        for user in &shell.online_users {
+                        if let Some(ref user) = current_user() {
                             Link {
-                                class: "online-user",
+                                class: "auth-chip",
                                 to: Route::Profile { id: user.id },
-                                "{user.username}"
+                                "Signed in as {user.username}"
+                            }
+                            button {
+                                class: "nav-link nav-button",
+                                onclick: move |_| {
+                                    spawn(async move {
+                                        let _ = logout_account().await;
+                                        let _ = document::eval(
+                                            &format!(
+                                                "document.cookie = '{}=; path=/; max-age=0; samesite=strict'; document.cookie = '{}=; path=/; max-age=0; samesite=strict';",
+                                                cookie_name(),
+                                                crate::data::csrf_cookie_name(),
+                                            ),
+                                        );
+                                        current_user.set(None);
+                                    });
+                                },
+                                "Logout"
+                            }
+                        } else {
+                            Link {
+                                class: "nav-link nav-link-muted",
+                                to: Route::Login {},
+                                "Login"
+                            }
+                            Link {
+                                class: "nav-link nav-link-strong",
+                                to: Route::Register {},
+                                "Register"
                             }
                         }
                     }
-                }
 
-                footer { class: "site-footer",
-                    p { "Powered by FluxBB RS" }
+                    div { class: "site-meta",
+                        p { "Members: {shell.stats.members}" }
+                        p { "Topics: {shell.stats.topics}" }
+                        p { "Posts: {shell.stats.posts}" }
+                        p { "Newest: {shell.stats.newest_member}" }
+                    }
+
+                    main { class: "page-wrap", Outlet::<Route> {} }
+
+                    if !shell.online_users.is_empty() {
+                        div { class: "online-users",
+                            p { class: "online-label", "Online users ({shell.online_users.len()}): " }
+                            for user in &shell.online_users {
+                                Link {
+                                    class: "online-user",
+                                    to: Route::Profile { id: user.id },
+                                    "{user.username}"
+                                }
+                            }
+                        }
+                    }
+
+                    footer { class: "site-footer",
+                        p { "Powered by FluxBB RS" }
+                    }
                 }
             }
         } else if let Some(Err(_)) = shell_resource() {

@@ -9,11 +9,18 @@ use crate::Route;
 
 #[component]
 pub fn SectionHeader(kicker: String, title: String, subtitle: String) -> Element {
+    if title.is_empty() && subtitle.is_empty() {
+        return rsx! {};
+    }
     rsx! {
         div { class: "section-header",
             p { class: "section-kicker", "{kicker}" }
-            h2 { class: "section-title", "{title}" }
-            p { class: "section-subtitle", "{subtitle}" }
+            if !title.is_empty() {
+                h2 { class: "section-title", "{title}" }
+            }
+            if !subtitle.is_empty() {
+                p { class: "section-subtitle", "{subtitle}" }
+            }
         }
     }
 }

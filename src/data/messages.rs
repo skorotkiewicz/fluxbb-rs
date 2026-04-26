@@ -5,8 +5,8 @@ use http::HeaderMap;
 #[cfg(feature = "server")]
 use super::{
     db::{
-        run_exec, run_parameterized_json, run_parameterized_scalar_i64, run_scalar_i64,
-        server_error, sql_literal,
+        run_exec, run_parameterized_exec, run_parameterized_json, run_parameterized_scalar_i64,
+        run_scalar_i64, server_error, PgBind,
     },
     security::{check_flood, require_session_csrf, unix_now},
 };
@@ -52,22 +52,19 @@ async fn get_or_create_conversation(
     }
 
     // Create new conversation
-    let conv_id = run_scalar_i64(&format!(
+    let subject = subject.to_string();
+    let conv_id = run_parameterized_scalar_i64(
         "INSERT INTO conversations (subject, created_at, updated_at, last_message_at)
-         VALUES ({}, {}, {}, {}) RETURNING id;",
-        sql_literal(subject),
-        now,
-        now,
-        now
-    ))
+         VALUES ($1, $2, $2, $2) RETURNING id;",
+        &[&subject as &(dyn PgBind + Sync), &now],
+    )
     .await? as i32;
 
-    // Add both participants
-    run_exec(&format!(
+    run_parameterized_exec(
         "INSERT INTO conversation_participants (conversation_id, user_id, joined_at, last_read_at)
-         VALUES ({}, {}, {}, 0), ({}, {}, {}, 0);",
-        conv_id, user1_id, now, conv_id, user2_id, now
-    ))
+         VALUES ($1, $2, $3, 0), ($1, $4, $3, 0);",
+        &[&conv_id as &(dyn PgBind + Sync), &user1_id, &now, &user2_id],
+    )
     .await?;
 
     Ok(conv_id)
@@ -247,10 +244,10 @@ pub async fn send_message(
         let now = unix_now();
 
         // Look up recipient
-        let recipient_id: i64 = run_scalar_i64(&format!(
-            "SELECT COALESCE((SELECT id FROM users WHERE LOWER(username) = LOWER({}) LIMIT 1), 0);",
-            sql_literal(&form.recipient_username)
-        ))
+        let recipient_id: i64 = run_parameterized_scalar_i64(
+            "SELECT COALESCE((SELECT id FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1), 0);",
+            &[&form.recipient_username as &(dyn PgBind + Sync)],
+        )
         .await
         .map_err(server_error)?;
 
@@ -269,22 +266,19 @@ pub async fn send_message(
             .map_err(server_error)?;
 
         // Add the message
-        run_exec(&format!(
+        let body = form.body.trim().to_string();
+        run_parameterized_exec(
             "INSERT INTO messages (conversation_id, sender_id, body, created_at)
-             VALUES ({}, {}, {}, {});",
-            conversation_id,
-            user.id,
-            sql_literal(&form.body),
-            now
-        ))
+             VALUES ($1, $2, $3, $4);",
+            &[&conversation_id as &(dyn PgBind + Sync), &user.id, &body, &now],
+        )
         .await
         .map_err(server_error)?;
 
-        // Update conversation timestamps
-        run_exec(&format!(
-            "UPDATE conversations SET updated_at = {}, last_message_at = {} WHERE id = {};",
-            now, now, conversation_id
-        ))
+        run_parameterized_exec(
+            "UPDATE conversations SET updated_at = $1, last_message_at = $1 WHERE id = $2;",
+            &[&now as &(dyn PgBind + Sync), &conversation_id],
+        )
         .await
         .map_err(server_error)?;
 
@@ -327,32 +321,27 @@ pub async fn reply_message(form: ReplyMessageForm) -> Result<(), ServerFnError> 
 
         let now = unix_now();
 
-        // Add the message
-        run_exec(&format!(
+        let body = form.body.trim().to_string();
+        run_parameterized_exec(
             "INSERT INTO messages (conversation_id, sender_id, body, created_at)
-             VALUES ({}, {}, {}, {});",
-            form.conversation_id,
-            user.id,
-            sql_literal(&form.body),
-            now
-        ))
+             VALUES ($1, $2, $3, $4);",
+            &[&form.conversation_id as &(dyn PgBind + Sync), &user.id, &body, &now],
+        )
         .await
         .map_err(server_error)?;
 
-        // Update conversation timestamps
-        run_exec(&format!(
-            "UPDATE conversations SET updated_at = {}, last_message_at = {} WHERE id = {};",
-            now, now, form.conversation_id
-        ))
+        run_parameterized_exec(
+            "UPDATE conversations SET updated_at = $1, last_message_at = $1 WHERE id = $2;",
+            &[&now as &(dyn PgBind + Sync), &form.conversation_id],
+        )
         .await
         .map_err(server_error)?;
 
-        // Undelete for all participants (in case someone deleted it)
-        run_exec(&format!(
+        run_parameterized_exec(
             "UPDATE conversation_participants SET is_deleted = false
-             WHERE conversation_id = {};",
-            form.conversation_id
-        ))
+             WHERE conversation_id = $1;",
+            &[&form.conversation_id as &(dyn PgBind + Sync)],
+        )
         .await
         .map_err(server_error)?;
 

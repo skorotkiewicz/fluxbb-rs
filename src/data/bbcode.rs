@@ -113,26 +113,29 @@ fn render_node(output: &mut String, node: &BBCodeNode<'_>) {
             output.push_str("</code></pre>");
         }
         BBCodeNode::Url(Some(href), children) => {
-            let href = escape_html(href);
+            let href = sanitize_url(href);
             output.push_str(&format!(
                 r#"<a href="{}" class="bbcode-url" target="_blank" rel="noopener noreferrer">"#,
-                href
+                href,
             ));
             render_nodes(output, children);
             output.push_str("</a>");
         }
         BBCodeNode::Url(None, children) => {
-            // If no explicit href, treat content as the URL
             let mut content = String::new();
             render_nodes(&mut content, children);
-            let href = escape_html(&content);
+            let href = sanitize_url(&content);
             output.push_str(&format!(r#"<a href="{}" class="bbcode-url" target="_blank" rel="noopener noreferrer">{}</a>"#, href, content));
         }
         BBCodeNode::Img(src) => {
-            let src = escape_html(src);
+            let src = sanitize_url(src);
             output.push_str(&format!(r#"<img src="{}" class="bbcode-img" alt="">"#, src));
         }
         BBCodeNode::Email(Some(href), children) => {
+            let href_lower = href.trim().to_lowercase();
+            if !href_lower.starts_with("mailto:") && !href_lower.contains('@') {
+                return;
+            }
             let href = escape_html(href);
             output.push_str(&format!(
                 r#"<a href="mailto:{}" class="bbcode-email">"#,
@@ -144,7 +147,7 @@ fn render_node(output: &mut String, node: &BBCodeNode<'_>) {
         BBCodeNode::Email(None, children) => {
             let mut content = String::new();
             render_nodes(&mut content, children);
-            let href = escape_html(&content);
+            let href = sanitize_url(&content);
             output.push_str(&format!(
                 r#"<a href="mailto:{}" class="bbcode-email">{}</a>"#,
                 href, content
@@ -257,6 +260,16 @@ fn escape_html(text: &str) -> String {
             c => c.to_string(),
         })
         .collect()
+}
+
+fn sanitize_url(url: &str) -> String {
+    let trimmed = url.trim();
+    let lower = trimmed.to_lowercase();
+    if lower.starts_with("javascript:") || lower.starts_with("data:") || lower.starts_with("vbscript:") {
+        "#".to_string()
+    } else {
+        escape_html(trimmed)
+    }
 }
 
 struct BBCodeParser<'a> {
@@ -704,5 +717,21 @@ mod tests {
         assert!(html.contains("<ul"));
         assert!(!html.contains("<ol"));
         assert!(html.contains("<li>First</li>"));
+    }
+
+    #[test]
+    fn test_javascript_url_sanitized() {
+        let input = "[url=javascript:alert(1)]click[/url]";
+        let html = render_to_html(&parse_bbcode(input));
+        assert!(!html.contains("javascript:"));
+        assert!(html.contains("href=\"#\""));
+    }
+
+    #[test]
+    fn test_data_url_img_sanitized() {
+        let input = "[img]data:text/html,<script>alert(1)</script>[/img]";
+        let html = render_to_html(&parse_bbcode(input));
+        assert!(!html.contains("data:text/html"));
+        assert!(html.contains("src=\"#\""));
     }
 }

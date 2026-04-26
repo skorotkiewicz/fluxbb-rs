@@ -373,6 +373,21 @@ pub fn ResetPassword() -> Element {
     let mut is_error = use_signal(|| false);
     let mut submitting = use_signal(|| false);
 
+    use_effect(move || {
+        if token().is_empty() {
+            spawn(async move {
+                let mut eval = document::eval(
+                    "const t = new URLSearchParams(window.location.search).get('token'); dioxus.send(t || '');",
+                );
+                if let Ok(t) = eval.recv::<String>().await {
+                    if !t.is_empty() {
+                        token.set(t);
+                    }
+                }
+            });
+        }
+    });
+
     rsx! {
         section { class: "page",
             article { class: "hero-card compact-hero",

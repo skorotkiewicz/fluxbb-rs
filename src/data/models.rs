@@ -6,12 +6,19 @@ pub struct BoardMeta {
     pub tagline: String,
     pub announcement_title: String,
     pub announcement_body: String,
+    #[serde(default)]
     pub smtp_host: String,
+    #[serde(default)]
     pub smtp_port: i32,
+    #[serde(default)]
     pub smtp_user: String,
+    #[serde(default)]
     pub smtp_pass: String,
+    #[serde(default)]
     pub smtp_from_email: String,
+    #[serde(default)]
     pub smtp_from_name: String,
+    #[serde(default)]
     pub smtp_enable: bool,
 }
 
@@ -136,7 +143,8 @@ pub struct Attachment {
     pub filename: String,
     pub file_size: i64,
     pub mime_type: String,
-    pub storage_path: String,
+    #[serde(default)]
+    pub download_url: String,
     pub uploaded_at: String,
 }
 

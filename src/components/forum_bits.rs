@@ -258,7 +258,7 @@ pub fn AttachmentItem(
             if is_image {
                 div { class: "attachment-preview",
                     img {
-                        src: "/{attachment.storage_path}",
+                        src: "{attachment.download_url}",
                         alt: "{attachment.filename}",
                         class: "attachment-image",
                     }
@@ -267,7 +267,7 @@ pub fn AttachmentItem(
             div { class: "attachment-info",
                 a {
                     class: "attachment-link",
-                    href: "/{attachment.storage_path}",
+                    href: "{attachment.download_url}",
                     download: "{attachment.filename}",
                     "{attachment.filename}"
                 }

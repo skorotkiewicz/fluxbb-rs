@@ -6,7 +6,7 @@ use serde::Deserialize;
 
 #[cfg(feature = "server")]
 use super::{
-    db::{run_exec, run_json_query, run_scalar_i64, server_error, sql_literal},
+    db::{run_exec, run_json_query, run_parameterized_exec, run_parameterized_json, run_scalar_i64, server_error, sql_literal, PgBind},
     security::{
         check_ban,
         check_flood,
@@ -17,7 +17,6 @@ use super::{
         unix_now,
         verify_password,
         Permission,
-        // require_session,
     },
 };
 use super::{
@@ -33,7 +32,7 @@ pub async fn load_shell_data() -> Result<ShellData, ServerFnError> {
         let cutoff = unix_now() - 900;
         let data = run_json_query::<ShellData>(&format!(
             "SELECT json_build_object(
-                'meta', (SELECT row_to_json(m) FROM (SELECT title, tagline, announcement_title, announcement_body, smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from_email, smtp_from_name, smtp_enable FROM board_meta LIMIT 1) m),
+                'meta', (SELECT row_to_json(m) FROM (SELECT title, tagline, announcement_title, announcement_body, smtp_enable FROM board_meta LIMIT 1) m),
                 'stats', json_build_object(
                     'members', (SELECT COUNT(*)::int FROM users),
                     'topics', (SELECT COUNT(*)::int FROM topics),
@@ -78,7 +77,7 @@ pub async fn load_index_data() -> Result<IndexData, ServerFnError> {
         };
         let data = run_json_query::<IndexData>(&format!(
             "SELECT json_build_object(
-                'meta', (SELECT row_to_json(m) FROM (SELECT title, tagline, announcement_title, announcement_body, smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from_email, smtp_from_name, smtp_enable FROM board_meta LIMIT 1) m),
+                'meta', (SELECT row_to_json(m) FROM (SELECT title, tagline, announcement_title, announcement_body, smtp_enable FROM board_meta LIMIT 1) m),
                 'categories', (SELECT COALESCE(json_agg(row_to_json(c)), '[]'::json) FROM (SELECT id, name, description, sort_order FROM categories ORDER BY sort_order, id) c),
                 'forums', (SELECT COALESCE(json_agg(row_to_json(f)), '[]'::json) FROM (SELECT id, category_id, name, description, moderators, sort_order FROM forums ORDER BY category_id, sort_order, id) f),
                 'forum_stats', (SELECT COALESCE(json_agg(row_to_json(fa)), '[]'::json) FROM (
@@ -103,7 +102,7 @@ pub async fn load_index_data() -> Result<IndexData, ServerFnError> {
                     FROM topics ORDER BY activity_rank DESC, id LIMIT 4
                 ) t),
                 'recent_users', (SELECT COALESCE(json_agg(row_to_json(u)), '[]'::json) FROM (
-                    SELECT id, username, title, status, joined_at, post_count, location, about, last_seen, email, group_id
+                    SELECT id, username, title, status, joined_at, post_count, location, about, last_seen, group_id
                     FROM users WHERE id IN (SELECT author_id FROM topics ORDER BY activity_rank DESC, id LIMIT 4)
                 ) u),
                 'last_visit', COALESCE((SELECT last_visit FROM users WHERE id = {user_id}), 0)
@@ -176,7 +175,7 @@ pub async fn load_forum_data(id: i32, page: i32) -> Result<ForumData, ServerFnEr
                     LIMIT {per_page} OFFSET {offset}
                 ) t),
                 'users', (SELECT COALESCE(json_agg(row_to_json(u)), '[]'::json) FROM (
-                    SELECT id, username, title, status, joined_at, post_count, location, about, last_seen, email, group_id
+                    SELECT id, username, title, status, joined_at, post_count, location, about, last_seen, group_id
                     FROM users WHERE id IN (SELECT author_id FROM topics WHERE forum_id = {id})
                 ) u),
                 'total_topics', (SELECT COUNT(*) FROM topics WHERE forum_id = {id}),
@@ -241,14 +240,14 @@ pub async fn load_topic_data(id: i32, page: i32) -> Result<TopicData, ServerFnEr
                 'posts', (SELECT COALESCE(json_agg(row_to_json(p)), '[]'::json) FROM (
                     SELECT id, topic_id, author_id, posted_at, edited_at, body, signature, position,
                         COALESCE((SELECT json_agg(row_to_json(a)) FROM (
-                            SELECT id, post_id, filename, file_size, mime_type, storage_path, uploaded_at
+                            SELECT id, post_id, filename, file_size, mime_type, '/' || storage_path AS download_url, uploaded_at
                             FROM attachments WHERE post_id = posts.id
                         ) a), '[]'::json) AS attachments
                     FROM posts WHERE topic_id = {id} ORDER BY position, id
                     LIMIT {per_page} OFFSET {offset}
                 ) p),
                 'users', (SELECT COALESCE(json_agg(row_to_json(u)), '[]'::json) FROM (
-                    SELECT id, username, title, status, joined_at, post_count, location, about, last_seen, email, group_id
+                    SELECT id, username, title, status, joined_at, post_count, location, about, last_seen, group_id
                     FROM users WHERE id IN (SELECT author_id FROM posts WHERE topic_id = {id})
                 ) u),
                 'forum', (SELECT row_to_json(f) FROM forums f WHERE f.id = (SELECT forum_id FROM topics WHERE id = {id})),
@@ -321,7 +320,7 @@ pub async fn load_users_data() -> Result<Vec<UserProfile>, ServerFnError> {
     {
         let users = run_json_query::<Vec<UserProfile>>(
             "SELECT COALESCE(json_agg(row_to_json(u)), '[]'::json) FROM (
-                SELECT id, username, title, status, joined_at, post_count, location, about, last_seen, email, group_id
+                SELECT id, username, title, status, joined_at, post_count, location, about, last_seen, group_id
                 FROM users ORDER BY post_count DESC, id
             ) u;",
         )
@@ -358,7 +357,7 @@ pub async fn search_server(query: String) -> Result<SearchResults, ServerFnError
                     LIMIT 20
                 ) t),
                 'users', (SELECT COALESCE(json_agg(row_to_json(u)), '[]'::json) FROM (
-                    SELECT id, username, title, status, joined_at, post_count, location, about, last_seen, email, group_id
+                    SELECT id, username, title, status, joined_at, post_count, location, about, last_seen, group_id
                     FROM users
                     WHERE LOWER(username) LIKE {}
                        OR LOWER(title) LIKE {}
@@ -467,25 +466,21 @@ pub async fn edit_post(input: EditPostForm) -> Result<(), ServerFnError> {
                 .map_err(server_error)?;
         }
 
-        let message = input.message.trim();
+        let message = input.message.trim().to_string();
         if message.is_empty() {
             return Err(server_error("Message is required.".into()));
         }
 
-        let now_str = "to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI UTC')";
-        run_exec(&format!(
-            "UPDATE posts SET body = ARRAY[{msg}], edited_at = {now} WHERE id = {pid};",
-            msg = sql_literal(message),
-            now = now_str,
-            pid = input.post_id,
-        ))
+        run_parameterized_exec(
+            "UPDATE posts SET body = ARRAY[$1], edited_at = to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI UTC') WHERE id = $2;",
+            &[&message as &(dyn PgBind + Sync), &input.post_id],
+        )
         .await
         .map_err(server_error)?;
 
         run_exec(&format!(
-            "UPDATE topics SET updated_at = {now}, activity_rank = EXTRACT(EPOCH FROM now())::integer WHERE id = {tid};",
-            now = now_str,
-            tid = post.topic_id,
+            "UPDATE topics SET updated_at = to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI UTC'), activity_rank = EXTRACT(EPOCH FROM now())::integer WHERE id = {};",
+            post.topic_id,
         ))
         .await
         .map_err(server_error)?;
@@ -509,7 +504,7 @@ pub async fn load_attachments(post_id: i32) -> Result<Vec<Attachment>, ServerFnE
     {
         let attachments = run_json_query::<Vec<Attachment>>(&format!(
             "SELECT COALESCE(json_agg(row_to_json(a)), '[]'::json) FROM (
-                SELECT id, post_id, filename, file_size, mime_type, storage_path, uploaded_at
+                SELECT id, post_id, filename, file_size, mime_type, '/' || storage_path AS download_url, uploaded_at
                 FROM attachments WHERE post_id = {} ORDER BY id
             ) a;",
             post_id
@@ -651,6 +646,7 @@ async fn upload_attachment_impl(
         "mp4" => "video/mp4",
         _ => "application/octet-stream",
     };
+    let mime_type = mime_type.to_string();
 
     // Create storage directory if needed
     let storage_dir = std::path::Path::new("uploads");
@@ -670,19 +666,20 @@ async fn upload_attachment_impl(
     let now_str = "to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI UTC')";
 
     // Insert into database
-    let attachment = run_json_query::<Attachment>(&format!(
+    let attachment = run_parameterized_json::<Attachment>(
         "WITH ins AS (
             INSERT INTO attachments (post_id, filename, file_size, mime_type, storage_path, uploaded_at)
-            VALUES ({}, {}, {}, {}, {}, {})
-            RETURNING id, post_id, filename, file_size, mime_type, storage_path, uploaded_at
+            VALUES ($1, $2, $3, $4, $5, to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI UTC'))
+            RETURNING id, post_id, filename, file_size, mime_type, '/' || storage_path AS download_url, uploaded_at
         ) SELECT row_to_json(ins) FROM ins;",
-        post_id,
-        sql_literal(&filename),
-        content.len() as i64,
-        sql_literal(mime_type),
-        sql_literal(&storage_path_str),
-        now_str,
-    ))
+        &[
+            &post_id as &(dyn PgBind + Sync),
+            &filename,
+            &(content.len() as i64),
+            &mime_type,
+            &storage_path_str,
+        ],
+    )
     .await?;
 
     Ok(attachment)
@@ -699,8 +696,8 @@ async fn create_topic_impl(
         return Err(format!("You are banned: {msg}"));
     }
     check_flood(user.id, user.is_admin).await?;
-    let subject = input.subject.trim();
-    let message = input.message.trim();
+    let subject = input.subject.trim().to_string();
+    let message = input.message.trim().to_string();
     if subject.is_empty() {
         return Err("Subject is required.".to_string());
     }
@@ -717,27 +714,21 @@ async fn create_topic_impl(
     struct IdRow {
         id: i32,
     }
-    let topic = run_json_query::<IdRow>(&format!(
+    let topic = run_parameterized_json::<IdRow>(
         "WITH ins AS (
              INSERT INTO topics (forum_id, author_id, subject, closed, created_at, updated_at, activity_rank, sticky, moved_to)
-             VALUES ({fid}, {uid}, {subject}, false, {now}, {now}, EXTRACT(EPOCH FROM now())::integer, false, 0)
+             VALUES ($1, $2, $3, false, to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI UTC'), to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI UTC'), EXTRACT(EPOCH FROM now())::integer, false, 0)
              RETURNING id
          ) SELECT row_to_json(ins) FROM ins;",
-        fid = input.forum_id,
-        uid = user.id,
-        subject = sql_literal(subject),
-        now = now_str,
-    ))
+        &[&input.forum_id as &(dyn PgBind + Sync), &user.id, &subject],
+    )
     .await?;
 
-    run_exec(&format!(
+    run_parameterized_exec(
         "INSERT INTO posts (topic_id, author_id, posted_at, body, position)
-         VALUES ({tid}, {uid}, {now}, ARRAY[{msg}], 1);",
-        tid = topic.id,
-        uid = user.id,
-        now = now_str,
-        msg = sql_literal(message),
-    ))
+         VALUES ($1, $2, to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI UTC'), ARRAY[$3], 1);",
+        &[&topic.id as &(dyn PgBind + Sync), &user.id, &message],
+    )
     .await?;
 
     run_exec(&format!(
@@ -757,7 +748,7 @@ async fn create_reply_impl(input: ReplyForm, headers: HeaderMap) -> Result<(), S
         return Err(format!("You are banned: {msg}"));
     }
     check_flood(user.id, user.is_admin).await?;
-    let message = input.message.trim();
+    let message = input.message.trim().to_string();
     if message.is_empty() {
         return Err("Message is required.".to_string());
     }
@@ -783,21 +774,16 @@ async fn create_reply_impl(input: ReplyForm, headers: HeaderMap) -> Result<(), S
     ))
     .await?;
 
-    run_exec(&format!(
+    run_parameterized_exec(
         "INSERT INTO posts (topic_id, author_id, posted_at, body, position)
-         VALUES ({tid}, {uid}, {now}, ARRAY[{msg}], {pos});",
-        tid = input.topic_id,
-        uid = user.id,
-        now = now_str,
-        msg = sql_literal(message),
-        pos = pos,
-    ))
+         VALUES ($1, $2, to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI UTC'), ARRAY[$3], $4);",
+        &[&input.topic_id as &(dyn PgBind + Sync), &user.id, &message, &(pos as i32)],
+    )
     .await?;
 
     run_exec(&format!(
-        "UPDATE topics SET updated_at = {now}, activity_rank = EXTRACT(EPOCH FROM now())::integer WHERE id = {tid};",
-        now = now_str,
-        tid = input.topic_id,
+        "UPDATE topics SET updated_at = to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI UTC'), activity_rank = EXTRACT(EPOCH FROM now())::integer WHERE id = {};",
+        input.topic_id,
     ))
     .await?;
 
@@ -841,9 +827,9 @@ pub async fn delete_post(post_id: i32) -> Result<(), ServerFnError> {
             .await
             .map_err(server_error)?;
 
-        // Update user post count
+        // Update user post count (with floor check)
         run_exec(&format!(
-            "UPDATE users SET post_count = post_count - 1 WHERE id = {};",
+            "UPDATE users SET post_count = GREATEST(post_count - 1, 0) WHERE id = {};",
             info.author_id
         ))
         .await
@@ -990,27 +976,29 @@ pub async fn update_profile(input: UpdateProfileForm) -> Result<(), ServerFnErro
             return Err(ServerFnError::new("Not authorized"));
         }
 
-        let email = input.email.trim();
-        let location = input.location.trim();
-        let about = input.about.trim();
+        let email = input.email.trim().to_string();
+        let location = input.location.trim().to_string();
+        let about = input.about.trim().to_string();
 
         if email.is_empty() {
             return Err(ServerFnError::new("Email is required."));
         }
 
-        run_exec(&format!(
-            "UPDATE users SET email = {}, location = {}, about = {},
-             timezone = {}, disp_topics = {}, disp_posts = {}, show_online = {}, theme = {} WHERE id = {};",
-            sql_literal(email),
-            sql_literal(location),
-            sql_literal(about),
-            sql_literal(&input.timezone),
-            input.disp_topics,
-            input.disp_posts,
-            input.show_online,
-            sql_literal(&input.theme),
-            input.user_id
-        ))
+        run_parameterized_exec(
+            "UPDATE users SET email = $1, location = $2, about = $3,
+             timezone = $4, disp_topics = $5, disp_posts = $6, show_online = $7, theme = $8 WHERE id = $9;",
+            &[
+                &email as &(dyn PgBind + Sync),
+                &location,
+                &about,
+                &input.timezone,
+                &input.disp_topics,
+                &input.disp_posts,
+                &input.show_online,
+                &input.theme,
+                &input.user_id,
+            ],
+        )
         .await
         .map_err(server_error)?;
 
@@ -1029,7 +1017,13 @@ pub async fn change_password(input: ChangePasswordForm) -> Result<(), ServerFnEr
     {
         let user = require_session_csrf(&headers).await.map_err(server_error)?;
 
-        // Verify old password
+        if let Some(msg) = check_ban(&user.username, &user.email)
+            .await
+            .map_err(server_error)?
+        {
+            return Err(server_error(format!("You are banned: {msg}")));
+        }
+
         #[derive(Deserialize)]
         struct UserPass {
             password_hash: String,
@@ -1045,10 +1039,9 @@ pub async fn change_password(input: ChangePasswordForm) -> Result<(), ServerFnEr
             return Err(ServerFnError::new("Current password is incorrect."));
         }
 
-        // Validate new password
-        if input.new_password.len() < 6 {
+        if input.new_password.chars().count() < 9 {
             return Err(ServerFnError::new(
-                "Password must be at least 6 characters.",
+                "Password must be at least 9 characters.",
             ));
         }
 
@@ -1056,14 +1049,12 @@ pub async fn change_password(input: ChangePasswordForm) -> Result<(), ServerFnEr
             return Err(ServerFnError::new("New passwords do not match."));
         }
 
-        // Hash and update
         let new_hash = hash_password(&input.new_password);
 
-        run_exec(&format!(
-            "UPDATE users SET password_hash = {} WHERE id = {};",
-            sql_literal(&new_hash),
-            user.id
-        ))
+        run_parameterized_exec(
+            "UPDATE users SET password_hash = $1 WHERE id = $2;",
+            &[&new_hash as &(dyn PgBind + Sync), &user.id],
+        )
         .await
         .map_err(server_error)?;
 

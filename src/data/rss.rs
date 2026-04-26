@@ -1,11 +1,12 @@
-use dioxus::prelude::*;
+#[cfg(feature = "server")]
+use dioxus::prelude::ServerFnError;
 
 #[cfg(feature = "server")]
 use super::db::{run_json_query, server_error};
 #[cfg(feature = "server")]
 use super::Topic;
 
-#[post("/api/rss")]
+#[cfg(feature = "server")]
 pub async fn generate_rss_feed() -> Result<String, ServerFnError> {
     #[cfg(feature = "server")]
     {

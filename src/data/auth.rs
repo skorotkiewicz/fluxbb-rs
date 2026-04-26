@@ -6,7 +6,10 @@ use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "server")]
 use super::{
-    db::{run_exec, run_json_query, run_scalar_i64, server_error, sql_literal},
+    db::{
+        run_exec, run_json_query, run_parameterized_exec, run_parameterized_json,
+        run_parameterized_scalar_i64, run_scalar_i64, server_error, PgBind,
+    },
     security::{
         check_ban, hash_password, normalize_username, parse_session_cookie, random_hex, unix_now,
         validate_email, validate_username, verify_password,
@@ -160,10 +163,10 @@ pub async fn request_password_reset(
             return Err(server_error("Password reset is not enabled.".into()));
         }
 
-        let user = run_json_query::<Option<SessionUser>>(&format!(
-            "SELECT COALESCE((SELECT row_to_json(r) FROM (SELECT id, username, title, group_id FROM users WHERE LOWER(email) = LOWER({email}) LIMIT 1) r), 'null'::json);",
-            email = sql_literal(&email),
-        ))
+        let user = run_parameterized_json::<Option<SessionUser>>(
+            "SELECT COALESCE((SELECT row_to_json(r) FROM (SELECT id, username, title, group_id FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1) r), 'null'::json);",
+            &[&email as &(dyn PgBind + Sync)],
+        )
         .await
         .map_err(server_error)?;
 
@@ -183,23 +186,23 @@ pub async fn request_password_reset(
                 ));
             }
 
-            let _ = run_exec(&format!(
-                "DELETE FROM password_resets WHERE user_id = {};",
-                user.id
-            ))
-            .await;
+            run_parameterized_exec(
+                "DELETE FROM password_resets WHERE user_id = $1;",
+                &[&user.id as &(dyn PgBind + Sync)],
+            )
+            .await
+            .ok();
 
             let token = random_hex(32);
             let now = unix_now();
             let expires = now + 86400;
 
-            run_exec(&format!(
-                "INSERT INTO password_resets (user_id, token, created_at, expires_at) VALUES ({}, {}, {}, {});",
-                user.id,
-                sql_literal(&token),
-                now,
-                expires,
-            )).await.map_err(server_error)?;
+            run_parameterized_exec(
+                "INSERT INTO password_resets (user_id, token, created_at, expires_at) VALUES ($1, $2, $3, $4);",
+                &[&user.id as &(dyn PgBind + Sync), &token, &now, &expires],
+            )
+            .await
+            .map_err(server_error)?;
 
             let port = config
                 .get("smtp_port")
@@ -259,18 +262,17 @@ pub async fn request_password_reset(
 pub async fn reset_password(input: ResetPasswordForm) -> Result<String, ServerFnError> {
     #[cfg(feature = "server")]
     {
-        if input.password.len() < 9 {
+        if input.password.chars().count() < 9 {
             return Err(server_error(
                 "Password must be at least 9 characters.".into(),
             ));
         }
 
         let now = unix_now();
-        let user_id = run_scalar_i64(&format!(
-            "SELECT COALESCE((SELECT user_id FROM password_resets WHERE token = {} AND expires_at > {} LIMIT 1), 0);",
-            sql_literal(&input.token),
-            now,
-        ))
+        let user_id = run_parameterized_scalar_i64(
+            "SELECT COALESCE((SELECT user_id FROM password_resets WHERE token = $1 AND expires_at > $2 LIMIT 1), 0);",
+            &[&input.token as &(dyn PgBind + Sync), &now],
+        )
         .await
         .map_err(server_error)?;
 
@@ -281,18 +283,17 @@ pub async fn reset_password(input: ResetPasswordForm) -> Result<String, ServerFn
         }
 
         let hash = hash_password(&input.password);
-        run_exec(&format!(
-            "UPDATE users SET password_hash = {} WHERE id = {};",
-            sql_literal(&hash),
-            user_id,
-        ))
+        run_parameterized_exec(
+            "UPDATE users SET password_hash = $1 WHERE id = $2;",
+            &[&hash as &(dyn PgBind + Sync), &user_id],
+        )
         .await
         .map_err(server_error)?;
 
-        run_exec(&format!(
-            "DELETE FROM password_resets WHERE token = {};",
-            sql_literal(&input.token),
-        ))
+        run_parameterized_exec(
+            "DELETE FROM password_resets WHERE token = $1;",
+            &[&input.token as &(dyn PgBind + Sync)],
+        )
         .await
         .map_err(server_error)?;
 
@@ -312,8 +313,8 @@ pub async fn reset_password(input: ResetPasswordForm) -> Result<String, ServerFn
 async fn register_account_impl(input: RegisterForm) -> Result<AuthResponse, String> {
     let username = normalize_username(&input.username);
     let email = input.email.trim().to_lowercase();
-    let location = input.location.trim();
-    let about = input.about.trim();
+    let location = input.location.trim().to_string();
+    let about = input.about.trim().to_string();
 
     validate_username(&username)?;
     validate_email(&email)?;
@@ -332,7 +333,7 @@ async fn register_account_impl(input: RegisterForm) -> Result<AuthResponse, Stri
 
     let password_hash = hash_password(&input.password);
 
-    let mut user = run_json_query::<SessionUser>(&format!(
+    let mut user = run_parameterized_json::<SessionUser>(
         "WITH inserted AS (
              INSERT INTO users (
                  username, title, status, joined_at, post_count, location, about, last_seen,
@@ -340,14 +341,14 @@ async fn register_account_impl(input: RegisterForm) -> Result<AuthResponse, Stri
                  timezone, disp_topics, disp_posts, show_online, theme
              )
              VALUES (
-                 {username}, 'Member', 'Online',
+                 $1, 'Member', 'Online',
                  to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD'),
                  0,
-                 {location},
-                 {about},
+                 $2,
+                 $3,
                  'just now',
-                 {email},
-                 {password_hash},
+                 $4,
+                 $5,
                  4,
                  EXTRACT(EPOCH FROM now())::bigint,
                  EXTRACT(EPOCH FROM now())::bigint,
@@ -362,12 +363,14 @@ async fn register_account_impl(input: RegisterForm) -> Result<AuthResponse, Stri
                        false AS is_moderator, false AS is_admin
          )
          SELECT row_to_json(inserted) FROM inserted;",
-        username = sql_literal(&username),
-        location = sql_literal(location),
-        about = sql_literal(about),
-        email = sql_literal(&email),
-        password_hash = sql_literal(&password_hash),
-    ))
+        &[
+            &username as &(dyn PgBind + Sync),
+            &location,
+            &about,
+            &email,
+            &password_hash,
+        ],
+    )
     .await?;
 
     let (session_token, csrf_token) = create_session(user.id).await?;
@@ -387,7 +390,7 @@ async fn login_account_impl(input: LoginForm) -> Result<AuthResponse, String> {
         return Err("Username and password are required.".to_string());
     }
 
-    let user = run_json_query::<Option<StoredAuthUser>>(&format!(
+    let user = run_parameterized_json::<Option<StoredAuthUser>>(
         "SELECT COALESCE((
              SELECT row_to_json(user_row)
              FROM (
@@ -398,12 +401,12 @@ async fn login_account_impl(input: LoginForm) -> Result<AuthResponse, String> {
                         g.manage_groups, g.manage_settings, g.is_moderator, g.is_admin
                  FROM users u
                  JOIN groups g ON g.id = u.group_id
-                 WHERE LOWER(u.username) = LOWER({username})
+                 WHERE LOWER(u.username) = LOWER($1)
                  LIMIT 1
              ) AS user_row
          ), 'null'::json);",
-        username = sql_literal(&username),
-    ))
+        &[&username as &(dyn PgBind + Sync)],
+    )
     .await?
     .ok_or_else(|| "Wrong username or password.".to_string())?;
 
@@ -468,14 +471,13 @@ async fn current_session_user_impl(headers: HeaderMap) -> Result<Option<SessionU
     };
 
     let now = unix_now();
-    let _ = run_exec(&format!(
-        "UPDATE forum_sessions SET last_seen = {now} WHERE token = {token} AND expires_at > {now};",
-        token = sql_literal(&token),
-        now = now,
-    ))
+    let _ = run_parameterized_exec(
+        "UPDATE forum_sessions SET last_seen = $1 WHERE token = $2 AND expires_at > $1;",
+        &[&now as &(dyn PgBind + Sync), &token],
+    )
     .await;
 
-    run_json_query::<Option<SessionUser>>(&format!(
+    run_parameterized_json::<Option<SessionUser>>(
         "SELECT COALESCE((
              SELECT row_to_json(session_row)
              FROM (
@@ -487,23 +489,23 @@ async fn current_session_user_impl(headers: HeaderMap) -> Result<Option<SessionU
                    FROM forum_sessions AS s
                    INNER JOIN users AS u ON u.id = s.user_id
                    INNER JOIN groups AS g ON g.id = u.group_id
-                   WHERE s.token = {token}
+                   WHERE s.token = $1
                     AND s.expires_at > EXTRACT(EPOCH FROM now())::bigint
                    LIMIT 1
              ) AS session_row
          ), 'null'::json);",
-        token = sql_literal(&token),
-    ))
+        &[&token as &(dyn PgBind + Sync)],
+    )
     .await
 }
 
 #[cfg(feature = "server")]
 async fn logout_account_impl(headers: HeaderMap) -> Result<(), String> {
     if let Some(token) = parse_session_cookie(&headers) {
-        run_exec(&format!(
-            "DELETE FROM forum_sessions WHERE token = {token};",
-            token = sql_literal(&token)
-        ))
+        run_parameterized_exec(
+            "DELETE FROM forum_sessions WHERE token = $1;",
+            &[&token as &(dyn PgBind + Sync)],
+        )
         .await?;
     }
 
@@ -525,8 +527,8 @@ async fn check_installed_impl() -> Result<bool, String> {
 
 #[cfg(feature = "server")]
 async fn install_board_impl(input: InstallForm) -> Result<AuthResponse, String> {
-    let title = input.board_title.trim();
-    let tagline = input.board_tagline.trim();
+    let title = input.board_title.trim().to_string();
+    let tagline = input.board_tagline.trim().to_string();
     let username = normalize_username(&input.admin_username);
     let email = input.admin_email.trim().to_lowercase();
 
@@ -581,15 +583,14 @@ async fn install_board_impl(input: InstallForm) -> Result<AuthResponse, String> 
     )
     .await?;
 
-    run_exec(&format!(
-        "INSERT INTO board_meta (title, tagline) VALUES ({title}, {tagline}) ON CONFLICT (id) DO UPDATE SET title = EXCLUDED.title, tagline = EXCLUDED.tagline;",
-        title = sql_literal(title),
-        tagline = sql_literal(tagline),
-    ))
+    run_parameterized_exec(
+        "INSERT INTO board_meta (title, tagline) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET title = EXCLUDED.title, tagline = EXCLUDED.tagline;",
+        &[&title as &(dyn PgBind + Sync), &tagline],
+    )
     .await?;
 
     let password_hash = hash_password(&input.admin_password);
-    let mut user = run_json_query::<SessionUser>(&format!(
+    let mut user = run_parameterized_json::<SessionUser>(
         "WITH inserted AS (
              INSERT INTO users (
                  username, title, status, joined_at, post_count, location, about, last_seen,
@@ -597,14 +598,14 @@ async fn install_board_impl(input: InstallForm) -> Result<AuthResponse, String> 
                  timezone, disp_topics, disp_posts, show_online, theme
              )
              VALUES (
-                 {username}, 'Administrator', 'Online',
+                 $1, 'Administrator', 'Online',
                  to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD'),
                  0,
                  '',
                  '',
                  'just now',
-                 {email},
-                 {password_hash},
+                 $2,
+                 $3,
                  1,
                  EXTRACT(EPOCH FROM now())::bigint,
                  EXTRACT(EPOCH FROM now())::bigint,
@@ -620,37 +621,23 @@ async fn install_board_impl(input: InstallForm) -> Result<AuthResponse, String> 
                        true AS is_moderator, true AS is_admin
          )
          SELECT row_to_json(inserted) FROM inserted;",
-        username = sql_literal(&username),
-        email = sql_literal(&email),
-        password_hash = sql_literal(&password_hash),
-    ))
+        &[
+            &username as &(dyn PgBind + Sync),
+            &email,
+            &password_hash,
+        ],
+    )
     .await?;
-
-    user.post_topics = true;
-    user.post_replies = true;
-    user.edit_posts = true;
-    user.delete_posts = true;
-    user.delete_topic = true;
-    user.move_topic = true;
-    user.sticky_topic = true;
-    user.close_topic = true;
-    user.manage_users = true;
-    user.manage_forums = true;
-    user.manage_categories = true;
-    user.manage_bans = true;
-    user.manage_groups = true;
-    user.manage_settings = true;
-    user.is_moderator = true;
-    user.is_admin = true;
 
     run_exec(
         "INSERT INTO categories (name, description, sort_order) VALUES ('General', 'Main discussion area.', 1);",
     )
     .await?;
-    run_exec(&format!(
-        "INSERT INTO forums (category_id, name, description, moderators, sort_order) VALUES (1, 'General Discussion', 'Talk about anything.', ARRAY[{username}], 1);",
-        username = sql_literal(&username),
-    ))
+
+    run_parameterized_exec(
+        "INSERT INTO forums (category_id, name, description, moderators, sort_order) VALUES (1, 'General Discussion', 'Talk about anything.', ARRAY[$1], 1);",
+        &[&username as &(dyn PgBind + Sync)],
+    )
     .await?;
 
     let (session_token, csrf_token) = create_session(user.id).await?;
@@ -664,20 +651,22 @@ async fn install_board_impl(input: InstallForm) -> Result<AuthResponse, String> 
 
 #[cfg(feature = "server")]
 async fn username_exists(username: &str) -> Result<bool, String> {
-    let count = run_scalar_i64(&format!(
-        "SELECT COUNT(*) FROM users WHERE LOWER(username) = LOWER({username});",
-        username = sql_literal(username)
-    ))
+    let username = username.to_string();
+    let count = run_parameterized_scalar_i64(
+        "SELECT COUNT(*) FROM users WHERE LOWER(username) = LOWER($1);",
+        &[&username as &(dyn PgBind + Sync)],
+    )
     .await?;
     Ok(count > 0)
 }
 
 #[cfg(feature = "server")]
 async fn email_exists(email: &str) -> Result<bool, String> {
-    let count = run_scalar_i64(&format!(
-        "SELECT COUNT(*) FROM users WHERE LOWER(email) = LOWER({email});",
-        email = sql_literal(email)
-    ))
+    let email = email.to_string();
+    let count = run_parameterized_scalar_i64(
+        "SELECT COUNT(*) FROM users WHERE LOWER(email) = LOWER($1);",
+        &[&email as &(dyn PgBind + Sync)],
+    )
     .await?;
     Ok(count > 0)
 }
@@ -689,12 +678,11 @@ async fn create_session(user_id: i32) -> Result<(String, String), String> {
     let now = unix_now();
     let expires = now + super::cookie_max_age();
 
-    run_exec(&format!(
+    run_parameterized_exec(
         "INSERT INTO forum_sessions (token, user_id, created_at, expires_at, last_seen, csrf_token)
-         VALUES ({token}, {user_id}, {now}, {expires}, {now}, {csrf});",
-        token = sql_literal(&token),
-        csrf = sql_literal(&csrf),
-    ))
+         VALUES ($1, $2, $3, $4, $3, $5);",
+        &[&token as &(dyn PgBind + Sync), &user_id, &now, &expires, &csrf],
+    )
     .await?;
 
     Ok((token, csrf))

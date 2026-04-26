@@ -14,9 +14,9 @@ mod security;
 
 pub use admin::{
     add_ban, admin_add_category, admin_add_forum, admin_clean_sessions, admin_delete_category,
-    admin_delete_forum, admin_delete_user, admin_update_board, admin_update_category,
-    admin_update_forum, admin_update_user, dismiss_report, load_admin_data, load_bans, load_groups,
-    remove_ban, report_post, test_smtp_settings, update_group, zap_report,
+    admin_delete_forum, admin_delete_topic, admin_delete_user, admin_update_board,
+    admin_update_category, admin_update_forum, admin_update_user, dismiss_report, load_admin_data,
+    load_bans, load_groups, remove_ban, report_post, test_smtp_settings, update_group, zap_report,
 };
 pub use auth::{
     check_installed, current_session_user, install_board, login_account, logout_account,

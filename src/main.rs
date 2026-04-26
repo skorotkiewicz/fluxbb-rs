@@ -71,8 +71,9 @@ fn main() {
     #[cfg(feature = "server")]
     {
         let _ = dotenvy::dotenv();
-        // std::env::set_var("RUST_LOG", "warn");
-        std::env::set_var("RUST_LOG", "sqlx=warn,info");
+        if std::env::var("RUST_LOG").is_err() {
+            std::env::set_var("RUST_LOG", "sqlx=warn,info");
+        }
         dioxus::serve(|| async move {
             use dioxus::server::axum::extract::DefaultBodyLimit;
             use tower_http::services::ServeDir;

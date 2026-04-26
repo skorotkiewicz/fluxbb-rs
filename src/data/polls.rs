@@ -4,7 +4,7 @@ use http::HeaderMap;
 
 #[cfg(feature = "server")]
 use super::{
-    db::{run_exec, run_json_query, run_scalar_i64, server_error, sql_literal},
+    db::{run_exec, run_json_query, run_parameterized_exec, run_scalar_i64, server_error, PgBind},
     security::{require_session_csrf, unix_now},
 };
 use super::{CastVoteForm, CreatePollForm, Poll, PollOption};
@@ -136,31 +136,34 @@ pub async fn create_poll(input: CreatePollForm) -> Result<i32, ServerFnError> {
 
         let now = unix_now();
         let ends_at = input.duration_hours.map(|h| now + (h as i64 * 3600));
+        let question_owned = question.to_string();
 
-        // Insert poll
-        let poll_id = run_scalar_i64(&format!(
+        let poll_id = run_parameterized_exec(
             "INSERT INTO polls (topic_id, question, created_at, ends_at, allow_multiple, allow_change, is_closed) 
-             VALUES ({}, {}, {}, {}, {}, {}, false) RETURNING id;",
-            input.topic_id,
-            sql_literal(question),
-            now,
-            ends_at.map(|e| e.to_string()).unwrap_or_else(|| "NULL".into()),
-            input.allow_multiple,
-            input.allow_change
-        ))
+             VALUES ($1, $2, $3, $4, $5, $6, false);",
+            &[
+                &input.topic_id as &(dyn PgBind + Sync),
+                &question_owned,
+                &now,
+                &ends_at,
+                &input.allow_multiple,
+                &input.allow_change,
+            ],
+        )
         .await
         .map_err(server_error)?;
 
-        // Insert options
+        let poll_id = run_scalar_i64("SELECT LASTVAL();")
+            .await
+            .map_err(server_error)?;
+
         for (idx, option) in input.options.iter().enumerate() {
-            let opt_text = option.trim();
+            let opt_text = option.trim().to_string();
             if !opt_text.is_empty() {
-                let _ = run_exec(&format!(
-                    "INSERT INTO poll_options (poll_id, option_text, sort_order) VALUES ({}, {}, {});",
-                    poll_id,
-                    sql_literal(opt_text),
-                    idx
-                ))
+                let _ = run_parameterized_exec(
+                    "INSERT INTO poll_options (poll_id, option_text, sort_order) VALUES ($1, $2, $3);",
+                    &[&poll_id as &(dyn PgBind + Sync), &opt_text, &(idx as i32)],
+                )
                 .await;
             }
         }
@@ -222,41 +225,56 @@ pub async fn cast_vote(input: CastVoteForm) -> Result<(), ServerFnError> {
             if !poll.allow_change {
                 return Err(server_error("You have already voted on this poll.".into()));
             }
-            // Update existing vote
-            run_exec(&format!(
-                "UPDATE poll_votes SET option_id = {}, voted_at = {} WHERE id = {};",
-                input.option_id,
-                unix_now(),
+            // Get the old option_id before updating
+            #[derive(serde::Deserialize)]
+            struct OldVote {
+                option_id: i32,
+            }
+            let old = run_json_query::<OldVote>(&format!(
+                "SELECT row_to_json(r) FROM (SELECT option_id FROM poll_votes WHERE id = {}) AS r;",
                 existing_vote
             ))
             .await
             .map_err(server_error)?;
 
-            // Update vote counts
-            run_exec(&format!(
-                "UPDATE poll_options SET vote_count = vote_count - 1 
-                 WHERE poll_id = {} AND id NOT IN (SELECT option_id FROM poll_votes WHERE poll_id = {} AND id = {});",
-                input.poll_id, input.poll_id, existing_vote
-            ))
+            let now = unix_now();
+            run_parameterized_exec(
+                "UPDATE poll_votes SET option_id = $1, voted_at = $2 WHERE id = $3;",
+                &[&input.option_id as &(dyn PgBind + Sync), &now, &existing_vote],
+            )
+            .await
+            .map_err(server_error)?;
+
+            // Decrement old option, increment new option
+            run_parameterized_exec(
+                "UPDATE poll_options SET vote_count = GREATEST(vote_count - 1, 0) WHERE id = $1;",
+                &[&old.option_id as &(dyn PgBind + Sync)],
+            )
+            .await
+            .map_err(server_error)?;
+
+            run_parameterized_exec(
+                "UPDATE poll_options SET vote_count = vote_count + 1 WHERE id = $1;",
+                &[&input.option_id as &(dyn PgBind + Sync)],
+            )
             .await
             .map_err(server_error)?;
         } else {
-            // Insert new vote
-            run_exec(&format!(
-                "INSERT INTO poll_votes (poll_id, option_id, user_id, voted_at) VALUES ({}, {}, {}, {});",
-                input.poll_id, input.option_id, user.id, unix_now()
-            ))
+            let now = unix_now();
+            run_parameterized_exec(
+                "INSERT INTO poll_votes (poll_id, option_id, user_id, voted_at) VALUES ($1, $2, $3, $4);",
+                &[&input.poll_id as &(dyn PgBind + Sync), &input.option_id, &user.id, &now],
+            )
+            .await
+            .map_err(server_error)?;
+
+            run_parameterized_exec(
+                "UPDATE poll_options SET vote_count = vote_count + 1 WHERE id = $1;",
+                &[&input.option_id as &(dyn PgBind + Sync)],
+            )
             .await
             .map_err(server_error)?;
         }
-
-        // Update option vote count
-        run_exec(&format!(
-            "UPDATE poll_options SET vote_count = vote_count + 1 WHERE id = {};",
-            input.option_id
-        ))
-        .await
-        .map_err(server_error)?;
 
         Ok(())
     }

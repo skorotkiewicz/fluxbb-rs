@@ -170,11 +170,11 @@ pub fn EditPost(id: i32) -> Element {
                 div { class: "file-upload",
                     h4 { class: "attachments-title", "Add Attachments" }
 
-                    label {
-                        class: "file-upload-label",
-                        r#for: "file-input-edit",
+                    label { class: "file-upload-label", r#for: "file-input-edit",
                         "Select files to upload"
-                        span { class: "file-upload-hint", "Max 10MB • jpg, png, gif, pdf, txt, zip, mp4" }
+                        span { class: "file-upload-hint",
+                            "Max 10MB • jpg, png, gif, pdf, txt, zip, mp4"
+                        }
                         input {
                             id: "file-input-edit",
                             class: "file-upload-input",
@@ -193,7 +193,11 @@ pub fn EditPost(id: i32) -> Element {
                                                     files_vec.push((file_name, bytes.to_vec()));
                                                 }
                                                 Err(err) => {
-                                                    files_vec.push((format!("{} (read error: {})", file_name, err), Vec::new()));
+                                                    files_vec
+                                                        .push((
+                                                            format!("{} (read error: {})", file_name, err),
+                                                            Vec::new(),
+                                                        ));
                                                 }
                                             }
                                         }
@@ -265,31 +269,45 @@ pub fn EditPost(id: i32) -> Element {
                                     if content.is_empty() {
                                         continue;
                                     }
-                                    if let Err(e) = upload_attachment(pid, file_name.clone(), content.clone()).await {
+                                    if let Err(e) = upload_attachment(
+                                            pid,
+                                            file_name.clone(),
+                                            content.clone(),
+                                        )
+                                        .await
+                                    {
                                         upload_errors.push(format!("{}: {}", file_name, clean_error(e)));
                                     }
                                 }
                                 selected_files.set(Vec::new());
-
                                 if upload_errors.is_empty() {
                                     status.set("Post updated.".to_string());
                                 } else {
                                     is_error.set(true);
-                                    status.set(format!("Post saved, but some uploads failed: {}", upload_errors.join(", ")));
+                                    status
+                                        .set(
+                                            format!(
+                                                "Post saved, but some uploads failed: {}",
+                                                upload_errors.join(", "),
+                                            ),
+                                        );
                                 }
-
                                 refresh.set(());
-                                navigator.push(Route::TopicPage {
-                                    id: tid,
-                                    page: 1,
-                                });
-
+                                navigator
+                                    .push(Route::TopicPage {
+                                        id: tid,
+                                        page: 1,
+                                    });
                                 is_uploading.set(false);
                                 submitting.set(false);
                             });
                         },
                         if submitting() || is_uploading() {
-                            if is_uploading() { "Saving…" } else { "Saving…" }
+                            if is_uploading() {
+                                "Saving…"
+                            } else {
+                                "Saving…"
+                            }
                         } else {
                             "Save changes"
                         }

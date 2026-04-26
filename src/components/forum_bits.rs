@@ -171,7 +171,7 @@ pub fn PostCard(
                                 AttachmentItem {
                                     attachment: attachment.clone(),
                                     current_user: current_user.clone(),
-                                    author_id: author_id,
+                                    author_id,
                                 }
                             }
                         }
@@ -179,7 +179,10 @@ pub fn PostCard(
                 }
 
                 if let Some(signature) = post.signature {
-                    p { class: "post-signature", dangerous_inner_html: render_paragraph(&signature) }
+                    p {
+                        class: "post-signature",
+                        dangerous_inner_html: render_paragraph(&signature),
+                    }
                 }
             }
         }

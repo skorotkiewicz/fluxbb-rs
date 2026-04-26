@@ -54,11 +54,7 @@ pub fn PollSection(
                         }
                     } else if can_create_poll {
                         rsx! {
-                            button {
-                                class: "small-button",
-                                onclick: move |_| creating.set(true),
-                                "Create poll"
-                            }
+                            button { class: "small-button", onclick: move |_| creating.set(true), "Create poll" }
                         }
                     } else {
                         rsx! {}
@@ -110,10 +106,7 @@ fn PollCreator(
             h4 { "Create Poll" }
 
             if !error().is_empty() {
-                StatusMessage {
-                    message: error(),
-                    is_error: true,
-                }
+                StatusMessage { message: error(), is_error: true }
             }
 
             label {
@@ -206,12 +199,14 @@ fn PollCreator(
                             options: trimmed_opts,
                             allow_multiple: false,
                             allow_change: false,
-                            duration_hours: if duration_hours() > 0 { Some(duration_hours()) } else { None },
+                            duration_hours: if duration_hours() > 0 {
+                                Some(duration_hours())
+                            } else {
+                                None
+                            },
                         };
-
                         submitting.set(true);
                         error.set(String::new());
-
                         spawn(async move {
                             match create_poll(form).await {
                                 Ok(_) => on_created.call(()),
@@ -222,7 +217,11 @@ fn PollCreator(
                             }
                         });
                     },
-                    if submitting() { "Creating…" } else { "Create poll" }
+                    if submitting() {
+                        "Creating…"
+                    } else {
+                        "Create poll"
+                    }
                 }
                 button {
                     class: "small-button secondary",
@@ -267,7 +266,11 @@ fn PollDisplay(
                 if show_results {
                     // Results view
                     for opt in options.clone() {
-                        PollResultBar { opt: opt.clone(), user_vote, total_votes }
+                        PollResultBar {
+                            opt: opt.clone(),
+                            user_vote,
+                            total_votes,
+                        }
                     }
                     p { class: "poll-total", "Total votes: {total_votes}" }
                 } else if can_vote {
@@ -327,7 +330,9 @@ fn PollDisplay(
                 div { class: "poll-login-prompt",
                     button {
                         class: "link-button",
-                        onclick: move |_| { nav.push(crate::Route::Login {}); },
+                        onclick: move |_| {
+                            nav.push(crate::Route::Login {});
+                        },
                         "Log in to vote"
                     }
                 }
@@ -358,8 +363,7 @@ fn PollResultBar(opt: PollOption, user_vote: Option<i32>, total_votes: i32) -> E
     };
 
     rsx! {
-        div {
-            class: class_name,
+        div { class: class_name,
             div { class: "poll-result-bar-container",
                 div {
                     class: "poll-result-bar",

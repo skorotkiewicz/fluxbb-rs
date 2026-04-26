@@ -316,7 +316,10 @@ pub fn TopicPage(id: i32, page: i32) -> Element {
                                         span { class: "review-date", "{post.posted_at}" }
                                     }
                                     for line in post.body.clone() {
-                                        p { class: "review-body", dangerous_inner_html: render_paragraph(&line) }
+                                        p {
+                                            class: "review-body",
+                                            dangerous_inner_html: render_paragraph(&line),
+                                        }
                                     }
                                 }
                             }

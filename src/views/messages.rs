@@ -95,11 +95,7 @@ pub fn Inbox() -> Element {
                 SectionHeader {
                     kicker: "Inbox".to_string(),
                     title: "Private Messages".to_string(),
-                    subtitle: if data.unread_count > 0 {
-                        format!("{} unread messages", data.unread_count)
-                    } else {
-                        "No new messages".to_string()
-                    },
+                    subtitle: if data.unread_count > 0 { format!("{} unread messages", data.unread_count) } else { "No new messages".to_string() },
                 }
             }
 
@@ -120,7 +116,9 @@ pub fn Inbox() -> Element {
                             navigator.push(Route::Conversation { id: item.id });
                         },
                         h4 { class: "card-title",
-                            if item.unread { span { class: "badge badge-new", "New" } }
+                            if item.unread {
+                                span { class: "badge badge-new", "New" }
+                            }
                             " {item.subject}"
                         }
                         p { class: "card-meta", "With: {item.participants}" }
@@ -277,7 +275,10 @@ pub fn Conversation(id: i32) -> Element {
                             status.set("Message cannot be empty.".to_string());
                             return;
                         }
-                        let form = ReplyMessageForm { conversation_id: id, body };
+                        let form = ReplyMessageForm {
+                            conversation_id: id,
+                            body,
+                        };
                         spawn(async move {
                             sending.set(true);
                             match reply_message(form).await {
@@ -295,7 +296,11 @@ pub fn Conversation(id: i32) -> Element {
                             sending.set(false);
                         });
                     },
-                    if sending() { "Sending…" } else { "Send Reply" }
+                    if sending() {
+                        "Sending…"
+                    } else {
+                        "Send Reply"
+                    }
                 }
             }
         }
@@ -412,7 +417,10 @@ pub fn ComposeMessage() -> Element {
                                     Ok(result) => {
                                         is_error.set(false);
                                         status.set("Message sent.".to_string());
-                                        navigator.push(Route::Conversation { id: result.conversation_id });
+                                        navigator
+                                            .push(Route::Conversation {
+                                                id: result.conversation_id,
+                                            });
                                     }
                                     Err(e) => {
                                         is_error.set(true);
@@ -422,7 +430,11 @@ pub fn ComposeMessage() -> Element {
                                 sending.set(false);
                             });
                         },
-                        if sending() { "Sending…" } else { "Send Message" }
+                        if sending() {
+                            "Sending…"
+                        } else {
+                            "Send Message"
+                        }
                     }
                 }
             }

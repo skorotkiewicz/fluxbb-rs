@@ -98,7 +98,11 @@ pub fn AppShell() -> Element {
 
                         if current_user().is_some() {
                             if show_unread {
-                                Link { class: "nav-link nav-unread", to: Route::Inbox {}, "Messages ({unread_count})" }
+                                Link {
+                                    class: "nav-link nav-unread",
+                                    to: Route::Inbox {},
+                                    "Messages ({unread_count})"
+                                }
                             } else {
                                 Link { class: "nav-link", to: Route::Inbox {}, "Messages" }
                             }

@@ -141,9 +141,9 @@ pub async fn create_poll(input: CreatePollForm) -> Result<i32, ServerFnError> {
         let ends_at = input.duration_hours.map(|h| now + (h as i64 * 3600));
         let question_owned = question.to_string();
 
-        run_parameterized_exec(
+        let poll_id = run_parameterized_scalar_i64(
             "INSERT INTO polls (topic_id, question, created_at, ends_at, allow_multiple, allow_change, is_closed) 
-             VALUES ($1, $2, $3, $4, $5, $6, false);",
+             VALUES ($1, $2, $3, $4, $5, $6, false) RETURNING id;",
             &[
                 &input.topic_id as &(dyn PgBind + Sync),
                 &question_owned,
@@ -155,10 +155,6 @@ pub async fn create_poll(input: CreatePollForm) -> Result<i32, ServerFnError> {
         )
         .await
         .map_err(server_error)?;
-
-        let poll_id = run_parameterized_scalar_i64("SELECT LASTVAL();", &[])
-            .await
-            .map_err(server_error)?;
 
         for (idx, option) in input.options.iter().enumerate() {
             let opt_text = option.trim().to_string();

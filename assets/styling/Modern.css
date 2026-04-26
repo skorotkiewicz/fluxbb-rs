@@ -400,7 +400,7 @@ a:focus {
 /* Unread bold */
 .topic-link-new,
 .recent-topic-link-new {
-    /* font-weight: 700; */
+    font-weight: 700;
     color: #0284c7;
 }
 

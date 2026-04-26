@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "server")]
 use super::{
     db::{
-        run_parameterized_exec, run_parameterized_json, run_parameterized_scalar_i64,
-        run_raw_exec, server_error, PgBind,
+        run_parameterized_exec, run_parameterized_json, run_parameterized_scalar_i64, run_raw_exec,
+        server_error, PgBind,
     },
     security::{
         check_ban, hash_password, normalize_username, parse_session_cookie, random_hex, unix_now,
@@ -682,7 +682,13 @@ async fn create_session(user_id: i32) -> Result<(String, String), String> {
     run_parameterized_exec(
         "INSERT INTO forum_sessions (token, user_id, created_at, expires_at, last_seen, csrf_token)
          VALUES ($1, $2, $3, $4, $3, $5);",
-        &[&token as &(dyn PgBind + Sync), &user_id, &now, &expires, &csrf],
+        &[
+            &token as &(dyn PgBind + Sync),
+            &user_id,
+            &now,
+            &expires,
+            &csrf,
+        ],
     )
     .await?;
 

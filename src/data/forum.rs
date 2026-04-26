@@ -6,17 +6,13 @@ use serde::Deserialize;
 
 #[cfg(feature = "server")]
 use super::{
-    db::{run_parameterized_exec, run_parameterized_json, run_parameterized_scalar_i64, server_error, PgBind},
+    db::{
+        run_parameterized_exec, run_parameterized_json, run_parameterized_scalar_i64, server_error,
+        PgBind,
+    },
     security::{
-        check_ban,
-        check_flood,
-        check_permission,
-        hash_password,
-        parse_session_cookie,
-        require_session_csrf,
-        unix_now,
-        verify_password,
-        Permission,
+        check_ban, check_flood, check_permission, hash_password, parse_session_cookie,
+        require_session_csrf, unix_now, verify_password, Permission,
     },
 };
 use super::{

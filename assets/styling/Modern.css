@@ -101,7 +101,8 @@ a:focus {
 }
 
 .masthead-art {
-    width: 120px;
+    /*width: 120px;*/
+    width: 400px;
     height: auto;
     opacity: 0.8;
     margin-left: 24px;
@@ -1793,7 +1794,8 @@ label em {
     }
 
     .masthead-art {
-        width: 80px;
+        /*width: 80px;*/
+        width: 300px;
     }
 
     .topic-table-head,

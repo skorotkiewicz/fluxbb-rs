@@ -4,7 +4,10 @@ use http::HeaderMap;
 
 #[cfg(feature = "server")]
 use super::{
-    db::{run_parameterized_exec, run_parameterized_json, run_parameterized_scalar_i64, server_error, PgBind},
+    db::{
+        run_parameterized_exec, run_parameterized_json, run_parameterized_scalar_i64, server_error,
+        PgBind,
+    },
     security::{require_session_csrf, unix_now},
 };
 use super::{CastVoteForm, CreatePollForm, Poll, PollOption};

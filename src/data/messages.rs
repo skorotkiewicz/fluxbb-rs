@@ -270,7 +270,12 @@ pub async fn send_message(
         run_parameterized_exec(
             "INSERT INTO messages (conversation_id, sender_id, body, created_at)
              VALUES ($1, $2, $3, $4);",
-            &[&conversation_id as &(dyn PgBind + Sync), &user.id, &body, &now],
+            &[
+                &conversation_id as &(dyn PgBind + Sync),
+                &user.id,
+                &body,
+                &now,
+            ],
         )
         .await
         .map_err(server_error)?;
@@ -325,7 +330,12 @@ pub async fn reply_message(form: ReplyMessageForm) -> Result<(), ServerFnError> 
         run_parameterized_exec(
             "INSERT INTO messages (conversation_id, sender_id, body, created_at)
              VALUES ($1, $2, $3, $4);",
-            &[&form.conversation_id as &(dyn PgBind + Sync), &user.id, &body, &now],
+            &[
+                &form.conversation_id as &(dyn PgBind + Sync),
+                &user.id,
+                &body,
+                &now,
+            ],
         )
         .await
         .map_err(server_error)?;

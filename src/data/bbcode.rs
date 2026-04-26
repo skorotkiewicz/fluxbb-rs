@@ -265,7 +265,10 @@ fn escape_html(text: &str) -> String {
 fn sanitize_url(url: &str) -> String {
     let trimmed = url.trim();
     let lower = trimmed.to_lowercase();
-    if lower.starts_with("javascript:") || lower.starts_with("data:") || lower.starts_with("vbscript:") {
+    if lower.starts_with("javascript:")
+        || lower.starts_with("data:")
+        || lower.starts_with("vbscript:")
+    {
         "#".to_string()
     } else {
         escape_html(trimmed)

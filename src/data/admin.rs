@@ -6,7 +6,10 @@ use serde::Deserialize;
 
 #[cfg(feature = "server")]
 use super::{
-    db::{run_parameterized_exec, run_parameterized_json, run_parameterized_scalar_i64, server_error, PgBind},
+    db::{
+        run_parameterized_exec, run_parameterized_json, run_parameterized_scalar_i64, server_error,
+        PgBind,
+    },
     security::{require_session, require_session_csrf, unix_now},
 };
 use super::{
@@ -120,11 +123,11 @@ pub async fn admin_delete_category(input: AdminDeleteItem) -> Result<(), ServerF
         //     .await
         //     .map_err(server_error)?;
         run_parameterized_exec(
-                "DELETE FROM categories WHERE id = $1;",
-                &[&input.id as &(dyn PgBind + Sync)],
-            )
-            .await
-            .map_err(server_error)
+            "DELETE FROM categories WHERE id = $1;",
+            &[&input.id as &(dyn PgBind + Sync)],
+        )
+        .await
+        .map_err(server_error)
     }
     #[cfg(not(feature = "server"))]
     {
@@ -145,11 +148,11 @@ pub async fn admin_delete_forum(input: AdminDeleteItem) -> Result<(), ServerFnEr
         //     .await
         //     .map_err(server_error)?;
         run_parameterized_exec(
-                "DELETE FROM forums WHERE id = $1;",
-                &[&input.id as &(dyn PgBind + Sync)],
-            )
-            .await
-            .map_err(server_error)
+            "DELETE FROM forums WHERE id = $1;",
+            &[&input.id as &(dyn PgBind + Sync)],
+        )
+        .await
+        .map_err(server_error)
     }
     #[cfg(not(feature = "server"))]
     {
@@ -173,7 +176,12 @@ pub async fn admin_update_category(input: AdminCategoryUpdate) -> Result<(), Ser
         let description = input.description.trim().to_string();
         run_parameterized_exec(
             "UPDATE categories SET name = $1, description = $2, sort_order = $3 WHERE id = $4;",
-            &[&name as &(dyn PgBind + Sync), &description, &input.sort_order, &input.id],
+            &[
+                &name as &(dyn PgBind + Sync),
+                &description,
+                &input.sort_order,
+                &input.id,
+            ],
         )
         .await
         .map_err(server_error)
@@ -226,7 +234,11 @@ pub async fn admin_update_user(input: AdminUserUpdate) -> Result<(), ServerFnErr
         let title = input.title.trim().to_string();
         run_parameterized_exec(
             "UPDATE users SET group_id = $1, title = $2 WHERE id = $3;",
-            &[&input.group_id as &(dyn PgBind + Sync), &title, &input.user_id],
+            &[
+                &input.group_id as &(dyn PgBind + Sync),
+                &title,
+                &input.user_id,
+            ],
         )
         .await
         .map_err(server_error)
@@ -253,17 +265,17 @@ pub async fn admin_delete_user(input: AdminDeleteItem) -> Result<(), ServerFnErr
             return Err(server_error("Cannot delete yourself.".into()));
         }
         run_parameterized_exec(
-                "DELETE FROM forum_sessions WHERE user_id = $1;",
-                &[&input.id as &(dyn PgBind + Sync)],
-            )
-            .await
-            .map_err(server_error)?;
+            "DELETE FROM forum_sessions WHERE user_id = $1;",
+            &[&input.id as &(dyn PgBind + Sync)],
+        )
+        .await
+        .map_err(server_error)?;
         run_parameterized_exec(
-                "DELETE FROM users WHERE id = $1;",
-                &[&input.id as &(dyn PgBind + Sync)],
-            )
-            .await
-            .map_err(server_error)
+            "DELETE FROM users WHERE id = $1;",
+            &[&input.id as &(dyn PgBind + Sync)],
+        )
+        .await
+        .map_err(server_error)
     }
     #[cfg(not(feature = "server"))]
     {
@@ -284,17 +296,17 @@ pub async fn admin_delete_topic(input: AdminDeleteItem) -> Result<(), ServerFnEr
         //     .await
         //     .map_err(server_error)?;
         run_parameterized_exec(
-                "DELETE FROM posts WHERE topic_id = $1;",
-                &[&input.id as &(dyn PgBind + Sync)],
-            )
-            .await
-            .map_err(server_error)?;
+            "DELETE FROM posts WHERE topic_id = $1;",
+            &[&input.id as &(dyn PgBind + Sync)],
+        )
+        .await
+        .map_err(server_error)?;
         run_parameterized_exec(
-                "DELETE FROM topics WHERE id = $1;",
-                &[&input.id as &(dyn PgBind + Sync)],
-            )
-            .await
-            .map_err(server_error)?;
+            "DELETE FROM topics WHERE id = $1;",
+            &[&input.id as &(dyn PgBind + Sync)],
+        )
+        .await
+        .map_err(server_error)?;
         Ok(())
     }
     #[cfg(not(feature = "server"))]
@@ -413,11 +425,11 @@ pub async fn dismiss_report(report_id: i32) -> Result<(), ServerFnError> {
         //     .await
         //     .map_err(server_error)?;
         run_parameterized_exec(
-                "UPDATE reports SET zapped = true WHERE id = $1;",
-                &[&report_id as &(dyn PgBind + Sync)],
-            )
-            .await
-            .map_err(server_error)
+            "UPDATE reports SET zapped = true WHERE id = $1;",
+            &[&report_id as &(dyn PgBind + Sync)],
+        )
+        .await
+        .map_err(server_error)
     }
     #[cfg(not(feature = "server"))]
     {
@@ -438,11 +450,11 @@ pub async fn zap_report(report_id: i32) -> Result<(), ServerFnError> {
         //     .await
         //     .map_err(server_error)?;
         run_parameterized_exec(
-                "UPDATE reports SET zapped = true WHERE id = $1;",
-                &[&report_id as &(dyn PgBind + Sync)],
-            )
-            .await
-            .map_err(server_error)?;
+            "UPDATE reports SET zapped = true WHERE id = $1;",
+            &[&report_id as &(dyn PgBind + Sync)],
+        )
+        .await
+        .map_err(server_error)?;
         #[derive(Deserialize)]
         struct PostInfo {
             topic_id: i32,
@@ -462,30 +474,30 @@ pub async fn zap_report(report_id: i32) -> Result<(), ServerFnError> {
         .map_err(server_error)?;
         if info.is_first {
             run_parameterized_exec(
-                    "DELETE FROM posts WHERE topic_id = $1;",
-                    &[&info.topic_id as &(dyn PgBind + Sync)],
-                )
-                .await
-                .map_err(server_error)?;
+                "DELETE FROM posts WHERE topic_id = $1;",
+                &[&info.topic_id as &(dyn PgBind + Sync)],
+            )
+            .await
+            .map_err(server_error)?;
             run_parameterized_exec(
-                    "DELETE FROM topics WHERE id = $1;",
-                    &[&info.topic_id as &(dyn PgBind + Sync)],
-                )
-                .await
-                .map_err(server_error)?;
+                "DELETE FROM topics WHERE id = $1;",
+                &[&info.topic_id as &(dyn PgBind + Sync)],
+            )
+            .await
+            .map_err(server_error)?;
         } else {
             run_parameterized_exec(
-                    "DELETE FROM posts WHERE id = (SELECT post_id FROM reports WHERE id = $1);",
-                    &[&report_id as &(dyn PgBind + Sync)],
-                )
-                .await
-                .map_err(server_error)?;
+                "DELETE FROM posts WHERE id = (SELECT post_id FROM reports WHERE id = $1);",
+                &[&report_id as &(dyn PgBind + Sync)],
+            )
+            .await
+            .map_err(server_error)?;
             run_parameterized_exec(
-                    "UPDATE users SET post_count = GREATEST(post_count - 1, 0) WHERE id = $1;",
-                    &[&info.author_id as &(dyn PgBind + Sync)],
-                )
-                .await
-                .map_err(server_error)?;
+                "UPDATE users SET post_count = GREATEST(post_count - 1, 0) WHERE id = $1;",
+                &[&info.author_id as &(dyn PgBind + Sync)],
+            )
+            .await
+            .map_err(server_error)?;
         }
         Ok(())
     }
@@ -642,11 +654,11 @@ pub async fn remove_ban(ban_id: i32) -> Result<(), ServerFnError> {
         //     .await
         //     .map_err(server_error)?;
         run_parameterized_exec(
-                "DELETE FROM bans WHERE id = $1;",
-                &[&ban_id as &(dyn PgBind + Sync)],
-            )
-            .await
-            .map_err(server_error)?;
+            "DELETE FROM bans WHERE id = $1;",
+            &[&ban_id as &(dyn PgBind + Sync)],
+        )
+        .await
+        .map_err(server_error)?;
         Ok(())
     }
     #[cfg(not(feature = "server"))]

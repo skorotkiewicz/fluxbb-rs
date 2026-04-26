@@ -1,0 +1,53 @@
+# docker compose up --build
+# db-reset
+# docker compose exec -T postgres psql -U fluxbb -d fluxbb -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+#
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: fluxbb-postgres
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_USER: fluxbb
+      POSTGRES_PASSWORD: fluxbb
+      POSTGRES_DB: fluxbb
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fluxbb -d fluxbb"]
+      interval: 25s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    container_name: fluxbb-app
+    restart: unless-stopped
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    environment:
+      DATABASE_URL: postgres://fluxbb:fluxbb@postgres:5432/fluxbb
+      RUST_LOG: "sqlx=warn,info"
+      IP: "0.0.0.0"
+      PORT: "8080"
+
+    ports:
+      - "8080:8080"
+
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:

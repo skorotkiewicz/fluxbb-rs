@@ -67,13 +67,17 @@ fn main() {
         // std::env::set_var("RUST_LOG", "warn");
         std::env::set_var("RUST_LOG", "sqlx=warn,info");
         dioxus::serve(|| async move {
-            let router = dioxus::server::router(App).route(
-                "/feed",
-                dioxus::server::axum::routing::get(rss_feed_handler),
-            );
+            let router = dioxus::server::router(App)
+                .route("/api/health", dioxus::server::axum::routing::get(healthcheck_handler))
+                .route("/feed", dioxus::server::axum::routing::get(rss_feed_handler));
             Ok(router)
         });
     }
+}
+
+#[cfg(feature = "server")]
+async fn healthcheck_handler() -> &'static str {
+    "OK"
 }
 
 #[cfg(feature = "server")]

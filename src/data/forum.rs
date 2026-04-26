@@ -6,7 +6,7 @@ use serde::Deserialize;
 
 #[cfg(feature = "server")]
 use super::{
-    db::{run_exec, run_json_query, run_parameterized_exec, run_parameterized_json, run_scalar_i64, server_error, sql_literal, PgBind},
+    db::{run_parameterized_exec, run_parameterized_json, run_parameterized_scalar_i64, server_error, PgBind},
     security::{
         check_ban,
         check_flood,
@@ -30,7 +30,7 @@ pub async fn load_shell_data() -> Result<ShellData, ServerFnError> {
     #[cfg(feature = "server")]
     {
         let cutoff = unix_now() - 900;
-        let data = run_json_query::<ShellData>(&format!(
+        let data = run_parameterized_json::<ShellData>(
             "SELECT json_build_object(
                 'meta', (SELECT row_to_json(m) FROM (SELECT title, tagline, announcement_title, announcement_body, smtp_enable FROM board_meta LIMIT 1) m),
                 'stats', json_build_object(
@@ -43,13 +43,13 @@ pub async fn load_shell_data() -> Result<ShellData, ServerFnError> {
                     SELECT DISTINCT u.id, u.username, u.title
                     FROM forum_sessions s
                     JOIN users u ON u.id = s.user_id
-                    WHERE s.last_seen > {cutoff}
+                    WHERE s.last_seen > $1
                       AND u.show_online = true
                     ORDER BY u.username
                 ) u)
             )::json;",
-            cutoff = cutoff,
-        ))
+            &[&cutoff as &(dyn PgBind + Sync)],
+        )
         .await
         .map_err(server_error)?;
         Ok(data)
@@ -66,16 +66,16 @@ pub async fn load_index_data() -> Result<IndexData, ServerFnError> {
     {
         let token = parse_session_cookie(&headers);
         let user_id = if let Some(token) = token {
-            run_scalar_i64(&format!(
-                "SELECT COALESCE((SELECT user_id FROM forum_sessions WHERE token = {} AND expires_at > EXTRACT(EPOCH FROM now())::bigint LIMIT 1), 0);",
-                sql_literal(&token)
-            ))
+            run_parameterized_scalar_i64(
+                "SELECT COALESCE((SELECT user_id FROM forum_sessions WHERE token = $1 AND expires_at > EXTRACT(EPOCH FROM now())::bigint LIMIT 1), 0);",
+                &[&token as &(dyn PgBind + Sync)],
+            )
             .await
             .unwrap_or(0)
         } else {
             0
         };
-        let data = run_json_query::<IndexData>(&format!(
+        let data = run_parameterized_json::<IndexData>(
             "SELECT json_build_object(
                 'meta', (SELECT row_to_json(m) FROM (SELECT title, tagline, announcement_title, announcement_body, smtp_enable FROM board_meta LIMIT 1) m),
                 'categories', (SELECT COALESCE(json_agg(row_to_json(c)), '[]'::json) FROM (SELECT id, name, description, sort_order FROM categories ORDER BY sort_order, id) c),
@@ -105,10 +105,10 @@ pub async fn load_index_data() -> Result<IndexData, ServerFnError> {
                     SELECT id, username, title, status, joined_at, post_count, location, about, last_seen, group_id
                     FROM users WHERE id IN (SELECT author_id FROM topics ORDER BY activity_rank DESC, id LIMIT 4)
                 ) u),
-                'last_visit', COALESCE((SELECT last_visit FROM users WHERE id = {user_id}), 0)
+                'last_visit', COALESCE((SELECT last_visit FROM users WHERE id = $1), 0)
             )::json;",
-            user_id = user_id,
-        ))
+            &[&user_id as &(dyn PgBind + Sync)],
+        )
         .await
         .map_err(server_error)?;
         Ok(data)
@@ -124,8 +124,9 @@ pub async fn load_index_data() -> Result<IndexData, ServerFnError> {
 pub async fn load_forums() -> Result<Vec<Forum>, ServerFnError> {
     #[cfg(feature = "server")]
     {
-        let forums = run_json_query::<Vec<Forum>>(
+        let forums = run_parameterized_json::<Vec<Forum>>(
             "SELECT COALESCE(json_agg(row_to_json(f)), '[]'::json) FROM (SELECT id, category_id, name, description, moderators, sort_order FROM forums ORDER BY category_id, sort_order, id) f;",
+            &[],
         )
         .await
         .map_err(server_error)?;
@@ -143,10 +144,10 @@ pub async fn load_forum_data(id: i32, page: i32) -> Result<ForumData, ServerFnEr
     {
         let token = parse_session_cookie(&headers);
         let user_id = if let Some(token) = token {
-            run_scalar_i64(&format!(
-                "SELECT COALESCE((SELECT user_id FROM forum_sessions WHERE token = {} AND expires_at > EXTRACT(EPOCH FROM now())::bigint LIMIT 1), 0);",
-                sql_literal(&token)
-            ))
+            run_parameterized_scalar_i64(
+                "SELECT COALESCE((SELECT user_id FROM forum_sessions WHERE token = $1 AND expires_at > EXTRACT(EPOCH FROM now())::bigint LIMIT 1), 0);",
+                &[&token as &(dyn PgBind + Sync)],
+            )
             .await
             .unwrap_or(0)
         } else {
@@ -154,10 +155,10 @@ pub async fn load_forum_data(id: i32, page: i32) -> Result<ForumData, ServerFnEr
         };
         let page = page.max(1);
         let per_page = if user_id > 0 {
-            run_scalar_i64(&format!(
-                "SELECT COALESCE((SELECT disp_topics FROM users WHERE id = {}), 25);",
-                user_id
-            ))
+            run_parameterized_scalar_i64(
+                "SELECT COALESCE((SELECT disp_topics FROM users WHERE id = $1), 25);",
+                &[&user_id as &(dyn PgBind + Sync)],
+            )
             .await
             .unwrap_or(25) as i32
         } else {
@@ -165,30 +166,26 @@ pub async fn load_forum_data(id: i32, page: i32) -> Result<ForumData, ServerFnEr
         }
         .clamp(5, 100);
         let offset = (page - 1) * per_page;
-        let data = run_json_query::<ForumData>(&format!(
+        let data = run_parameterized_json::<ForumData>(
             "SELECT json_build_object(
-                'forum', (SELECT row_to_json(f) FROM forums f WHERE f.id = {id}),
+                'forum', (SELECT row_to_json(f) FROM forums f WHERE f.id = $1),
                 'topics', (SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json) FROM (
                     SELECT id, forum_id, author_id, subject, closed, views, tags, created_at, updated_at, activity_rank, sticky, moved_to,
                         COALESCE((SELECT COUNT(*) FROM posts WHERE topic_id = t.id), 0) - 1 AS reply_count
-                    FROM topics t WHERE forum_id = {id} ORDER BY sticky DESC, activity_rank DESC, id
-                    LIMIT {per_page} OFFSET {offset}
+                    FROM topics t WHERE forum_id = $1 ORDER BY sticky DESC, activity_rank DESC, id
+                    LIMIT $2 OFFSET $3
                 ) t),
                 'users', (SELECT COALESCE(json_agg(row_to_json(u)), '[]'::json) FROM (
                     SELECT id, username, title, status, joined_at, post_count, location, about, last_seen, group_id
-                    FROM users WHERE id IN (SELECT author_id FROM topics WHERE forum_id = {id})
+                    FROM users WHERE id IN (SELECT author_id FROM topics WHERE forum_id = $1)
                 ) u),
-                'total_topics', (SELECT COUNT(*) FROM topics WHERE forum_id = {id}),
-                'page', {page},
-                'per_page', {per_page},
-                'last_visit', COALESCE((SELECT last_visit FROM users WHERE id = {user_id}), 0)
+                'total_topics', (SELECT COUNT(*) FROM topics WHERE forum_id = $1),
+                'page', $4,
+                'per_page', $2,
+                'last_visit', COALESCE((SELECT last_visit FROM users WHERE id = $5), 0)
             )::json;",
-            id = id,
-            page = page,
-            per_page = per_page,
-            offset = offset,
-            user_id = user_id,
-        ))
+            &[&id as &(dyn PgBind + Sync), &per_page, &offset, &page, &user_id],
+        )
         .await
         .map_err(server_error)?;
         Ok(data)
@@ -207,11 +204,11 @@ pub async fn load_topic_data(id: i32, page: i32) -> Result<TopicData, ServerFnEr
     #[cfg(feature = "server")]
     {
         let token = parse_session_cookie(&headers);
-        let user_id = if let Some(token) = &token {
-            run_scalar_i64(&format!(
-                "SELECT COALESCE((SELECT user_id FROM forum_sessions WHERE token = {} AND expires_at > EXTRACT(EPOCH FROM now())::bigint LIMIT 1), 0);",
-                sql_literal(token)
-            ))
+        let user_id = if let Some(token) = token {
+            run_parameterized_scalar_i64(
+                "SELECT COALESCE((SELECT user_id FROM forum_sessions WHERE token = $1 AND expires_at > EXTRACT(EPOCH FROM now())::bigint LIMIT 1), 0);",
+                &[&token as &(dyn PgBind + Sync)],
+            )
             .await
             .unwrap_or(0)
         } else {
@@ -219,10 +216,10 @@ pub async fn load_topic_data(id: i32, page: i32) -> Result<TopicData, ServerFnEr
         };
         let page = page.max(1);
         let per_page = if user_id > 0 {
-            run_scalar_i64(&format!(
-                "SELECT COALESCE((SELECT disp_posts FROM users WHERE id = {}), 20);",
-                user_id
-            ))
+            run_parameterized_scalar_i64(
+                "SELECT COALESCE((SELECT disp_posts FROM users WHERE id = $1), 20);",
+                &[&user_id as &(dyn PgBind + Sync)],
+            )
             .await
             .unwrap_or(20) as i32
         } else {
@@ -230,12 +227,12 @@ pub async fn load_topic_data(id: i32, page: i32) -> Result<TopicData, ServerFnEr
         }
         .clamp(5, 100);
         let offset = (page - 1) * per_page;
-        let data = run_json_query::<TopicData>(&format!(
+        let data = run_parameterized_json::<TopicData>(
             "SELECT json_build_object(
                 'topic', (SELECT row_to_json(t) FROM (
                     SELECT id, forum_id, author_id, subject, closed, views, tags, created_at, updated_at, activity_rank, sticky, moved_to,
                         COALESCE((SELECT COUNT(*) FROM posts WHERE topic_id = topics.id), 0) - 1 AS reply_count
-                    FROM topics WHERE id = {id}
+                    FROM topics WHERE id = $1
                 ) t),
                 'posts', (SELECT COALESCE(json_agg(row_to_json(p)), '[]'::json) FROM (
                     SELECT id, topic_id, author_id, posted_at, edited_at, body, signature, position,
@@ -243,31 +240,28 @@ pub async fn load_topic_data(id: i32, page: i32) -> Result<TopicData, ServerFnEr
                             SELECT id, post_id, filename, file_size, mime_type, '/' || storage_path AS download_url, uploaded_at
                             FROM attachments WHERE post_id = posts.id
                         ) a), '[]'::json) AS attachments
-                    FROM posts WHERE topic_id = {id} ORDER BY position, id
-                    LIMIT {per_page} OFFSET {offset}
+                    FROM posts WHERE topic_id = $1 ORDER BY position, id
+                    LIMIT $2 OFFSET $3
                 ) p),
                 'users', (SELECT COALESCE(json_agg(row_to_json(u)), '[]'::json) FROM (
                     SELECT id, username, title, status, joined_at, post_count, location, about, last_seen, group_id
-                    FROM users WHERE id IN (SELECT author_id FROM posts WHERE topic_id = {id})
+                    FROM users WHERE id IN (SELECT author_id FROM posts WHERE topic_id = $1)
                 ) u),
-                'forum', (SELECT row_to_json(f) FROM forums f WHERE f.id = (SELECT forum_id FROM topics WHERE id = {id})),
-                'total_posts', (SELECT COUNT(*) FROM posts WHERE topic_id = {id}),
-                'page', {page},
-                'per_page', {per_page}
+                'forum', (SELECT row_to_json(f) FROM forums f WHERE f.id = (SELECT forum_id FROM topics WHERE id = $1)),
+                'total_posts', (SELECT COUNT(*) FROM posts WHERE topic_id = $1),
+                'page', $4,
+                'per_page', $2
             )::json;",
-            id = id,
-            page = page,
-            per_page = per_page,
-            offset = offset
-        ))
+            &[&id as &(dyn PgBind + Sync), &per_page, &offset, &page],
+        )
         .await
         .map_err(server_error)?;
 
         if let Some(token) = parse_session_cookie(&headers) {
-            let _ = run_exec(&format!(
-                "UPDATE users SET last_visit = EXTRACT(EPOCH FROM now())::bigint WHERE id = (SELECT user_id FROM forum_sessions WHERE token = {} AND expires_at > EXTRACT(EPOCH FROM now())::bigint LIMIT 1);",
-                sql_literal(&token)
-            ))
+            let _ = run_parameterized_exec(
+                "UPDATE users SET last_visit = EXTRACT(EPOCH FROM now())::bigint WHERE id = (SELECT user_id FROM forum_sessions WHERE token = $1 AND expires_at > EXTRACT(EPOCH FROM now())::bigint LIMIT 1);",
+                &[&token as &(dyn PgBind + Sync)],
+            )
             .await;
         }
 
@@ -286,23 +280,23 @@ pub async fn load_topic_data(id: i32, page: i32) -> Result<TopicData, ServerFnEr
 pub async fn load_profile_data(id: i32) -> Result<ProfileData, ServerFnError> {
     #[cfg(feature = "server")]
     {
-        let data = run_json_query::<ProfileData>(&format!(
+        let data = run_parameterized_json::<ProfileData>(
             "SELECT json_build_object(
                 'user', (SELECT row_to_json(u) FROM (
                     SELECT id, username, title, status, joined_at, post_count, location, about, last_seen, email, group_id, timezone, disp_topics, disp_posts, show_online, theme
-                    FROM users WHERE id = {id}
+                    FROM users WHERE id = $1
                 ) u),
                 'topics', (SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json) FROM (
                     SELECT id, forum_id, author_id, subject, closed, views, tags, created_at, updated_at, activity_rank, sticky, moved_to
-                    FROM topics WHERE author_id = {id} ORDER BY activity_rank DESC, id LIMIT 10
+                    FROM topics WHERE author_id = $1 ORDER BY activity_rank DESC, id LIMIT 10
                 ) t),
                 'posts', (SELECT COALESCE(json_agg(row_to_json(p)), '[]'::json) FROM (
                     SELECT id, topic_id, author_id, posted_at, edited_at, body, signature, position
-                    FROM posts WHERE author_id = {id} ORDER BY posted_at DESC LIMIT 10
+                    FROM posts WHERE author_id = $1 ORDER BY posted_at DESC LIMIT 10
                 ) p)
             )::json;",
-            id = id
-        ))
+            &[&id as &(dyn PgBind + Sync)],
+        )
         .await
         .map_err(server_error)?;
         Ok(data)
@@ -318,11 +312,12 @@ pub async fn load_profile_data(id: i32) -> Result<ProfileData, ServerFnError> {
 pub async fn load_users_data() -> Result<Vec<UserProfile>, ServerFnError> {
     #[cfg(feature = "server")]
     {
-        let users = run_json_query::<Vec<UserProfile>>(
+        let users = run_parameterized_json::<Vec<UserProfile>>(
             "SELECT COALESCE(json_agg(row_to_json(u)), '[]'::json) FROM (
                 SELECT id, username, title, status, joined_at, post_count, location, about, last_seen, group_id
                 FROM users ORDER BY post_count DESC, id
             ) u;",
+            &[],
         )
         .await
         .map_err(server_error)?;
@@ -343,15 +338,15 @@ pub async fn search_server(query: String) -> Result<SearchResults, ServerFnError
             return Ok(SearchResults::default());
         }
         let like = format!("%{}%", needle.replace('%', "\\%").replace('_', "\\_"));
-        let results = run_json_query::<SearchResults>(&format!(
+        let results = run_parameterized_json::<SearchResults>(
             "SELECT json_build_object(
                 'topics', (SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json) FROM (
                     SELECT id, forum_id, author_id, subject, closed, views, tags, created_at, updated_at, activity_rank, sticky, moved_to
                     FROM topics
-                    WHERE LOWER(subject) LIKE {}
-                       OR EXISTS (SELECT 1 FROM unnest(tags) tag WHERE LOWER(tag) LIKE {})
+                    WHERE LOWER(subject) LIKE $1
+                       OR EXISTS (SELECT 1 FROM unnest(tags) tag WHERE LOWER(tag) LIKE $2)
                        OR id IN (SELECT DISTINCT topic_id FROM posts p WHERE EXISTS (
-                           SELECT 1 FROM unnest(p.body) para WHERE LOWER(para) LIKE {}
+                           SELECT 1 FROM unnest(p.body) para WHERE LOWER(para) LIKE $3
                        ))
                     ORDER BY activity_rank DESC
                     LIMIT 20
@@ -359,21 +354,15 @@ pub async fn search_server(query: String) -> Result<SearchResults, ServerFnError
                 'users', (SELECT COALESCE(json_agg(row_to_json(u)), '[]'::json) FROM (
                     SELECT id, username, title, status, joined_at, post_count, location, about, last_seen, group_id
                     FROM users
-                    WHERE LOWER(username) LIKE {}
-                       OR LOWER(title) LIKE {}
-                       OR LOWER(about) LIKE {}
-                       OR LOWER(location) LIKE {}
+                    WHERE LOWER(username) LIKE $4
+                       OR LOWER(title) LIKE $5
+                       OR LOWER(about) LIKE $6
+                       OR LOWER(location) LIKE $7
                     LIMIT 20
                 ) u)
             )::json;",
-            sql_literal(&like),
-            sql_literal(&like),
-            sql_literal(&like),
-            sql_literal(&like),
-            sql_literal(&like),
-            sql_literal(&like),
-            sql_literal(&like),
-        ))
+            &[&like as &(dyn PgBind + Sync), &like, &like, &like, &like, &like, &like],
+        )
         .await
         .map_err(server_error)?;
         Ok(results)
@@ -419,10 +408,10 @@ pub async fn create_reply(input: ReplyForm) -> Result<(), ServerFnError> {
 pub async fn load_post(id: i32) -> Result<Post, ServerFnError> {
     #[cfg(feature = "server")]
     {
-        let post = run_json_query::<Post>(&format!(
-            "SELECT row_to_json(post_row) FROM (SELECT id, topic_id, author_id, posted_at, edited_at, body, signature, position FROM posts WHERE id = {}) AS post_row;",
-            id
-        ))
+        let post = run_parameterized_json::<Post>(
+            "SELECT row_to_json(post_row) FROM (SELECT id, topic_id, author_id, posted_at, edited_at, body, signature, position FROM posts WHERE id = $1) AS post_row;",
+            &[&id as &(dyn PgBind + Sync)],
+        )
         .await
         .map_err(server_error)?;
         Ok(post)
@@ -445,10 +434,10 @@ pub async fn edit_post(input: EditPostForm) -> Result<(), ServerFnError> {
         {
             return Err(server_error(format!("You are banned: {msg}")));
         }
-        let post = run_json_query::<Option<Post>>(&format!(
-            "SELECT COALESCE((SELECT row_to_json(post_row) FROM (SELECT id, topic_id, author_id, posted_at, edited_at, body, signature, position FROM posts WHERE id = {}) AS post_row), 'null'::json);",
-            input.post_id
-        ))
+        let post = run_parameterized_json::<Option<Post>>(
+            "SELECT COALESCE((SELECT row_to_json(post_row) FROM (SELECT id, topic_id, author_id, posted_at, edited_at, body, signature, position FROM posts WHERE id = $1) AS post_row), 'null'::json);",
+            &[&input.post_id as &(dyn PgBind + Sync)],
+        )
         .await
         .map_err(server_error)?;
 
@@ -478,10 +467,10 @@ pub async fn edit_post(input: EditPostForm) -> Result<(), ServerFnError> {
         .await
         .map_err(server_error)?;
 
-        run_exec(&format!(
-            "UPDATE topics SET updated_at = to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI UTC'), activity_rank = EXTRACT(EPOCH FROM now())::integer WHERE id = {};",
-            post.topic_id,
-        ))
+        run_parameterized_exec(
+            "UPDATE topics SET updated_at = to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI UTC'), activity_rank = EXTRACT(EPOCH FROM now())::integer WHERE id = $1;",
+            &[&post.topic_id as &(dyn PgBind + Sync)],
+        )
         .await
         .map_err(server_error)?;
 
@@ -502,13 +491,13 @@ pub const ALLOWED_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "gif", "pdf", "t
 pub async fn load_attachments(post_id: i32) -> Result<Vec<Attachment>, ServerFnError> {
     #[cfg(feature = "server")]
     {
-        let attachments = run_json_query::<Vec<Attachment>>(&format!(
+        let attachments = run_parameterized_json::<Vec<Attachment>>(
             "SELECT COALESCE(json_agg(row_to_json(a)), '[]'::json) FROM (
                 SELECT id, post_id, filename, file_size, mime_type, '/' || storage_path AS download_url, uploaded_at
-                FROM attachments WHERE post_id = {} ORDER BY id
+                FROM attachments WHERE post_id = $1 ORDER BY id
             ) a;",
-            post_id
-        ))
+            &[&post_id as &(dyn PgBind + Sync)],
+        )
         .await
         .map_err(server_error)?;
         Ok(attachments)
@@ -547,45 +536,40 @@ pub async fn delete_attachment(attachment_id: i32) -> Result<(), ServerFnError> 
     {
         let user = require_session_csrf(&headers).await.map_err(server_error)?;
 
-        // Get attachment info to check ownership and get storage path
         #[derive(Deserialize)]
         struct AttachmentInfo {
             post_id: i32,
             storage_path: String,
         }
 
-        let info = run_json_query::<AttachmentInfo>(&format!(
+        let info = run_parameterized_json::<AttachmentInfo>(
             "SELECT row_to_json(r) FROM (
-                SELECT post_id, storage_path FROM attachments WHERE id = {}
+                SELECT post_id, storage_path FROM attachments WHERE id = $1
             ) r;",
-            attachment_id
-        ))
+            &[&attachment_id as &(dyn PgBind + Sync)],
+        )
         .await
         .map_err(server_error)?;
 
-        // Get post author to verify ownership
-        let author_id: i32 = run_scalar_i64(&format!(
-            "SELECT author_id FROM posts WHERE id = {};",
-            info.post_id
-        ))
+        let author_id: i32 = run_parameterized_scalar_i64(
+            "SELECT author_id FROM posts WHERE id = $1;",
+            &[&info.post_id as &(dyn PgBind + Sync)],
+        )
         .await
         .map_err(server_error)? as i32;
 
-        // Only post author or moderators can delete attachments
         if author_id != user.id {
             check_permission(&user, Permission::Moderator)
                 .await
                 .map_err(server_error)?;
         }
 
-        // Delete file from storage
         let _ = std::fs::remove_file(&info.storage_path);
 
-        // Delete from database
-        run_exec(&format!(
-            "DELETE FROM attachments WHERE id = {};",
-            attachment_id
-        ))
+        run_parameterized_exec(
+            "DELETE FROM attachments WHERE id = $1;",
+            &[&attachment_id as &(dyn PgBind + Sync)],
+        )
         .await
         .map_err(server_error)?;
 
@@ -607,11 +591,10 @@ async fn upload_attachment_impl(
 ) -> Result<Attachment, String> {
     let user = require_session_csrf(&headers).await?;
 
-    // Verify post ownership
-    let author_id: i32 = run_scalar_i64(&format!(
-        "SELECT author_id FROM posts WHERE id = {};",
-        post_id
-    ))
+    let author_id: i32 = run_parameterized_scalar_i64(
+        "SELECT author_id FROM posts WHERE id = $1;",
+        &[&post_id as &(dyn PgBind + Sync)],
+    )
     .await? as i32;
 
     if author_id != user.id {
@@ -731,10 +714,10 @@ async fn create_topic_impl(
     )
     .await?;
 
-    run_exec(&format!(
-        "UPDATE users SET post_count = post_count + 1 WHERE id = {};",
-        user.id
-    ))
+    run_parameterized_exec(
+        "UPDATE users SET post_count = post_count + 1 WHERE id = $1;",
+        &[&user.id as &(dyn PgBind + Sync)],
+    )
     .await?;
 
     Ok(NewTopicResult { topic_id: topic.id })
@@ -759,19 +742,19 @@ async fn create_reply_impl(input: ReplyForm, headers: HeaderMap) -> Result<(), S
     struct TopicCheck {
         closed: bool,
     }
-    let topic = run_json_query::<TopicCheck>(&format!(
-        "SELECT row_to_json(r) FROM (SELECT closed FROM topics WHERE id = {}) AS r;",
-        input.topic_id
-    ))
+    let topic = run_parameterized_json::<TopicCheck>(
+        "SELECT row_to_json(r) FROM (SELECT closed FROM topics WHERE id = $1) AS r;",
+        &[&input.topic_id as &(dyn PgBind + Sync)],
+    )
     .await?;
     if topic.closed {
         return Err("This topic is closed. No new replies are allowed.".to_string());
     }
 
-    let pos = run_scalar_i64(&format!(
-        "SELECT COALESCE(MAX(position), 0) + 1 FROM posts WHERE topic_id = {};",
-        input.topic_id,
-    ))
+    let pos = run_parameterized_scalar_i64(
+        "SELECT COALESCE(MAX(position), 0) + 1 FROM posts WHERE topic_id = $1;",
+        &[&input.topic_id as &(dyn PgBind + Sync)],
+    )
     .await?;
 
     run_parameterized_exec(
@@ -781,16 +764,16 @@ async fn create_reply_impl(input: ReplyForm, headers: HeaderMap) -> Result<(), S
     )
     .await?;
 
-    run_exec(&format!(
-        "UPDATE topics SET updated_at = to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI UTC'), activity_rank = EXTRACT(EPOCH FROM now())::integer WHERE id = {};",
-        input.topic_id,
-    ))
+    run_parameterized_exec(
+        "UPDATE topics SET updated_at = to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI UTC'), activity_rank = EXTRACT(EPOCH FROM now())::integer WHERE id = $1;",
+        &[&input.topic_id as &(dyn PgBind + Sync)],
+    )
     .await?;
 
-    run_exec(&format!(
-        "UPDATE users SET post_count = post_count + 1 WHERE id = {};",
-        user.id
-    ))
+    run_parameterized_exec(
+        "UPDATE users SET post_count = post_count + 1 WHERE id = $1;",
+        &[&user.id as &(dyn PgBind + Sync)],
+    )
     .await?;
 
     Ok(())
@@ -808,10 +791,10 @@ pub async fn delete_post(post_id: i32) -> Result<(), ServerFnError> {
             author_id: i32,
             topic_id: i32,
         }
-        let info = run_json_query::<PostInfo>(&format!(
-            "SELECT row_to_json(r) FROM (SELECT author_id, topic_id FROM posts WHERE id = {}) AS r;",
-            post_id
-        ))
+        let info = run_parameterized_json::<PostInfo>(
+            "SELECT row_to_json(r) FROM (SELECT author_id, topic_id FROM posts WHERE id = $1) AS r;",
+            &[&post_id as &(dyn PgBind + Sync)],
+        )
         .await
         .map_err(server_error)?;
 
@@ -823,15 +806,18 @@ pub async fn delete_post(post_id: i32) -> Result<(), ServerFnError> {
         }
 
         // Delete the post
-        run_exec(&format!("DELETE FROM posts WHERE id = {};", post_id))
-            .await
-            .map_err(server_error)?;
+        run_parameterized_exec(
+            "DELETE FROM posts WHERE id = $1;",
+            &[&post_id as &(dyn PgBind + Sync)],
+        )
+        .await
+        .map_err(server_error)?;
 
         // Update user post count (with floor check)
-        run_exec(&format!(
-            "UPDATE users SET post_count = GREATEST(post_count - 1, 0) WHERE id = {};",
-            info.author_id
-        ))
+        run_parameterized_exec(
+            "UPDATE users SET post_count = GREATEST(post_count - 1, 0) WHERE id = $1;",
+            &[&info.author_id as &(dyn PgBind + Sync)],
+        )
         .await
         .map_err(server_error)?;
 
@@ -854,13 +840,19 @@ pub async fn delete_topic(topic_id: i32) -> Result<(), ServerFnError> {
             .map_err(server_error)?;
 
         // Delete topic and all posts
-        run_exec(&format!("DELETE FROM posts WHERE topic_id = {};", topic_id))
-            .await
-            .map_err(server_error)?;
+        run_parameterized_exec(
+            "DELETE FROM posts WHERE topic_id = $1;",
+            &[&topic_id as &(dyn PgBind + Sync)],
+        )
+        .await
+        .map_err(server_error)?;
 
-        run_exec(&format!("DELETE FROM topics WHERE id = {};", topic_id))
-            .await
-            .map_err(server_error)?;
+        run_parameterized_exec(
+            "DELETE FROM topics WHERE id = $1;",
+            &[&topic_id as &(dyn PgBind + Sync)],
+        )
+        .await
+        .map_err(server_error)?;
 
         Ok(())
     }
@@ -880,10 +872,10 @@ pub async fn move_topic(input: MoveTopicForm) -> Result<(), ServerFnError> {
             .await
             .map_err(server_error)?;
 
-        run_exec(&format!(
-            "UPDATE topics SET forum_id = {} WHERE id = {};",
-            input.forum_id, input.topic_id
-        ))
+        run_parameterized_exec(
+            "UPDATE topics SET forum_id = $1 WHERE id = $2;",
+            &[&input.forum_id as &(dyn PgBind + Sync), &input.topic_id],
+        )
         .await
         .map_err(server_error)?;
 
@@ -905,10 +897,10 @@ pub async fn toggle_sticky(topic_id: i32) -> Result<(), ServerFnError> {
             .await
             .map_err(server_error)?;
 
-        run_exec(&format!(
-            "UPDATE topics SET sticky = NOT sticky WHERE id = {};",
-            topic_id
-        ))
+        run_parameterized_exec(
+            "UPDATE topics SET sticky = NOT sticky WHERE id = $1;",
+            &[&topic_id as &(dyn PgBind + Sync)],
+        )
         .await
         .map_err(server_error)?;
 
@@ -930,10 +922,10 @@ pub async fn toggle_topic_status(topic_id: i32) -> Result<(), ServerFnError> {
             .await
             .map_err(server_error)?;
 
-        run_exec(&format!(
-            "UPDATE topics SET closed = NOT closed WHERE id = {};",
-            topic_id
-        ))
+        run_parameterized_exec(
+            "UPDATE topics SET closed = NOT closed WHERE id = $1;",
+            &[&topic_id as &(dyn PgBind + Sync)],
+        )
         .await
         .map_err(server_error)?;
 
@@ -951,10 +943,10 @@ pub async fn mark_all_read() -> Result<(), ServerFnError> {
     #[cfg(feature = "server")]
     {
         let user = require_session_csrf(&headers).await.map_err(server_error)?;
-        run_exec(&format!(
-            "UPDATE users SET last_visit = EXTRACT(EPOCH FROM now())::bigint WHERE id = {};",
-            user.id
-        ))
+        run_parameterized_exec(
+            "UPDATE users SET last_visit = EXTRACT(EPOCH FROM now())::bigint WHERE id = $1;",
+            &[&user.id as &(dyn PgBind + Sync)],
+        )
         .await
         .map_err(server_error)?;
         Ok(())
@@ -1028,10 +1020,10 @@ pub async fn change_password(input: ChangePasswordForm) -> Result<(), ServerFnEr
         struct UserPass {
             password_hash: String,
         }
-        let stored = run_json_query::<UserPass>(&format!(
-            "SELECT row_to_json(r) FROM (SELECT password_hash FROM users WHERE id = {}) AS r;",
-            user.id
-        ))
+        let stored = run_parameterized_json::<UserPass>(
+            "SELECT row_to_json(r) FROM (SELECT password_hash FROM users WHERE id = $1) AS r;",
+            &[&user.id as &(dyn PgBind + Sync)],
+        )
         .await
         .map_err(server_error)?;
 
@@ -1071,10 +1063,10 @@ pub async fn change_password(input: ChangePasswordForm) -> Result<(), ServerFnEr
 pub async fn increment_topic_views(topic_id: i32) -> Result<(), ServerFnError> {
     #[cfg(feature = "server")]
     {
-        run_exec(&format!(
-            "UPDATE topics SET views = views + 1 WHERE id = {};",
-            topic_id
-        ))
+        run_parameterized_exec(
+            "UPDATE topics SET views = views + 1 WHERE id = $1;",
+            &[&topic_id as &(dyn PgBind + Sync)],
+        )
         .await
         .map_err(server_error)?;
         Ok(())

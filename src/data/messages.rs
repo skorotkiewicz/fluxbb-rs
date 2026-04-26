@@ -5,8 +5,8 @@ use http::HeaderMap;
 #[cfg(feature = "server")]
 use super::{
     db::{
-        run_exec, run_parameterized_exec, run_parameterized_json, run_parameterized_scalar_i64,
-        run_scalar_i64, server_error, PgBind,
+        run_parameterized_exec, run_parameterized_json, run_parameterized_scalar_i64, server_error,
+        PgBind,
     },
     security::{check_flood, require_session_csrf, unix_now},
 };
@@ -42,11 +42,11 @@ async fn get_or_create_conversation(
         let conv_id = existing as i32;
 
         // Undelete for both users if needed
-        let _ = run_exec(&format!(
+        let _ = run_parameterized_exec(
             "UPDATE conversation_participants SET is_deleted = false, last_read_at = 0
-             WHERE conversation_id = {} AND user_id IN ({}, {});",
-            conv_id, user1_id, user2_id
-        ))
+             WHERE conversation_id = $1 AND user_id IN ($2, $3);",
+            &[&conv_id as &(dyn PgBind + Sync), &user1_id, &user2_id],
+        )
         .await;
         return Ok(conv_id);
     }
@@ -159,11 +159,11 @@ pub async fn load_conversation(id: i32) -> Result<ConversationThread, ServerFnEr
         let user = require_session_csrf(&headers).await.map_err(server_error)?;
 
         // Verify user is a participant and not deleted
-        let is_participant: i64 = run_scalar_i64(&format!(
+        let is_participant: i64 = run_parameterized_scalar_i64(
             "SELECT COUNT(*) FROM conversation_participants
-             WHERE conversation_id = {} AND user_id = {} AND is_deleted = false;",
-            id, user.id
-        ))
+             WHERE conversation_id = $1 AND user_id = $2 AND is_deleted = false;",
+            &[&id as &(dyn PgBind + Sync), &user.id],
+        )
         .await
         .map_err(server_error)?;
 
@@ -210,11 +210,11 @@ pub async fn load_conversation(id: i32) -> Result<ConversationThread, ServerFnEr
 
         // Mark as read
         let now = unix_now();
-        let _ = run_exec(&format!(
-            "UPDATE conversation_participants SET last_read_at = {}
-             WHERE conversation_id = {} AND user_id = {};",
-            now, id, user.id
-        ))
+        let _ = run_parameterized_exec(
+            "UPDATE conversation_participants SET last_read_at = $1
+             WHERE conversation_id = $2 AND user_id = $3;",
+            &[&now as &(dyn PgBind + Sync), &id, &user.id],
+        )
         .await;
 
         Ok(data)
@@ -305,11 +305,11 @@ pub async fn reply_message(form: ReplyMessageForm) -> Result<(), ServerFnError> 
             .map_err(server_error)?;
 
         // Verify user is a participant and not deleted
-        let is_participant: i64 = run_scalar_i64(&format!(
+        let is_participant: i64 = run_parameterized_scalar_i64(
             "SELECT COUNT(*) FROM conversation_participants
-             WHERE conversation_id = {} AND user_id = {} AND is_deleted = false;",
-            form.conversation_id, user.id
-        ))
+             WHERE conversation_id = $1 AND user_id = $2 AND is_deleted = false;",
+            &[&form.conversation_id as &(dyn PgBind + Sync), &user.id],
+        )
         .await
         .map_err(server_error)?;
 
@@ -364,11 +364,11 @@ pub async fn delete_conversation(id: i32) -> Result<(), ServerFnError> {
         let user = require_session_csrf(&headers).await.map_err(server_error)?;
 
         // Verify user is a participant
-        let is_participant: i64 = run_scalar_i64(&format!(
+        let is_participant: i64 = run_parameterized_scalar_i64(
             "SELECT COUNT(*) FROM conversation_participants
-             WHERE conversation_id = {} AND user_id = {};",
-            id, user.id
-        ))
+             WHERE conversation_id = $1 AND user_id = $2;",
+            &[&id as &(dyn PgBind + Sync), &user.id],
+        )
         .await
         .map_err(server_error)?;
 
@@ -376,27 +376,27 @@ pub async fn delete_conversation(id: i32) -> Result<(), ServerFnError> {
             return Err(ServerFnError::new("Conversation not found"));
         }
 
-        // Soft delete for this user
-        run_exec(&format!(
+        run_parameterized_exec(
             "UPDATE conversation_participants SET is_deleted = true
-                     WHERE conversation_id = {} AND user_id = {};",
-            id, user.id
-        ))
+             WHERE conversation_id = $1 AND user_id = $2;",
+            &[&id as &(dyn PgBind + Sync), &user.id],
+        )
         .await
         .map_err(server_error)?;
-        // Check if all participants have deleted
-        let remaining: i64 = run_scalar_i64(&format!(
+        let remaining: i64 = run_parameterized_scalar_i64(
             "SELECT COUNT(*) FROM conversation_participants
-                     WHERE conversation_id = {} AND is_deleted = false;",
-            id
-        ))
+             WHERE conversation_id = $1 AND is_deleted = false;",
+            &[&id as &(dyn PgBind + Sync)],
+        )
         .await
         .map_err(server_error)?;
         if remaining == 0 {
-            // Hard delete: CASCADE wipes messages and participants automatically
-            run_exec(&format!("DELETE FROM conversations WHERE id = {};", id))
-                .await
-                .map_err(server_error)?;
+            run_parameterized_exec(
+                "DELETE FROM conversations WHERE id = $1;",
+                &[&id as &(dyn PgBind + Sync)],
+            )
+            .await
+            .map_err(server_error)?;
         }
         Ok(())
 

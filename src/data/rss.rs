@@ -2,7 +2,7 @@
 use dioxus::prelude::ServerFnError;
 
 #[cfg(feature = "server")]
-use super::db::{run_json_query, server_error};
+use super::db::{run_parameterized_json, server_error};
 #[cfg(feature = "server")]
 use super::Topic;
 
@@ -10,8 +10,9 @@ use super::Topic;
 pub async fn generate_rss_feed() -> Result<String, ServerFnError> {
     #[cfg(feature = "server")]
     {
-        let meta = run_json_query::<Option<serde_json::Value>>(
-            "SELECT COALESCE((SELECT row_to_json(m) FROM (SELECT title, tagline FROM board_meta LIMIT 1) m), 'null'::json);"
+        let meta = run_parameterized_json::<Option<serde_json::Value>>(
+            "SELECT COALESCE((SELECT row_to_json(m) FROM (SELECT title, tagline FROM board_meta LIMIT 1) m), 'null'::json);",
+            &[],
         )
         .await
         .map_err(server_error)?;
@@ -29,11 +30,12 @@ pub async fn generate_rss_feed() -> Result<String, ServerFnError> {
             .unwrap_or("")
             .to_string();
 
-        let topics = run_json_query::<Vec<Topic>>(
+        let topics = run_parameterized_json::<Vec<Topic>>(
             "SELECT COALESCE(json_agg(row_to_json(t)), '[]'::json) FROM (
                 SELECT id, forum_id, author_id, subject, closed, views, tags, created_at, updated_at, activity_rank, sticky, moved_to
                 FROM topics ORDER BY updated_at DESC LIMIT 25
             ) t;",
+            &[],
         )
         .await
         .map_err(server_error)?;

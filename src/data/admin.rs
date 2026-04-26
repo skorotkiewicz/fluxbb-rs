@@ -6,7 +6,7 @@ use serde::Deserialize;
 
 #[cfg(feature = "server")]
 use super::{
-    db::{run_exec, run_json_query, run_parameterized_exec, run_scalar_i64, server_error, PgBind},
+    db::{run_parameterized_exec, run_parameterized_json, run_parameterized_scalar_i64, server_error, PgBind},
     security::{require_session, require_session_csrf, unix_now},
 };
 use super::{
@@ -23,7 +23,7 @@ pub async fn load_admin_data() -> Result<AdminData, ServerFnError> {
         if !u.is_admin {
             return Err(server_error("Admin only.".into()));
         }
-        let data = run_json_query::<AdminData>(
+        let data = run_parameterized_json::<AdminData>(
             "SELECT json_build_object(
                 'meta', (SELECT row_to_json(m) FROM (SELECT title, tagline, announcement_title, announcement_body, smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from_email, smtp_from_name, smtp_enable FROM board_meta LIMIT 1) m),
                 'categories', (SELECT COALESCE(json_agg(row_to_json(c)), '[]'::json) FROM (SELECT id, name, description, sort_order FROM categories ORDER BY sort_order, id) c),
@@ -42,6 +42,7 @@ pub async fn load_admin_data() -> Result<AdminData, ServerFnError> {
                     ORDER BY rep.created_at DESC
                 ) r)
             )::json;",
+            &[],
         )
         .await
         .map_err(server_error)?;
@@ -118,7 +119,10 @@ pub async fn admin_delete_category(input: AdminDeleteItem) -> Result<(), ServerF
         // check_permission(&u, Permission::ManageCategories)
         //     .await
         //     .map_err(server_error)?;
-        run_exec(&format!("DELETE FROM categories WHERE id = {};", input.id))
+        run_parameterized_exec(
+                "DELETE FROM categories WHERE id = $1;",
+                &[&input.id as &(dyn PgBind + Sync)],
+            )
             .await
             .map_err(server_error)
     }
@@ -140,7 +144,10 @@ pub async fn admin_delete_forum(input: AdminDeleteItem) -> Result<(), ServerFnEr
         // check_permission(&u, Permission::ManageForums)
         //     .await
         //     .map_err(server_error)?;
-        run_exec(&format!("DELETE FROM forums WHERE id = {};", input.id))
+        run_parameterized_exec(
+                "DELETE FROM forums WHERE id = $1;",
+                &[&input.id as &(dyn PgBind + Sync)],
+            )
             .await
             .map_err(server_error)
     }
@@ -245,13 +252,16 @@ pub async fn admin_delete_user(input: AdminDeleteItem) -> Result<(), ServerFnErr
         if input.id == u.id {
             return Err(server_error("Cannot delete yourself.".into()));
         }
-        run_exec(&format!(
-            "DELETE FROM forum_sessions WHERE user_id = {};",
-            input.id
-        ))
-        .await
-        .map_err(server_error)?;
-        run_exec(&format!("DELETE FROM users WHERE id = {};", input.id))
+        run_parameterized_exec(
+                "DELETE FROM forum_sessions WHERE user_id = $1;",
+                &[&input.id as &(dyn PgBind + Sync)],
+            )
+            .await
+            .map_err(server_error)?;
+        run_parameterized_exec(
+                "DELETE FROM users WHERE id = $1;",
+                &[&input.id as &(dyn PgBind + Sync)],
+            )
             .await
             .map_err(server_error)
     }
@@ -273,10 +283,16 @@ pub async fn admin_delete_topic(input: AdminDeleteItem) -> Result<(), ServerFnEr
         // check_permission(&u, Permission::DeleteTopic)
         //     .await
         //     .map_err(server_error)?;
-        run_exec(&format!("DELETE FROM posts WHERE topic_id = {};", input.id))
+        run_parameterized_exec(
+                "DELETE FROM posts WHERE topic_id = $1;",
+                &[&input.id as &(dyn PgBind + Sync)],
+            )
             .await
             .map_err(server_error)?;
-        run_exec(&format!("DELETE FROM topics WHERE id = {};", input.id))
+        run_parameterized_exec(
+                "DELETE FROM topics WHERE id = $1;",
+                &[&input.id as &(dyn PgBind + Sync)],
+            )
             .await
             .map_err(server_error)?;
         Ok(())
@@ -345,8 +361,9 @@ pub async fn admin_clean_sessions() -> Result<i64, ServerFnError> {
         // check_permission(&u, Permission::ManageSettings)
         //     .await
         //     .map_err(server_error)?;
-        let deleted = run_scalar_i64(
-            "WITH deleted AS (DELETE FROM forum_sessions WHERE expires_at < EXTRACT(EPOCH FROM now())::bigint RETURNING *) SELECT COUNT(*) FROM deleted;"
+        let deleted = run_parameterized_scalar_i64(
+            "WITH deleted AS (DELETE FROM forum_sessions WHERE expires_at < EXTRACT(EPOCH FROM now())::bigint RETURNING *) SELECT COUNT(*) FROM deleted;",
+            &[],
         )
         .await
         .map_err(server_error)?;
@@ -395,12 +412,12 @@ pub async fn dismiss_report(report_id: i32) -> Result<(), ServerFnError> {
         // check_permission(&u, Permission::Moderator)
         //     .await
         //     .map_err(server_error)?;
-        run_exec(&format!(
-            "UPDATE reports SET zapped = true WHERE id = {};",
-            report_id
-        ))
-        .await
-        .map_err(server_error)
+        run_parameterized_exec(
+                "UPDATE reports SET zapped = true WHERE id = $1;",
+                &[&report_id as &(dyn PgBind + Sync)],
+            )
+            .await
+            .map_err(server_error)
     }
     #[cfg(not(feature = "server"))]
     {
@@ -420,52 +437,55 @@ pub async fn zap_report(report_id: i32) -> Result<(), ServerFnError> {
         // check_permission(&u, Permission::Moderator)
         //     .await
         //     .map_err(server_error)?;
-        run_exec(&format!(
-            "UPDATE reports SET zapped = true WHERE id = {};",
-            report_id
-        ))
-        .await
-        .map_err(server_error)?;
+        run_parameterized_exec(
+                "UPDATE reports SET zapped = true WHERE id = $1;",
+                &[&report_id as &(dyn PgBind + Sync)],
+            )
+            .await
+            .map_err(server_error)?;
         #[derive(Deserialize)]
         struct PostInfo {
             topic_id: i32,
             author_id: i32,
             is_first: bool,
         }
-        let info = run_json_query::<PostInfo>(&format!(
+        let info = run_parameterized_json::<PostInfo>(
             "SELECT row_to_json(r) FROM (
                 SELECT p.topic_id, p.author_id,
                        CASE WHEN p.id = (SELECT MIN(id) FROM posts WHERE topic_id = p.topic_id) THEN true ELSE false END AS is_first
                 FROM posts p
-                WHERE p.id = (SELECT post_id FROM reports WHERE id = {})
+                WHERE p.id = (SELECT post_id FROM reports WHERE id = $1)
             ) r;",
-            report_id
-        ))
+            &[&report_id as &(dyn PgBind + Sync)],
+        )
         .await
         .map_err(server_error)?;
         if info.is_first {
-            run_exec(&format!(
-                "DELETE FROM posts WHERE topic_id = {};",
-                info.topic_id
-            ))
-            .await
-            .map_err(server_error)?;
-            run_exec(&format!("DELETE FROM topics WHERE id = {};", info.topic_id))
+            run_parameterized_exec(
+                    "DELETE FROM posts WHERE topic_id = $1;",
+                    &[&info.topic_id as &(dyn PgBind + Sync)],
+                )
+                .await
+                .map_err(server_error)?;
+            run_parameterized_exec(
+                    "DELETE FROM topics WHERE id = $1;",
+                    &[&info.topic_id as &(dyn PgBind + Sync)],
+                )
                 .await
                 .map_err(server_error)?;
         } else {
-            run_exec(&format!(
-                "DELETE FROM posts WHERE id = (SELECT post_id FROM reports WHERE id = {});",
-                report_id
-            ))
-            .await
-            .map_err(server_error)?;
-            run_exec(&format!(
-                "UPDATE users SET post_count = GREATEST(post_count - 1, 0) WHERE id = {};",
-                info.author_id
-            ))
-            .await
-            .map_err(server_error)?;
+            run_parameterized_exec(
+                    "DELETE FROM posts WHERE id = (SELECT post_id FROM reports WHERE id = $1);",
+                    &[&report_id as &(dyn PgBind + Sync)],
+                )
+                .await
+                .map_err(server_error)?;
+            run_parameterized_exec(
+                    "UPDATE users SET post_count = GREATEST(post_count - 1, 0) WHERE id = $1;",
+                    &[&info.author_id as &(dyn PgBind + Sync)],
+                )
+                .await
+                .map_err(server_error)?;
         }
         Ok(())
     }
@@ -484,7 +504,7 @@ pub async fn load_groups() -> Result<Vec<Group>, ServerFnError> {
         if !u.is_admin && !u.is_moderator {
             return Err(server_error("Admin or moderator only.".into()));
         }
-        let groups = run_json_query::<Vec<Group>>(
+        let groups = run_parameterized_json::<Vec<Group>>(
             "SELECT COALESCE(json_agg(row_to_json(r)), '[]'::json) FROM (
                 SELECT id, title, read_board, post_topics, post_replies, edit_posts, delete_posts,
                        delete_topic, move_topic, sticky_topic, close_topic,
@@ -492,6 +512,7 @@ pub async fn load_groups() -> Result<Vec<Group>, ServerFnError> {
                        is_moderator, is_admin
                 FROM groups ORDER BY id
             ) r;",
+            &[],
         )
         .await
         .map_err(server_error)?;
@@ -561,8 +582,9 @@ pub async fn load_bans() -> Result<Vec<Ban>, ServerFnError> {
         if !u.is_admin && !u.is_moderator {
             return Err(server_error("Admin or moderator only.".into()));
         }
-        let bans = run_json_query::<Vec<Ban>>(
+        let bans = run_parameterized_json::<Vec<Ban>>(
             "SELECT COALESCE(json_agg(row_to_json(r)), '[]'::json) FROM (SELECT id, username, email, ip, message, created_at, expires_at FROM bans ORDER BY created_at DESC) r;",
+            &[],
         )
         .await
         .map_err(server_error)?;
@@ -619,7 +641,10 @@ pub async fn remove_ban(ban_id: i32) -> Result<(), ServerFnError> {
         // check_permission(&user, Permission::ManageBans)
         //     .await
         //     .map_err(server_error)?;
-        run_exec(&format!("DELETE FROM bans WHERE id = {};", ban_id))
+        run_parameterized_exec(
+                "DELETE FROM bans WHERE id = $1;",
+                &[&ban_id as &(dyn PgBind + Sync)],
+            )
             .await
             .map_err(server_error)?;
         Ok(())
@@ -643,8 +668,9 @@ pub async fn test_smtp_settings(input: TestSmtpForm) -> Result<String, ServerFnE
         //     .await
         //     .map_err(server_error)?;
 
-        let config = run_json_query::<Option<serde_json::Value>>(
-            "SELECT COALESCE((SELECT row_to_json(m) FROM (SELECT smtp_enable, smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from_email, smtp_from_name FROM board_meta LIMIT 1) m), 'null'::json);"
+        let config = run_parameterized_json::<Option<serde_json::Value>>(
+            "SELECT COALESCE((SELECT row_to_json(m) FROM (SELECT smtp_enable, smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from_email, smtp_from_name FROM board_meta LIMIT 1) m), 'null'::json);",
+            &[],
         )
         .await
         .map_err(server_error)?;

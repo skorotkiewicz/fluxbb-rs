@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "server")]
 use super::{
     db::{
-        run_exec, run_json_query, run_parameterized_exec, run_parameterized_json,
-        run_parameterized_scalar_i64, run_scalar_i64, server_error, PgBind,
+        run_parameterized_exec, run_parameterized_json, run_parameterized_scalar_i64,
+        run_raw_exec, server_error, PgBind,
     },
     security::{
         check_ban, hash_password, normalize_username, parse_session_cookie, random_hex, unix_now,
@@ -146,8 +146,9 @@ pub async fn request_password_reset(
             return Err(server_error("Enter a valid email address.".into()));
         }
 
-        let smtp_config = run_json_query::<Option<serde_json::Value>>(
-            "SELECT COALESCE((SELECT row_to_json(m) FROM (SELECT smtp_enable, smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from_email, smtp_from_name FROM board_meta LIMIT 1) m), 'null'::json);"
+        let smtp_config = run_parameterized_json::<Option<serde_json::Value>>(
+            "SELECT COALESCE((SELECT row_to_json(m) FROM (SELECT smtp_enable, smtp_host, smtp_port, smtp_user, smtp_pass, smtp_from_email, smtp_from_name FROM board_meta LIMIT 1) m), 'null'::json);",
+            &[],
         ).await.map_err(server_error)?;
 
         let config = match smtp_config {
@@ -418,13 +419,10 @@ async fn login_account_impl(input: LoginForm) -> Result<AuthResponse, String> {
         return Err(format!("Your account has been banned. Reason: {msg}"));
     }
 
-    run_exec(&format!(
-        "UPDATE users
-         SET status = 'Online',
-             last_seen = 'just now'
-         WHERE id = {};",
-        user.id
-    ))
+    run_parameterized_exec(
+        "UPDATE users SET status = 'Online', last_seen = 'just now' WHERE id = $1;",
+        &[&user.id as &(dyn PgBind + Sync)],
+    )
     .await?;
 
     let (session_token, csrf_token) = create_session(user.id).await?;
@@ -514,14 +512,15 @@ async fn logout_account_impl(headers: HeaderMap) -> Result<(), String> {
 
 #[cfg(feature = "server")]
 async fn check_installed_impl() -> Result<bool, String> {
-    let count = run_scalar_i64(
+    let count = run_parameterized_scalar_i64(
         "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'board_meta' AND table_schema = 'public';",
+        &[],
     )
     .await?;
     if count == 0 {
         return Ok(false);
     }
-    let rows = run_scalar_i64("SELECT COUNT(*) FROM board_meta;").await?;
+    let rows = run_parameterized_scalar_i64("SELECT COUNT(*) FROM board_meta;", &[]).await?;
     Ok(rows > 0)
 }
 
@@ -562,14 +561,14 @@ async fn install_board_impl(input: InstallForm) -> Result<AuthResponse, String> 
         for stmt in sql.split(';') {
             let stmt = stmt.trim();
             if !stmt.is_empty() {
-                run_exec(&format!("{stmt};")).await?;
+                run_raw_exec(&format!("{stmt};")).await?;
             }
         }
     } else {
         return Err("db/schema.sql not found.".to_string());
     }
 
-    run_exec(
+    run_parameterized_exec(
         "INSERT INTO groups (id, title, read_board, post_topics, post_replies, edit_posts, delete_posts,
                             delete_topic, move_topic, sticky_topic, close_topic,
                             manage_users, manage_forums, manage_categories, manage_bans, manage_groups, manage_settings,
@@ -580,6 +579,7 @@ async fn install_board_impl(input: InstallForm) -> Result<AuthResponse, String> 
              (3, 'Guests', true, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false),
              (4, 'Members', true, true, true, true, false, false, false, false, false, false, false, false, false, false, false, false, false)
          ON CONFLICT (id) DO NOTHING;",
+        &[],
     )
     .await?;
 
@@ -629,8 +629,9 @@ async fn install_board_impl(input: InstallForm) -> Result<AuthResponse, String> 
     )
     .await?;
 
-    run_exec(
+    run_parameterized_exec(
         "INSERT INTO categories (name, description, sort_order) VALUES ('General', 'Main discussion area.', 1);",
+        &[],
     )
     .await?;
 
